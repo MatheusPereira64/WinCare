@@ -641,26 +641,90 @@ ipcMain.handle("wincare:restartAsAdmin", async () => {
   const already = await isWindowsAdmin();
   if (already) return { ok: true, reason: "already-elevated" };
 
-  const exe = process.execPath.replace(/'/g, "''");
-  let ps;
-  if (app.isPackaged) {
-    ps = `Start-Process -FilePath '${exe}' -Verb RunAs`;
-  } else {
-    const cwd = process.cwd().replace(/'/g, "''");
-    ps = `Start-Process -FilePath '${exe}' -ArgumentList '.','--wincare-admin' -WorkingDirectory '${cwd}' -Verb RunAs`;
-  }
+  try {
+    const projectRoot = path.resolve(path.join(__dirname, ".."));
+    const brandedExe = path.join(projectRoot, ".electron-dev", "WinCare.exe");
+    const realAsar = path.join(path.dirname(process.execPath), "resources", "app.asar");
+    // .electron-dev copia o Electron com default_app.asar — app.isPackaged fica true
+    // mesmo em desenvolvimento. Só o app.asar de release é pacote real.
+    const isReleaseBuild = fs.existsSync(realAsar);
+    const exe =
+      !isReleaseBuild && fs.existsSync(brandedExe) ? brandedExe : process.execPath;
+    const args = isReleaseBuild ? [] : [projectRoot];
+    const cwd = isReleaseBuild ? path.dirname(process.execPath) : projectRoot;
 
-  return new Promise((resolve) => {
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps}"`, (err) => {
+    logger.log("admin", "Preparando elevação", {
+      isPackaged: app.isPackaged,
+      isReleaseBuild,
+      exe,
+      args,
+    });
+
+    await elevateProcess(exe, args, cwd, { delayMs: 1200 });
+    setTimeout(() => app.quit(), 200);
+    return { ok: true };
+  } catch (error) {
+    logger.error("admin", "Falha ao elevar", error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao solicitar administrador.",
+    };
+  }
+});
+
+/**
+ * Eleva um processo no Windows (seguro com espaços no path, ex.: LAB ITEGAM).
+ * 1) Gera um .cmd com paths absolutos entre aspas
+ * 2) Eleva esse .cmd via Shell.Application (VBS) — evita ArgumentList quebrado
+ * 3) O .cmd espera um pouco para a instância atual liberar o single-instance lock
+ */
+function elevateProcess(exePath, args, workingDirectory, options = {}) {
+  const delaySec = Math.max(2, Math.ceil((options.delayMs || 800) / 1000) + 1);
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const batFile = path.join(os.tmpdir(), `wincare-elevate-${id}.cmd`);
+  const vbsFile = path.join(os.tmpdir(), `wincare-elevate-${id}.vbs`);
+
+  const quotedArgs = args.map((a) => `"${String(a).replace(/"/g, "")}"`).join(" ");
+  const bat = [
+    "@echo off",
+    `ping -n ${delaySec} 127.0.0.1 >nul`,
+    `cd /d "${workingDirectory}"`,
+    `"${exePath}" ${quotedArgs}`.trim(),
+    'del "%~f0" >nul 2>&1',
+    "",
+  ].join("\r\n");
+  fs.writeFileSync(batFile, bat, "utf8");
+
+  // ShellExecute runas — FileName é o .cmd; parâmetros vazios (paths já estão no .cmd).
+  const vbs = [
+    'Set sh = CreateObject("Shell.Application")',
+    `sh.ShellExecute "${batFile.replace(/"/g, '""')}", "", "", "runas", 0`,
+    "",
+  ].join("\r\n");
+  fs.writeFileSync(vbsFile, vbs, "utf8");
+
+  logger.log("admin", "Elevando via UAC", { exe: exePath, args, batFile });
+
+  return new Promise((resolve, reject) => {
+    exec(`cscript //nologo "${vbsFile}"`, { windowsHide: true }, (err) => {
+      try {
+        fs.unlinkSync(vbsFile);
+      } catch {
+        /* ignore */
+      }
       if (err) {
-        resolve({ ok: false, reason: err.message });
+        try {
+          fs.unlinkSync(batFile);
+        } catch {
+          /* ignore */
+        }
+        reject(err);
         return;
       }
-      resolve({ ok: true });
-      setTimeout(() => app.quit(), 400);
+      resolve();
     });
   });
-});
+}
 
 const psJson = (script, timeoutMs = 20000) =>
   new Promise((resolve, reject) => {

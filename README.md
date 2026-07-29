@@ -66,6 +66,7 @@ Saída em `electron-release/WinCare-win32-x64/WinCare.exe`. Para comandos admini
 | Comando | Descrição |
 | --- | --- |
 | `npm run wincare:dev` | Compila e abre o WinCare (desktop) |
+| `npm run wincare:admin` | Compila e abre o WinCare **como administrador** |
 | `npm run wincare:dev:debug` | Igual ao dev, com DevTools (F12) |
 | `npm run wincare:build` | Compila só a interface em `dist/` |
 | `npm run wincare:package` | Gera o `.exe` para distribuição |
@@ -134,10 +135,15 @@ Atalho global: **Ctrl + K** foca a busca de ferramentas na página atual.
 
 ## Privilégios de administrador
 
-Várias ferramentas (SFC, DISM, `netsh`, limpeza do Windows Update etc.) exigem elevação. No app:
+Várias ferramentas (SFC, DISM, `netsh`, limpeza do Windows Update etc.) exigem elevação. **No modo desenvolvimento**, use uma destas opções:
 
-1. Use **Executar como admin** na barra superior, ou
-2. Clique com o botão direito no `WinCare.exe` → **Executar como administrador**
+1. **`npm run wincare:admin`** — recomendado
+2. **`WinCare-Admin.cmd`** na raiz do projeto (duplo clique)
+3. Botão **Executar como admin** dentro do app (barra superior)
+
+> **Não** execute diretamente `.electron-dev\WinCare.exe` como administrador — sem o caminho do projeto, o Electron abre a tela padrão vazia.
+
+Após **`npm run wincare:package`**, use o `WinCare.exe` em `electron-release/` — clique com o botão direito → **Executar como administrador**.
 
 O Windows exibirá o prompt UAC quando necessário.
 
@@ -156,6 +162,7 @@ O Windows exibirá o prompt UAC quando necessário.
 
 | Problema | O que fazer |
 | --- | --- |
+| Tela padrão do Electron (“run a local app…”) | Você abriu `.electron-dev\WinCare.exe` sem argumentos. Use `npm run wincare:dev` ou `WinCare-Admin.cmd` |
 | Processo aparece como "Electron" | Feche todas as instâncias e rode `npm run wincare:dev` de novo |
 | Erro de cache / ICU | Feche o app, apague `.electron-dev/` e execute `wincare:dev` novamente |
 | Ferramenta presa em "Executando..." | `npm run wincare:clear-data` e reinicie o app |
