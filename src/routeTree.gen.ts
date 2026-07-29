@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as RedeRouteImport } from './routes/rede'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SistemaRoute = SistemaRouteImport.update({
+  id: '/sistema',
+  path: '/sistema',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReparoRoute = ReparoRouteImport.update({
   id: '/reparo',
   path: '/reparo',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
+  '/sistema': typeof SistemaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
+  '/sistema': typeof SistemaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
+  '/sistema': typeof SistemaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/limpeza' | '/rede' | '/reparo'
+  fullPaths: '/' | '/limpeza' | '/rede' | '/reparo' | '/sistema'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/limpeza' | '/rede' | '/reparo'
-  id: '__root__' | '/' | '/limpeza' | '/rede' | '/reparo'
+  to: '/' | '/limpeza' | '/rede' | '/reparo' | '/sistema'
+  id: '__root__' | '/' | '/limpeza' | '/rede' | '/reparo' | '/sistema'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   LimpezaRoute: typeof LimpezaRoute
   RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
+  SistemaRoute: typeof SistemaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sistema': {
+      id: '/sistema'
+      path: '/sistema'
+      fullPath: '/sistema'
+      preLoaderRoute: typeof SistemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reparo': {
       id: '/reparo'
       path: '/reparo'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   LimpezaRoute: LimpezaRoute,
   RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
+  SistemaRoute: SistemaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
