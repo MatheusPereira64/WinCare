@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import tsConfigPaths from "vite-tsconfig-paths";
 
 /**
  * Build used for the Electron desktop shell (client-only SPA, loaded via file://).
@@ -10,9 +10,13 @@ import tsConfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   base: "./",
   root: "electron/renderer",
-  plugins: [react(), tailwindcss(), tsConfigPaths({ root: import.meta.dirname })],
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: "../../dist",
     emptyOutDir: true,
   },
 });
+
