@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Keyboard, Moon, ShieldAlert, Sun, Zap } from "lucide-react";
+import { Keyboard, Moon, ShieldAlert, ShieldCheck, Sun, Zap } from "lucide-react";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { actions, useStore } from "@/lib/wincare/store";
 import { isNative } from "@/lib/wincare/bridge";
+import { useAdmin } from "@/lib/wincare/useAdmin";
 
 export const Route = createFileRoute("/configuracoes")({
   head: () => ({
@@ -31,6 +34,20 @@ function SettingsPage() {
   const theme = useStore((s) => s.theme);
   const autoCheck = useStore((s) => s.autoCheck);
   const confirmCritical = useStore((s) => s.confirmCritical);
+  const { native, elevated, restartAsAdmin } = useAdmin();
+
+  const handleRestartAsAdmin = async () => {
+    const out = await restartAsAdmin();
+    if (out.ok && out.reason === "already-elevated") {
+      toast.info("O WinCare já está em modo administrador.");
+      return;
+    }
+    if (out.ok) {
+      toast.info("Reiniciando com privilégios de administrador...");
+      return;
+    }
+    toast.error("Não foi possível solicitar elevação.", { description: out.reason });
+  };
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -113,15 +130,49 @@ function SettingsPage() {
         </ul>
       </Card>
 
+      <Card className="surface-panel gap-4 border-border/60 p-6">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="size-5 text-primary" />
+          <h2 className="font-semibold">Privilégios de administrador</h2>
+        </div>
+        {native ? (
+          <>
+            <Badge
+              variant="outline"
+              className={
+                elevated
+                  ? "w-fit border-success/40 bg-success/10 text-success"
+                  : "w-fit border-warning/40 bg-warning/10 text-warning"
+              }
+            >
+              {elevated ? "Executando como administrador" : "Executando como usuário padrão"}
+            </Badge>
+            <p className="text-sm text-muted-foreground">
+              Ferramentas como SFC, DISM, Prefetch e reset de rede exigem privilégios elevados. Você
+              pode reiniciar o app inteiro como administrador (sem UAC a cada comando) ou aprovar o
+              UAC apenas quando executar uma ferramenta específica.
+            </p>
+            {elevated === false && (
+              <Button className="w-fit" onClick={() => void handleRestartAsAdmin()}>
+                <ShieldCheck className="size-4" /> Executar WinCare como administrador
+              </Button>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Disponível apenas no aplicativo desktop (Electron). No navegador os comandos são simulados.
+          </p>
+        )}
+      </Card>
+
       <Card className="surface-panel gap-2 border-border/60 p-6">
         <h2 className="font-semibold">Modo de execução</h2>
         <Badge variant="outline" className="w-fit border-primary/40 text-primary">
           {isNative() ? "Nativo (Windows)" : "Demonstração (navegador)"}
         </Badge>
         <p className="text-sm text-muted-foreground">
-          No navegador os comandos são simulados com saídas realistas. Ao rodar dentro do
-          empacotamento desktop para Windows, cada botão executa o comando real, elevado como
-          Administrador.
+          No navegador os comandos são simulados com saídas realistas. No aplicativo desktop, cada
+          botão executa o comando real no Windows — com elevação automática via UAC quando necessário.
         </p>
       </Card>
     </div>

@@ -8,7 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Shield, ShieldCheck, Sun } from "lucide-react";
+import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -19,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
 import { isNative } from "@/lib/wincare/bridge";
+import { useAdmin } from "@/lib/wincare/useAdmin";
 
 function NotFoundComponent() {
   return (
@@ -127,17 +129,48 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function TopBar() {
   const theme = useStore((s) => s.theme);
+  const { native, elevated, restartAsAdmin } = useAdmin();
+
+  const handleRestartAsAdmin = async () => {
+    const out = await restartAsAdmin();
+    if (out.ok && out.reason === "already-elevated") {
+      toast.info("O WinCare já está em modo administrador.");
+      return;
+    }
+    if (out.ok) {
+      toast.info("Reiniciando com privilégios de administrador...");
+      return;
+    }
+    toast.error("Não foi possível solicitar elevação.", {
+      description: out.reason ?? "Tente clicar com o botão direito no app e escolher Executar como administrador.",
+    });
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur">
       <SidebarTrigger />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">WinCare</span>
         <Badge variant="outline" className="border-primary/40 text-primary">
           {isNative() ? "Modo nativo" : "Modo demonstração"}
         </Badge>
+        {native && elevated === true && (
+          <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+            <ShieldCheck className="size-3" /> Administrador
+          </Badge>
+        )}
+        {native && elevated === false && (
+          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
+            <Shield className="size-3" /> Usuário padrão
+          </Badge>
+        )}
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        {native && elevated === false && (
+          <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={() => void handleRestartAsAdmin()}>
+            <ShieldCheck className="size-4" /> Executar como admin
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

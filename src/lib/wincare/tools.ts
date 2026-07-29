@@ -172,7 +172,8 @@ export const TOOLS: Tool[] = [
     id: "temp",
     name: "Limpar arquivos temporários",
     description: "Remove o conteúdo de %temp% e da pasta Temp do Windows.",
-    command: 'del /q /f /s "%temp%\\*" && del /q /f /s "%windir%\\Temp\\*"',
+    command:
+      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -LiteralPath ($env:TEMP + \'\\*\') -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath ($env:WINDIR + \'\\Temp\\*\') -Recurse -Force -ErrorAction SilentlyContinue; Write-Output \'Limpeza de temporarios concluida.\'"',
     category: "cleanup",
     risk: "safe",
     estimate: 9000,
@@ -182,7 +183,8 @@ export const TOOLS: Tool[] = [
     name: "Limpar Prefetch",
     description:
       "Apaga os arquivos de pré-carregamento. O Windows recria conforme você usa os programas.",
-    command: 'del /q /f /s "%windir%\\Prefetch\\*"',
+    command:
+      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -LiteralPath ($env:WINDIR + \'\\Prefetch\\*\') -Force -ErrorAction SilentlyContinue; Write-Output \'Prefetch limpo.\'"',
     category: "cleanup",
     risk: "warning",
     requiresAdmin: true,
@@ -193,7 +195,8 @@ export const TOOLS: Tool[] = [
     id: "icon-cache",
     name: "Limpar cache do Windows",
     description: "Recria o cache de ícones e miniaturas, corrigindo imagens quebradas.",
-    command: 'del /q /f /s "%localappdata%\\Microsoft\\Windows\\Explorer\\*.db"',
+    command:
+      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -LiteralPath ($env:LOCALAPPDATA + \'\\Microsoft\\Windows\\Explorer\\*.db\') -Force -ErrorAction SilentlyContinue; Start-Process explorer; Write-Output \'Cache de icones recriado.\'"',
     category: "cleanup",
     risk: "warning",
     requiresConfirmation: true,

@@ -4,17 +4,24 @@ import type { DiskDrive, SystemInfo, Tool } from "./types";
  * Bridge to the native layer.
  *
  * When WinCare runs inside its Windows desktop shell (Electron), the preload
- * script exposes `window.wincare` and every command runs for real, elevated.
- * In the browser preview there is no OS to talk to, so we stream a realistic
- * simulation and flag it as such in the UI.
+ * script exposes `window.wincare`. Commands that require admin trigger UAC
+ * automatically when the app is not already elevated.
  */
+export interface RunOptions {
+  /** Solicita elevação via UAC para este comando (Windows). */
+  elevated?: boolean;
+}
+
 export interface NativeBridge {
   run: (
     command: string,
     onData: (chunk: string) => void,
+    options?: RunOptions,
   ) => Promise<{ code: number; result: string }>;
   systemInfo: () => Promise<SystemInfo>;
   disks: () => Promise<DiskDrive[]>;
+  isElevated: () => Promise<boolean>;
+  restartAsAdmin: () => Promise<{ ok: boolean; reason?: string }>;
 }
 
 export function getNative(): NativeBridge | null {

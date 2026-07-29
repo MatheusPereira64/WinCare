@@ -15,6 +15,7 @@ export interface RunState {
 }
 
 const idle: RunState = { running: false, progress: 0, lines: [], status: "idle" };
+const MAX_LOG_LINES = 400;
 
 export function useToolRunner(tool: Tool) {
   const [state, setState] = useState<RunState>(idle);
@@ -27,12 +28,7 @@ export function useToolRunner(tool: Tool) {
       const command = target ? tool.command.replace(/[^ ]+$/, target) : tool.command;
       const id = `${tool.id}-${Date.now()}`;
       const started = Date.now();
-      const lines: LogLine[] = [
-        { time: now(), text: `Executando: ${command}`, kind: "info" },
-        ...(tool.requiresAdmin
-          ? [{ time: now(), text: "Elevando privilégios de Administrador...", kind: "warn" as const }]
-          : []),
-      ];
+      const lines: LogLine[] = [{ time: now(), text: `Executando: ${command}`, kind: "info" }];
 
       setState({ running: true, progress: 4, lines, status: "running" });
 
@@ -54,8 +50,20 @@ export function useToolRunner(tool: Tool) {
       }, 260);
 
       const push = (text: string, kind: LogLine["kind"] = "output") => {
-        const line = { time: now(), text, kind };
-        lines.push(line);
+        if (lines.length >= MAX_LOG_LINES) return;
+        lines.push({ time: now(), text, kind });
+        setState((s) => ({ ...s, lines: [...lines] }));
+      };
+
+      const pushChunk = (chunk: string, kind: LogLine["kind"] = "output") => {
+        if (lines.length >= MAX_LOG_LINES) return;
+        const next = chunk
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .slice(0, MAX_LOG_LINES - lines.length)
+          .map((text) => ({ time: now(), text, kind }));
+        if (!next.length) return;
+        lines.push(...next);
         setState((s) => ({ ...s, lines: [...lines] }));
       };
 
@@ -63,13 +71,16 @@ export function useToolRunner(tool: Tool) {
       let result = "";
       try {
         const native = getNative();
+        let elevated = false;
+        if (native && tool.requiresAdmin) {
+          const isAdmin = await native.isElevated();
+          elevated = !isAdmin;
+          if (elevated) {
+            push("Solicitando elevação via UAC (Executar como administrador)...", "warn");
+          }
+        }
         const out = native
-          ? await native.run(command, (chunk) =>
-              chunk
-                .split(/\r?\n/)
-                .filter(Boolean)
-                .forEach((l) => push(l)),
-            )
+          ? await native.run(command, (chunk) => pushChunk(chunk), { elevated })
           : await simulateRun({ ...tool, command }, (l) => push(l));
         code = out.code;
         result = out.result;

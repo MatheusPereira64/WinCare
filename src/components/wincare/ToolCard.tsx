@@ -127,9 +127,11 @@ export function ToolCard({ tool }: { tool: Tool }) {
               <TriangleAlert className="size-5 text-warning" /> Confirmar execução
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {tool.name} executa <span className="font-mono">{tool.command}</span> com privilégios
-              elevados. Nível de risco: {RISK_LABEL[tool.risk]}. Feche seus trabalhos antes de
-              continuar — algumas ações exigem reiniciar o computador.
+              {tool.name} executa <span className="font-mono">{tool.command}</span>.
+              {tool.requiresAdmin &&
+                " Será exibido o prompt UAC (Executar como administrador) se o app não estiver elevado."}{" "}
+              Nível de risco: {RISK_LABEL[tool.risk]}. Feche seus trabalhos antes de continuar — algumas
+              ações exigem reiniciar o computador.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

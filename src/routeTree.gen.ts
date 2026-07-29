@@ -9,55 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as SistemaRouteImport } from './routes/sistema'
-import { Route as ReparoRouteImport } from './routes/reparo'
-import { Route as RedeRouteImport } from './routes/rede'
-import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
-import { Route as LogsRouteImport } from './routes/logs'
-import { Route as LimpezaRouteImport } from './routes/limpeza'
-import { Route as DiscoRouteImport } from './routes/disco'
-import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as DiscoRouteImport } from './routes/disco'
+import { Route as LimpezaRouteImport } from './routes/limpeza'
+import { Route as LogsRouteImport } from './routes/logs'
+import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
+import { Route as RedeRouteImport } from './routes/rede'
+import { Route as ReparoRouteImport } from './routes/reparo'
+import { Route as SistemaRouteImport } from './routes/sistema'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SistemaRoute = SistemaRouteImport.update({
-  id: '/sistema',
-  path: '/sistema',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReparoRoute = ReparoRouteImport.update({
-  id: '/reparo',
-  path: '/reparo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RedeRoute = RedeRouteImport.update({
-  id: '/rede',
-  path: '/rede',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MonitoramentoRoute = MonitoramentoRouteImport.update({
-  id: '/monitoramento',
-  path: '/monitoramento',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LogsRoute = LogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LimpezaRoute = LimpezaRouteImport.update({
-  id: '/limpeza',
-  path: '/limpeza',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiscoRoute = DiscoRouteImport.update({
-  id: '/disco',
-  path: '/disco',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
@@ -65,9 +30,44 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DiscoRoute = DiscoRouteImport.update({
+  id: '/disco',
+  path: '/disco',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LimpezaRoute = LimpezaRouteImport.update({
+  id: '/limpeza',
+  path: '/limpeza',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoramentoRoute = MonitoramentoRouteImport.update({
+  id: '/monitoramento',
+  path: '/monitoramento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedeRoute = RedeRouteImport.update({
+  id: '/rede',
+  path: '/rede',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReparoRoute = ReparoRouteImport.update({
+  id: '/reparo',
+  path: '/reparo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SistemaRoute = SistemaRouteImport.update({
+  id: '/sistema',
+  path: '/sistema',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -162,60 +162,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sistema': {
-      id: '/sistema'
-      path: '/sistema'
-      fullPath: '/sistema'
-      preLoaderRoute: typeof SistemaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reparo': {
-      id: '/reparo'
-      path: '/reparo'
-      fullPath: '/reparo'
-      preLoaderRoute: typeof ReparoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rede': {
-      id: '/rede'
-      path: '/rede'
-      fullPath: '/rede'
-      preLoaderRoute: typeof RedeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/monitoramento': {
-      id: '/monitoramento'
-      path: '/monitoramento'
-      fullPath: '/monitoramento'
-      preLoaderRoute: typeof MonitoramentoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/logs': {
-      id: '/logs'
-      path: '/logs'
-      fullPath: '/logs'
-      preLoaderRoute: typeof LogsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/limpeza': {
-      id: '/limpeza'
-      path: '/limpeza'
-      fullPath: '/limpeza'
-      preLoaderRoute: typeof LimpezaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/disco': {
-      id: '/disco'
-      path: '/disco'
-      fullPath: '/disco'
-      preLoaderRoute: typeof DiscoRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configuracoes': {
@@ -225,11 +176,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/disco': {
+      id: '/disco'
+      path: '/disco'
+      fullPath: '/disco'
+      preLoaderRoute: typeof DiscoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/limpeza': {
+      id: '/limpeza'
+      path: '/limpeza'
+      fullPath: '/limpeza'
+      preLoaderRoute: typeof LimpezaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoramento': {
+      id: '/monitoramento'
+      path: '/monitoramento'
+      fullPath: '/monitoramento'
+      preLoaderRoute: typeof MonitoramentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rede': {
+      id: '/rede'
+      path: '/rede'
+      fullPath: '/rede'
+      preLoaderRoute: typeof RedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reparo': {
+      id: '/reparo'
+      path: '/reparo'
+      fullPath: '/reparo'
+      preLoaderRoute: typeof ReparoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sistema': {
+      id: '/sistema'
+      path: '/sistema'
+      fullPath: '/sistema'
+      preLoaderRoute: typeof SistemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -250,3 +250,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

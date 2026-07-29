@@ -42,12 +42,23 @@ export function FullCheckCard() {
       setCurrent(tool.name);
       push(`Executando: ${tool.command}`, "info");
       try {
+        let elevated = false;
+        if (native && tool.requiresAdmin) {
+          const isAdmin = await native.isElevated();
+          elevated = !isAdmin;
+          if (elevated) {
+            push("Solicitando elevação via UAC...", "warn");
+          }
+        }
         const out = native
-          ? await native.run(tool.command, (chunk) =>
-              chunk
-                .split(/\r?\n/)
-                .filter(Boolean)
-                .forEach((l) => push(l)),
+          ? await native.run(
+              tool.command,
+              (chunk) =>
+                chunk
+                  .split(/\r?\n/)
+                  .filter(Boolean)
+                  .forEach((l) => push(l)),
+              { elevated },
             )
           : await simulateRun(tool, (l) => push(l));
         push(`Resultado: ${out.result}`, out.code === 0 ? "success" : "error");
