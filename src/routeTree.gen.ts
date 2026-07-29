@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as RedeRouteImport } from './routes/rede'
@@ -19,6 +20,11 @@ import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SistemaRoute = SistemaRouteImport.update({
   id: '/sistema',
   path: '/sistema',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/rede'
     | '/reparo'
     | '/sistema'
+    | '/sitemap.xml'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/rede'
     | '/reparo'
     | '/sistema'
+    | '/sitemap.xml'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/rede'
     | '/reparo'
     | '/sistema'
+    | '/sitemap.xml'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,10 +157,18 @@ export interface RootRouteChildren {
   RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
   SistemaRoute: typeof SistemaRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sistema': {
       id: '/sistema'
       path: '/sistema'
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
   SistemaRoute: SistemaRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
