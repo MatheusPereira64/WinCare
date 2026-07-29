@@ -13,6 +13,7 @@ import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as RedeRouteImport } from './routes/rede'
 import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
+import { Route as LogsRouteImport } from './routes/logs'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const MonitoramentoRoute = MonitoramentoRouteImport.update({
   path: '/monitoramento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LimpezaRoute = LimpezaRouteImport.update({
   id: '/limpeza',
   path: '/limpeza',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/disco'
     | '/limpeza'
+    | '/logs'
     | '/monitoramento'
     | '/rede'
     | '/reparo'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/disco'
     | '/limpeza'
+    | '/logs'
     | '/monitoramento'
     | '/rede'
     | '/reparo'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/disco'
     | '/limpeza'
+    | '/logs'
     | '/monitoramento'
     | '/rede'
     | '/reparo'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiscoRoute: typeof DiscoRoute
   LimpezaRoute: typeof LimpezaRoute
+  LogsRoute: typeof LogsRoute
   MonitoramentoRoute: typeof MonitoramentoRoute
   RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MonitoramentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/limpeza': {
       id: '/limpeza'
       path: '/limpeza'
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiscoRoute: DiscoRoute,
   LimpezaRoute: LimpezaRoute,
+  LogsRoute: LogsRoute,
   MonitoramentoRoute: MonitoramentoRoute,
   RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
