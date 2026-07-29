@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Keyboard, Moon, ShieldAlert, ShieldCheck, Sun, Zap } from "lucide-react";
+import { Keyboard, Moon, ShieldAlert, ShieldCheck, Sun, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { actions, useStore } from "@/lib/wincare/store";
-import { isNative } from "@/lib/wincare/bridge";
+import { isNative, getNative } from "@/lib/wincare/bridge";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -163,6 +163,36 @@ function SettingsPage() {
             Disponível apenas no aplicativo desktop (Electron). No navegador os comandos são simulados.
           </p>
         )}
+      </Card>
+
+      <Card className="surface-panel gap-4 border-border/60 p-6">
+        <div className="flex items-center gap-2">
+          <Trash2 className="size-5 text-primary" />
+          <h2 className="font-semibold">Dados locais</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Limpa o histórico de execuções salvo neste computador. Use se alguma ferramenta ficou presa
+          em &quot;Executando...&quot;.
+        </p>
+        <Button
+          variant="secondary"
+          className="w-fit"
+          onClick={async () => {
+            actions.clearPersistedState();
+            const native = getNative();
+            if (native?.clearStorage) {
+              await native.clearStorage();
+            }
+            toast.success("Histórico local limpo.");
+            window.location.reload();
+          }}
+        >
+          <Trash2 className="size-4" /> Limpar histórico local
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          No menu superior do app: <strong>WinCare → Limpar histórico local</strong>. Esse comando
+          não funciona no PowerShell — só dentro do WinCare.
+        </p>
       </Card>
 
       <Card className="surface-panel gap-2 border-border/60 p-6">

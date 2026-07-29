@@ -1,5 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ToolSection } from "@/components/wincare/ToolSection";
+import { isNative } from "@/lib/wincare/bridge";
+import type { ToolCategory } from "@/lib/wincare/types";
+
+const NETWORK_CATEGORIES: ToolCategory[] = ["network"];
+
+function RedePage() {
+  return (
+    <ToolSection
+      title="Rede"
+      developmentBadge="Em desenvolvimento"
+      subtitle={
+        isNative()
+          ? "Testes de conectividade e reparo da pilha de rede — comandos reais do Windows. Esta seção ainda está instável no modo nativo."
+          : "Modo demonstração — use o app desktop (npm run electron:dev) para testes reais."
+      }
+      categories={NETWORK_CATEGORIES}
+    />
+  );
+}
 
 export const Route = createFileRoute("/rede")({
   head: () => ({
@@ -17,11 +36,5 @@ export const Route = createFileRoute("/rede")({
       },
     ],
   }),
-  component: () => (
-    <ToolSection
-      title="Rede"
-      subtitle="Testes de conectividade e reparo da pilha de rede do Windows."
-      categories={["network"]}
-    />
-  ),
+  component: RedePage,
 });

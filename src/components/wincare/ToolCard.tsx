@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Copy, Loader2, Play, Star, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatLog, useToolRunner } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
-import { RISK_LABEL } from "@/lib/wincare/tools";
+import { getCommandPreview, RISK_LABEL } from "@/lib/wincare/tools";
 import type { Tool } from "@/lib/wincare/types";
 import { LogView } from "./LogView";
 
@@ -29,19 +29,34 @@ const riskStyle: Record<string, string> = {
   advanced: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
-export function ToolCard({ tool }: { tool: Tool }) {
-  const { state, run } = useToolRunner(tool);
+interface ToolCardProps {
+  tool: Tool;
+  confirmCritical?: boolean;
+  onRequestConfirm?: (execute: () => void) => void;
+}
+
+function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProps) {
+  const { state, run, reset } = useToolRunner(tool);
   const { isFavorite, toggle } = useFavorite(tool.id);
-  const confirmCritical = useStore((s) => s.confirmCritical);
+  const storeConfirmCritical = useStore((s) => s.confirmCritical);
   const [target, setTarget] = useState(tool.input?.defaultValue ?? "");
   const [confirming, setConfirming] = useState(false);
+  const shouldConfirm = confirmCritical ?? storeConfirmCritical;
+
+  const execute = () => {
+    void run(target || undefined);
+  };
 
   const start = () => {
-    if (tool.requiresConfirmation && confirmCritical) {
+    if (tool.requiresConfirmation && shouldConfirm) {
+      if (onRequestConfirm) {
+        onRequestConfirm(execute);
+        return;
+      }
       setConfirming(true);
       return;
     }
-    void run(target || undefined);
+    execute();
   };
 
   const copy = async () => {
@@ -65,8 +80,11 @@ export function ToolCard({ tool }: { tool: Tool }) {
             )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{tool.description}</p>
-          <code className="mt-3 block truncate rounded-md bg-muted/60 px-2 py-1 font-mono text-xs text-muted-foreground">
-            {tool.command}
+          <code
+            className="mt-3 block truncate rounded-md bg-muted/60 px-2 py-1 font-mono text-xs text-muted-foreground"
+            title={tool.command}
+          >
+            {getCommandPreview(tool)}
           </code>
         </div>
         <Button
@@ -99,6 +117,11 @@ export function ToolCard({ tool }: { tool: Tool }) {
           {state.running ? <Loader2 className="animate-spin" /> : <Play />}
           {state.running ? "Executando..." : tool.launcher ? "Abrir" : "Executar"}
         </Button>
+        {state.running && (
+          <Button variant="ghost" onClick={reset}>
+            Cancelar
+          </Button>
+        )}
         {state.lines.length > 0 && (
           <Button variant="secondary" onClick={copy}>
             <Copy /> Copiar log
@@ -120,28 +143,51 @@ export function ToolCard({ tool }: { tool: Tool }) {
         </p>
       )}
 
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <TriangleAlert className="size-5 text-warning" /> Confirmar execução
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {tool.name} executa <span className="font-mono">{tool.command}</span>.
-              {tool.requiresAdmin &&
-                " Será exibido o prompt UAC (Executar como administrador) se o app não estiver elevado."}{" "}
-              Nível de risco: {RISK_LABEL[tool.risk]}. Feche seus trabalhos antes de continuar — algumas
-              ações exigem reiniciar o computador.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void run(target || undefined)}>
-              Executar mesmo assim
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!onRequestConfirm && confirming && (
+        <AlertDialog open={confirming} onOpenChange={setConfirming}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <TriangleAlert className="size-5 text-warning" /> Confirmar execução
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    {tool.name} executa{" "}
+                    <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-xs">
+                      {getCommandPreview(tool)}
+                    </code>
+                    .
+                  </p>
+                  {tool.requiresAdmin && (
+                    <p>
+                      Será exibido o prompt UAC (Executar como administrador) se o app não estiver
+                      elevado.
+                    </p>
+                  )}
+                  <p>
+                    Nível de risco: {RISK_LABEL[tool.risk]}. Feche seus trabalhos antes de continuar
+                    — algumas ações exigem reiniciar o computador.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setConfirming(false);
+                  execute();
+                }}
+              >
+                Executar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </Card>
   );
 }
+
+export const ToolCard = memo(ToolCardInner);

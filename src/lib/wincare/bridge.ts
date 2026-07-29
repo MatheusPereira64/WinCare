@@ -10,6 +10,14 @@ import type { DiskDrive, SystemInfo, Tool } from "./types";
 export interface RunOptions {
   /** Solicita elevação via UAC para este comando (Windows). */
   elevated?: boolean;
+  /** Encerra o processo após este tempo (ms) no modo nativo. */
+  timeoutMs?: number;
+}
+
+export interface RunResult {
+  code: number;
+  result: string;
+  output?: string;
 }
 
 export interface NativeBridge {
@@ -17,11 +25,18 @@ export interface NativeBridge {
     command: string,
     onData: (chunk: string) => void,
     options?: RunOptions,
-  ) => Promise<{ code: number; result: string }>;
+  ) => Promise<RunResult>;
+  /** Executa ferramentas de rede por ID — caminho estável no Electron. */
+  runNetwork: (
+    toolId: string,
+    target?: string,
+    options?: RunOptions,
+  ) => Promise<RunResult>;
   systemInfo: () => Promise<SystemInfo>;
   disks: () => Promise<DiskDrive[]>;
   isElevated: () => Promise<boolean>;
   restartAsAdmin: () => Promise<{ ok: boolean; reason?: string }>;
+  clearStorage?: () => Promise<{ ok: boolean }>;
 }
 
 export function getNative(): NativeBridge | null {
@@ -120,9 +135,8 @@ const SIM_OUTPUT: Record<string, string[]> = {
     "Addresses: 2800:3f0:4001:830::200e, 142.250.218.174",
   ],
   speedtest: [
-    "Medindo latência...  12 ms",
-    "Medindo download... 248,6 Mbps",
-    "Medindo upload...    96,4 Mbps",
+    "Baixando 1 MB para medir a velocidade...",
+    "Download: 248,6 Mbps em 0,3s",
     "Teste concluído.",
   ],
   temp: [
@@ -166,7 +180,7 @@ const SIM_RESULT: Record<string, string> = {
   ping: "0% de perda, latência média 12 ms.",
   tracert: "Rota completa em 4 saltos.",
   nslookup: "Domínio resolvido com sucesso.",
-  speedtest: "248,6 Mbps download / 96,4 Mbps upload.",
+  speedtest: "248,6 Mbps download (1 MB baixado).",
   temp: "2,7 GB liberados.",
   prefetch: "142 MB liberados.",
   "icon-cache": "Cache de ícones recriado.",

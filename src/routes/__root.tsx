@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -186,6 +187,19 @@ function TopBar() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    const unlock = () => {
+      document.body.style.removeProperty("pointer-events");
+      document.body.style.removeProperty("overflow");
+      document.body.removeAttribute("data-scroll-locked");
+      document.documentElement.removeAttribute("data-scroll-locked");
+    };
+    unlock();
+    const id = requestAnimationFrame(unlock);
+    return () => cancelAnimationFrame(id);
+  }, [pathname]);
 
   useEffect(() => {
     hydrateStore();

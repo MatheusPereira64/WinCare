@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getNative, simulateRun } from "./bridge";
+import { sanitizeNetworkTarget } from "./network";
 import { actions } from "./store";
+import { resolveCommand } from "./tools";
 import type { LogLine, RunRecord, Tool } from "./types";
 
 const now = () =>
@@ -20,12 +22,38 @@ const MAX_LOG_LINES = 400;
 export function useToolRunner(tool: Tool) {
   const [state, setState] = useState<RunState>(idle);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const runToken = useRef(0);
 
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
 
+  const reset = useCallback(() => {
+    runToken.current += 1;
+    if (timer.current) clearInterval(timer.current);
+    setState(idle);
+  }, []);
+
   const run = useCallback(
-    async (target?: string) => {
-      const command = target ? tool.command.replace(/[^ ]+$/, target) : tool.command;
+    async (rawTarget?: string) => {
+      const token = ++runToken.current;
+      let target = rawTarget?.trim();
+
+      if (tool.category === "network" && tool.input && target) {
+        try {
+          target = sanitizeNetworkTarget(target);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Destino inválido.";
+          setState({
+            running: false,
+            progress: 0,
+            lines: [{ time: now(), text: message, kind: "error" }],
+            result: message,
+            status: "error",
+          });
+          return;
+        }
+      }
+
+      const command = resolveCommand(tool, target);
       const id = `${tool.id}-${Date.now()}`;
       const started = Date.now();
       const lines: LogLine[] = [{ time: now(), text: `Executando: ${command}`, kind: "info" }];
@@ -39,15 +67,32 @@ export function useToolRunner(tool: Tool) {
         command,
         startedAt: started,
         status: "running",
-        lines,
+        lines: [...lines],
         result: undefined,
       };
-      actions.upsertRun(record);
 
       const estimate = tool.estimate ?? 6000;
       timer.current = setInterval(() => {
         setState((s) => ({ ...s, progress: Math.min(94, s.progress + 100 / (estimate / 260)) }));
       }, 260);
+
+      // Deixa a UI renderizar "Executando..." antes do IPC bloquear o fluxo async.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      let pendingChunkLines: string[] = [];
+      let chunkFrame: number | null = null;
+
+      const flushChunkLines = () => {
+        chunkFrame = null;
+        if (!pendingChunkLines.length || lines.length >= MAX_LOG_LINES) return;
+        const batch = pendingChunkLines.splice(0, MAX_LOG_LINES - lines.length);
+        for (const text of batch) {
+          lines.push({ time: now(), text, kind: "output" });
+        }
+        setState((s) => ({ ...s, lines: [...lines] }));
+      };
 
       const push = (text: string, kind: LogLine["kind"] = "output") => {
         if (lines.length >= MAX_LOG_LINES) return;
@@ -55,16 +100,16 @@ export function useToolRunner(tool: Tool) {
         setState((s) => ({ ...s, lines: [...lines] }));
       };
 
-      const pushChunk = (chunk: string, kind: LogLine["kind"] = "output") => {
+      const pushChunk = (chunk: string) => {
         if (lines.length >= MAX_LOG_LINES) return;
-        const next = chunk
-          .split(/\r?\n/)
-          .filter(Boolean)
-          .slice(0, MAX_LOG_LINES - lines.length)
-          .map((text) => ({ time: now(), text, kind }));
-        if (!next.length) return;
-        lines.push(...next);
-        setState((s) => ({ ...s, lines: [...lines] }));
+        pendingChunkLines.push(
+          ...chunk
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .slice(0, MAX_LOG_LINES - lines.length - pendingChunkLines.length),
+        );
+        if (!pendingChunkLines.length || chunkFrame !== null) return;
+        chunkFrame = requestAnimationFrame(flushChunkLines);
       };
 
       let code = 0;
@@ -79,17 +124,34 @@ export function useToolRunner(tool: Tool) {
             push("Solicitando elevação via UAC (Executar como administrador)...", "warn");
           }
         }
-        const out = native
-          ? await native.run(command, (chunk) => pushChunk(chunk), { elevated })
-          : await simulateRun({ ...tool, command }, (l) => push(l));
-        code = out.code;
-        result = out.result;
+        if (native?.runNetwork && tool.category === "network") {
+          const out = await native.runNetwork(tool.id, target, {
+            elevated,
+            timeoutMs: tool.timeoutMs,
+          });
+          code = out.code;
+          result = out.result;
+          if (out.output) pushChunk(out.output);
+        } else if (native) {
+          const out = await native.run(command, (chunk) => pushChunk(chunk), {
+            elevated,
+            timeoutMs: tool.timeoutMs,
+          });
+          code = out.code;
+          result = out.result;
+        } else {
+          const out = await simulateRun({ ...tool, command }, (l) => push(l));
+          code = out.code;
+          result = out.result;
+        }
       } catch (err) {
         code = 1;
         result = err instanceof Error ? err.message : "Falha ao executar o comando.";
+      } finally {
+        if (timer.current) clearInterval(timer.current);
+        if (chunkFrame !== null) cancelAnimationFrame(chunkFrame);
+        flushChunkLines();
       }
-
-      if (timer.current) clearInterval(timer.current);
 
       const ok = code === 0;
       push(`Resultado: ${result}`, ok ? "success" : "error");
@@ -101,6 +163,7 @@ export function useToolRunner(tool: Tool) {
         result,
       };
       actions.upsertRun(finished);
+      if (token !== runToken.current) return finished;
       setState({
         running: false,
         progress: 100,
@@ -113,7 +176,7 @@ export function useToolRunner(tool: Tool) {
     [tool],
   );
 
-  return { state, run, reset: () => setState(idle) };
+  return { state, run, reset };
 }
 
 export function formatLog(lines: LogLine[]) {

@@ -7,12 +7,16 @@ export interface Tool {
   name: string;
   description: string;
   command: string;
+  /** Versão curta exibida na UI quando o comando completo é muito longo. */
+  commandPreview?: string;
   category: ToolCategory;
   risk: RiskLevel;
   requiresConfirmation?: boolean;
   requiresAdmin?: boolean;
   /** estimated duration in ms, used for progress pacing in demo mode */
   estimate?: number;
+  /** kills the process after this many ms (native mode) */
+  timeoutMs?: number;
   /** true when the tool just opens a native Windows app */
   launcher?: boolean;
   /** accepts a free-text target (host, domain...) */

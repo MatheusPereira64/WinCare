@@ -101,7 +101,8 @@ export const TOOLS: Tool[] = [
     category: "network",
     risk: "warning",
     requiresConfirmation: true,
-    estimate: 8000,
+    estimate: 12000,
+    timeoutMs: 90000,
   },
   {
     id: "winsock",
@@ -129,21 +130,23 @@ export const TOOLS: Tool[] = [
   {
     id: "ping",
     name: "Teste de Internet",
-    description: "Envia pacotes para um servidor e mede a latência e a perda de pacotes.",
-    command: "ping google.com",
+    description: "Envia 4 pacotes para um servidor e mede a latência e a perda de pacotes.",
+    command: "ping -n 4 -w 2000 8.8.8.8",
     category: "network",
     risk: "safe",
-    estimate: 6000,
-    input: { label: "Destino", placeholder: "google.com", defaultValue: "google.com" },
+    estimate: 9000,
+    timeoutMs: 15000,
+    input: { label: "Destino", placeholder: "8.8.8.8 ou google.com", defaultValue: "8.8.8.8" },
   },
   {
     id: "tracert",
     name: "Traceroute",
-    description: "Mostra todos os saltos de rede entre o seu computador e o destino.",
-    command: "tracert google.com",
+    description: "Mostra os saltos de rede até o destino (máx. 12 saltos, timeout 1,5 s por salto).",
+    command: "tracert -h 12 -w 1500 -d google.com",
     category: "network",
     risk: "safe",
-    estimate: 12000,
+    estimate: 35000,
+    timeoutMs: 90000,
     input: { label: "Destino", placeholder: "google.com", defaultValue: "google.com" },
   },
   {
@@ -154,17 +157,20 @@ export const TOOLS: Tool[] = [
     category: "network",
     risk: "safe",
     estimate: 4000,
+    timeoutMs: 10000,
     input: { label: "Domínio", placeholder: "google.com", defaultValue: "google.com" },
   },
   {
     id: "speedtest",
     name: "Velocidade da conexão",
-    description:
-      "Mede download, upload e latência usando o serviço de teste de velocidade disponível no sistema.",
-    command: "wincare speedtest",
+    description: "Baixa 1 MB de um servidor de teste e calcula a velocidade de download.",
+    command:
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; $sw=[Diagnostics.Stopwatch]::StartNew(); Invoke-WebRequest -Uri 'https://speed.cloudflare.com/__down?bytes=1048576' -UseBasicParsing | Out-Null; $sw.Stop(); $s=$sw.Elapsed.TotalSeconds; $mb=[math]::Round(8/$s,1); Write-Output ('Download: ' + $mb + ' Mbps em ' + [math]::Round($s,1) + 's')\"",
+    commandPreview: "powershell … download de teste Cloudflare (1 MB)",
     category: "network",
     risk: "safe",
-    estimate: 10000,
+    estimate: 15000,
+    timeoutMs: 45000,
   },
 
   // ---------------- Limpeza ----------------
@@ -328,6 +334,17 @@ export const FULL_CHECK_IDS = [
 ];
 
 export const getTool = (id: string) => TOOLS.find((t) => t.id === id);
+
+export function getCommandPreview(tool: Tool) {
+  return tool.commandPreview ?? tool.command;
+}
+
+/** Substitui o host/domínio final quando a ferramenta aceita um destino customizado. */
+export function resolveCommand(tool: Tool, target?: string): string {
+  const host = target?.trim();
+  if (!host || !tool.input) return tool.command;
+  return tool.command.replace(/[^ ]+$/, host);
+}
 
 export const RISK_LABEL: Record<string, string> = {
   safe: "Seguro",

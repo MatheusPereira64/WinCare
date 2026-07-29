@@ -1,9 +1,9 @@
 import { QueryClient } from "@tanstack/react-query";
 import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
-import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { routeTree } from "@/routeTree.gen";
+import { hydrateStore } from "@/lib/wincare/store";
 import "@/styles.css";
 
 /**
@@ -15,7 +15,7 @@ const router = createRouter({
   context: { queryClient: new QueryClient() },
   history: createHashHistory(),
   defaultPreloadStaleTime: 0,
-  scrollRestoration: true,
+  scrollRestoration: false,
 });
 
 declare module "@tanstack/react-router" {
@@ -24,8 +24,6 @@ declare module "@tanstack/react-router" {
   }
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-);
+hydrateStore();
+
+createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
