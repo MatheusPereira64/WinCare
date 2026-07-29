@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as RedeRouteImport } from './routes/rede'
+import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ReparoRoute = ReparoRouteImport.update({
@@ -23,6 +24,11 @@ const RedeRoute = RedeRouteImport.update({
   path: '/rede',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LimpezaRoute = LimpezaRouteImport.update({
+  id: '/limpeza',
+  path: '/limpeza',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/limpeza': typeof LimpezaRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/rede' | '/reparo'
+  fullPaths: '/' | '/limpeza' | '/rede' | '/reparo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/rede' | '/reparo'
-  id: '__root__' | '/' | '/rede' | '/reparo'
+  to: '/' | '/limpeza' | '/rede' | '/reparo'
+  id: '__root__' | '/' | '/limpeza' | '/rede' | '/reparo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LimpezaRoute: typeof LimpezaRoute
   RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RedeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/limpeza': {
+      id: '/limpeza'
+      path: '/limpeza'
+      fullPath: '/limpeza'
+      preLoaderRoute: typeof LimpezaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LimpezaRoute: LimpezaRoute,
   RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
 }
