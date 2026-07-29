@@ -1,24 +1,138 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {
+  Clock,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Monitor,
+  RefreshCw,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { FullCheckCard } from "@/components/wincare/FullCheckCard";
+import { HealthRing } from "@/components/wincare/HealthRing";
+import { StatCard } from "@/components/wincare/StatCard";
+import { ToolCard } from "@/components/wincare/ToolCard";
+import { useStore } from "@/lib/wincare/store";
+import { TOOLS } from "@/lib/wincare/tools";
+import { useSystemInfo } from "@/lib/wincare/useSystem";
+
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Dashboard do sistema | WinCare" },
+      {
+        name: "description",
+        content:
+          "Veja CPU, memória, disco, tempo ligado, Windows Defender e a saúde geral do computador em tempo real.",
+      },
+      { property: "og:title", content: "Dashboard do sistema | WinCare" },
+      {
+        property: "og:description",
+        content: "Diagnóstico do Windows em tempo real com saúde geral de 0 a 100%.",
+      },
+    ],
+  }),
+  component: Dashboard,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Dashboard() {
+  const info = useSystemInfo();
+  const { favorites, autoCheck } = useStore((s) => ({
+    favorites: s.favorites,
+    autoCheck: s.autoCheck,
+  }));
+
+  useEffect(() => {
+    if (autoCheck) {
+      toast.info("Verificação automática concluída", {
+        description: "Nenhum problema crítico detectado na inicialização.",
+      });
+    }
+  }, [autoCheck]);
+
+  const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Estado atual de {info.hostname} — atualizado a cada 3 segundos.
+        </p>
+      </header>
+
+      <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
+        <Card className="surface-panel items-center justify-center border-border/60 p-6">
+          <HealthRing value={info.health} />
+          <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+            {info.health >= 80 ? "Sistema saudável" : "Requer atenção"}
+          </Badge>
+        </Card>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            icon={<Monitor className="size-4" />}
+            label="Computador"
+            value={info.hostname}
+            hint={`${info.osName} — Build ${info.build}`}
+          />
+          <StatCard
+            icon={<Cpu className="size-4" />}
+            label="Uso de CPU"
+            value={`${info.cpuUsage}%`}
+            progress={info.cpuUsage}
+          />
+          <StatCard
+            icon={<MemoryStick className="size-4" />}
+            label="Memória"
+            value={`${info.memoryUsage}%`}
+            hint={`${info.memoryTotalGb} GB instalados`}
+            progress={info.memoryUsage}
+          />
+          <StatCard
+            icon={<HardDrive className="size-4" />}
+            label="Espaço em disco (C:)"
+            value={`${info.diskUsage}% usado`}
+            hint={`${info.diskTotalGb} GB no total`}
+            progress={info.diskUsage}
+          />
+          <StatCard
+            icon={<Clock className="size-4" />}
+            label="Tempo ligado"
+            value={info.uptime}
+            hint={`Última atualização do Windows: ${info.lastUpdate}`}
+          />
+          <StatCard
+            icon={<ShieldCheck className="size-4" />}
+            label="Windows Defender"
+            value={info.defenderStatus}
+            hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
+          />
+        </div>
+      </div>
+
+      <FullCheckCard />
+
+      {favoriteTools.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Star className="size-4 text-warning" />
+            <h2 className="text-lg font-semibold">Favoritos</h2>
+            <RefreshCw className="size-3.5 text-muted-foreground" />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {favoriteTools.map((tool) => (
+              <ToolCard key={tool.id} tool={tool} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
