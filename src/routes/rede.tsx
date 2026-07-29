@@ -13,7 +13,7 @@ function RedePage() {
       subtitle={
         isNative()
           ? "Testes de conectividade e reparo da pilha de rede — comandos reais do Windows. Esta seção ainda está instável no modo nativo."
-          : "Modo demonstração — use o app desktop (npm run electron:dev) para testes reais."
+          : "Modo demonstração — use o app desktop (npm run wincare:dev) para testes reais."
       }
       categories={NETWORK_CATEGORIES}
     />

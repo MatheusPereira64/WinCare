@@ -1,5 +1,6 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "wincare",
+  "productName": "WinCare",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -10,12 +11,12 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "electron:build": "vite build --config vite.electron.config.ts",
-    "electron:dev": "vite build --config vite.electron.config.ts && electron .",
-    "electron:dev:debug": "vite build --config vite.electron.config.ts && set WINCARE_DEVTOOLS=1&& set ELECTRON_ENABLE_LOGGING=1&& electron .",
-    "electron:test-network": "node scripts/test-network-exec.cjs",
-    "electron:clear-data": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clear-wincare-data.ps1",
-    "electron:package": "vite build --config vite.electron.config.ts && npx @electron/packager . WinCare --platform=win32 --arch=x64 --out=electron-release --overwrite --ignore=node_modules --ignore=^/src --ignore=^/public --ignore=^/electron-release"
+    "wincare:build": "vite build --config vite.electron.config.ts",
+    "wincare:dev": "vite build --config vite.electron.config.ts && node scripts/run-electron-dev.cjs",
+    "wincare:dev:debug": "vite build --config vite.electron.config.ts && set WINCARE_DEVTOOLS=1&& set ELECTRON_ENABLE_LOGGING=1&& node scripts/run-electron-dev.cjs",
+    "wincare:test-network": "node scripts/test-network-exec.cjs",
+    "wincare:clear-data": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clear-wincare-data.ps1",
+    "wincare:package": "vite build --config vite.electron.config.ts && npx @electron/packager . WinCare --platform=win32 --arch=x64 --out=electron-release --overwrite --executable-name=WinCare --win32metadata.ProductName=WinCare --win32metadata.FileDescription=WinCare --win32metadata.InternalName=WinCare --win32metadata.OriginalFilename=WinCare.exe --ignore=node_modules --ignore=^/src --ignore=^/public --ignore=^/electron-release --ignore=^/.electron-dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -10,7 +10,15 @@ let mainWindow = null;
 
 const DIST = path.join(__dirname, "..", "dist");
 
-app.setName("WinCare");
+const APP_NAME = "WinCare";
+const APP_ID = "com.wincare.desktop";
+
+app.setName(APP_NAME);
+process.title = APP_NAME;
+
+if (process.platform === "win32") {
+  app.setAppUserModelId(APP_ID);
+}
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -51,7 +59,7 @@ function buildAppMenu() {
   const { logDir, logFile } = logger.getLogPaths();
   const template = [
     {
-      label: "WinCare",
+      label: APP_NAME,
       submenu: [
         {
           label: "Limpar histórico local",
@@ -103,7 +111,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     backgroundColor: "#0d1117",
-    title: "WinCare",
+    title: APP_NAME,
     autoHideMenuBar: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -168,7 +176,6 @@ if (hasSingleInstanceLock) {
   app.on("activate", () => BrowserWindow.getAllWindows().length === 0 && createWindow());
 }
 
-
 const MAX_STREAM_LINES = 300;
 const DEFAULT_RUN_TIMEOUT_MS = 60000;
 const SPAWN_OPTS = { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
@@ -192,12 +199,7 @@ const toText = (chunk) => {
 
 const decodeOutput = (stdout, stderr) => `${toText(stdout)}${toText(stderr)}`;
 
-const tailLine = (text) =>
-  text
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .pop() || "";
+const tailLine = (text) => text.trim().split(/\r?\n/).filter(Boolean).pop() || "";
 
 const MAX_OUTPUT_CHARS = 50000;
 
@@ -437,34 +439,47 @@ function runElevatedCommand(event, { command, runId }) {
     };
 
     const poll = () => {
-      streamFile(outFile, () => lastOutLen, (n) => {
-        lastOutLen = n;
-      });
-      streamFile(errFile, () => lastErrLen, (n) => {
-        lastErrLen = n;
-      });
+      streamFile(
+        outFile,
+        () => lastOutLen,
+        (n) => {
+          lastOutLen = n;
+        },
+      );
+      streamFile(
+        errFile,
+        () => lastErrLen,
+        (n) => {
+          lastErrLen = n;
+        },
+      );
     };
 
     const ps = `Start-Process -FilePath '${batFile.replace(/'/g, "''")}' -Verb RunAs -Wait -WindowStyle Hidden`;
-    exec(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps.replace(/"/g, '\\"')}"`, (err) => {
-      if (pollTimer) clearInterval(pollTimer);
-      poll();
+    exec(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps.replace(/"/g, '\\"')}"`,
+      (err) => {
+        if (pollTimer) clearInterval(pollTimer);
+        poll();
 
-      const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8").trim() : "";
-      const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8").trim() : "";
-      cleanupFiles([outFile, errFile, batFile]);
+        const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8").trim() : "";
+        const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8").trim() : "";
+        cleanupFiles([outFile, errFile, batFile]);
 
-      if (!stdout && !stderr && err) {
-        resolve({ code: 1, result: "Permissão de administrador negada ou cancelada." });
-        return;
-      }
+        if (!stdout && !stderr && err) {
+          resolve({ code: 1, result: "Permissão de administrador negada ou cancelada." });
+          return;
+        }
 
-      const tail = (stdout || stderr).split(/\r?\n/).filter(Boolean).pop() || "";
-      resolve({
-        code: err && !stdout ? 1 : 0,
-        result: tail || (err ? "Falha ao executar com privilégios elevados." : "Comando concluído com êxito."),
-      });
-    });
+        const tail = (stdout || stderr).split(/\r?\n/).filter(Boolean).pop() || "";
+        resolve({
+          code: err && !stdout ? 1 : 0,
+          result:
+            tail ||
+            (err ? "Falha ao executar com privilégios elevados." : "Comando concluído com êxito."),
+        });
+      },
+    );
 
     pollTimer = setInterval(poll, 400);
   });
@@ -484,92 +499,93 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
     }
 
     return await new Promise((resolve) => {
-    const child = spawn(process.platform === "win32" ? "cmd.exe" : "sh", [
-      process.platform === "win32" ? "/c" : "-c",
-      command,
-    ], SPAWN_OPTS);
-
-    let tail = "";
-    let pending = "";
-    let sentLines = 0;
-    let truncated = false;
-    let flushTimer = null;
-    let settled = false;
-
-    const finish = (code, result) => {
-      if (settled) return;
-      settled = true;
-      if (flushTimer) clearTimeout(flushTimer);
-      clearTimeout(killTimer);
-      resolve({ code, result });
-    };
-
-    const killTimer = setTimeout(() => {
-      try {
-        child.kill();
-      } catch {
-        /* ignore */
-      }
-      if (!event.sender.isDestroyed()) {
-        event.sender.send("wincare:data", {
-          runId,
-          chunk: `[Tempo limite de ${Math.round(limitMs / 1000)}s atingido — comando encerrado.]\n`,
-        });
-      }
-      finish(1, `Comando encerrado após ${Math.round(limitMs / 1000)} segundos.`);
-    }, limitMs);
-
-    const flush = () => {
-      flushTimer = null;
-      if (!pending || event.sender.isDestroyed()) return;
-
-      const parts = pending.split(/\r?\n/);
-      pending = parts.pop() ?? "";
-
-      for (const line of parts) {
-        if (!line) continue;
-        if (sentLines >= MAX_STREAM_LINES) {
-          if (!truncated) {
-            truncated = true;
-            event.sender.send("wincare:data", {
-              runId,
-              chunk: "[... saida truncada para manter a interface responsiva ...]\n",
-            });
-          }
-          continue;
-        }
-        sentLines++;
-        tail = line;
-        event.sender.send("wincare:data", { runId, chunk: `${line}\n` });
-      }
-    };
-
-    const scheduleFlush = () => {
-      if (flushTimer) return;
-      flushTimer = setTimeout(flush, 40);
-    };
-
-    const ingest = (chunk) => {
-      pending += chunk.toString("utf8");
-      scheduleFlush();
-    };
-
-    child.stdout.on("data", ingest);
-    child.stderr.on("data", ingest);
-    child.on("error", (err) => finish(1, err.message));
-    child.on("close", (code) => {
-      if (flushTimer) clearTimeout(flushTimer);
-      if (pending.trim() && sentLines < MAX_STREAM_LINES) {
-        tail = pending.trim();
-        event.sender.send("wincare:data", { runId, chunk: `${pending.trim()}\n` });
-      }
-      finish(
-        code ?? 0,
-        code === 0
-          ? tail.trim().split(/\r?\n/).filter(Boolean).pop() || "Comando concluído com êxito."
-          : `O comando terminou com o código ${code}.`,
+      const child = spawn(
+        process.platform === "win32" ? "cmd.exe" : "sh",
+        [process.platform === "win32" ? "/c" : "-c", command],
+        SPAWN_OPTS,
       );
-    });
+
+      let tail = "";
+      let pending = "";
+      let sentLines = 0;
+      let truncated = false;
+      let flushTimer = null;
+      let settled = false;
+
+      const finish = (code, result) => {
+        if (settled) return;
+        settled = true;
+        if (flushTimer) clearTimeout(flushTimer);
+        clearTimeout(killTimer);
+        resolve({ code, result });
+      };
+
+      const killTimer = setTimeout(() => {
+        try {
+          child.kill();
+        } catch {
+          /* ignore */
+        }
+        if (!event.sender.isDestroyed()) {
+          event.sender.send("wincare:data", {
+            runId,
+            chunk: `[Tempo limite de ${Math.round(limitMs / 1000)}s atingido — comando encerrado.]\n`,
+          });
+        }
+        finish(1, `Comando encerrado após ${Math.round(limitMs / 1000)} segundos.`);
+      }, limitMs);
+
+      const flush = () => {
+        flushTimer = null;
+        if (!pending || event.sender.isDestroyed()) return;
+
+        const parts = pending.split(/\r?\n/);
+        pending = parts.pop() ?? "";
+
+        for (const line of parts) {
+          if (!line) continue;
+          if (sentLines >= MAX_STREAM_LINES) {
+            if (!truncated) {
+              truncated = true;
+              event.sender.send("wincare:data", {
+                runId,
+                chunk: "[... saida truncada para manter a interface responsiva ...]\n",
+              });
+            }
+            continue;
+          }
+          sentLines++;
+          tail = line;
+          event.sender.send("wincare:data", { runId, chunk: `${line}\n` });
+        }
+      };
+
+      const scheduleFlush = () => {
+        if (flushTimer) return;
+        flushTimer = setTimeout(flush, 40);
+      };
+
+      const ingest = (chunk) => {
+        pending += chunk.toString("utf8");
+        scheduleFlush();
+      };
+
+      child.stdout.on("data", ingest);
+      child.stderr.on("data", ingest);
+      child.on("error", (err) => finish(1, err.message));
+      child.on("close", (code) => {
+        if (flushTimer) clearTimeout(flushTimer);
+        if (pending.trim() && sentLines < MAX_STREAM_LINES) {
+          tail = pending.trim();
+          event.sender.send("wincare:data", { runId, chunk: `${pending.trim()}\n` });
+        }
+        finish(
+          code ?? 0,
+          code === 0
+            ? tail.trim().split(/\r?\n/).filter(Boolean).pop() || "Comando concluído com êxito."
+            : `O comando terminou com o código ${code}.`,
+        );
+      });
     });
   } catch (error) {
     return {
@@ -590,7 +606,11 @@ ipcMain.handle("wincare:runNetwork", async (_event, payload) => {
     });
     return result;
   } catch (error) {
-    logger.error("network", "IPC runNetwork falhou", error instanceof Error ? error.message : error);
+    logger.error(
+      "network",
+      "IPC runNetwork falhou",
+      error instanceof Error ? error.message : error,
+    );
     return {
       code: 1,
       result: error instanceof Error ? error.message : "Falha ao executar teste de rede.",
@@ -695,7 +715,11 @@ ipcMain.handle("wincare:systemInfo", async () => {
     diskTotalGb: extra.diskSize ? Math.round(extra.diskSize / 1024 ** 3) : 0,
     uptime: `${days} dias, ${hours}:${minutes}`,
     defenderStatus:
-      extra.defender === true ? "Ativo e atualizado" : extra.defender === false ? "Desativado" : "Desconhecido",
+      extra.defender === true
+        ? "Ativo e atualizado"
+        : extra.defender === false
+          ? "Desativado"
+          : "Desconhecido",
     lastUpdate: extra.lastUpdate || "Desconhecida",
     health,
     simulated: false,

@@ -21,13 +21,13 @@ npm install --save-dev electron @electron/packager
 3. Rode em modo desktop (compila a interface e abre a janela do Electron):
 
 ```bash
-npm run electron:dev
+npm run wincare:dev
 ```
 
 4. Gere o executável `.exe` (pasta `electron-release/WinCare-win32-x64`):
 
 ```bash
-npm run electron:package
+npm run wincare:package
 ```
 
 > Dica: para os comandos que exigem elevação (`sfc`, `DISM`, `chkdsk /f`, `netsh`, limpeza do
@@ -47,6 +47,9 @@ npm run electron:package
 
 | Script | O que faz |
 | --- | --- |
-| `npm run electron:build` | Compila só a interface para `dist/` |
-| `npm run electron:dev` | Compila e abre a janela do Electron |
-| `npm run electron:package` | Gera o executável Windows em `electron-release/` |
+| `npm run wincare:build` | Compila só a interface para `dist/` |
+| `npm run wincare:dev` | Compila e abre a janela do WinCare (desktop) |
+| `npm run wincare:dev:debug` | Igual ao dev, com DevTools aberto |
+| `npm run wincare:package` | Gera o executável Windows em `electron-release/` |
+| `npm run wincare:clear-data` | Limpa histórico local do app |
+| `npm run wincare:test-network` | Testa comandos de rede fora da UI |

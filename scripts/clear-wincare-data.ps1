@@ -11,4 +11,4 @@ foreach ($path in $paths) {
   }
 }
 
-Write-Host "Concluido. Reinicie o WinCare com: npm run electron:dev"
+Write-Host "Concluido. Reinicie o WinCare com: npm run wincare:dev"
