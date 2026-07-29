@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReparoRouteImport } from './routes/reparo'
+import { Route as RedeRouteImport } from './routes/rede'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ReparoRoute = ReparoRouteImport.update({
   id: '/reparo',
   path: '/reparo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedeRoute = RedeRouteImport.update({
+  id: '/rede',
+  path: '/rede',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reparo'
+  fullPaths: '/' | '/rede' | '/reparo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reparo'
-  id: '__root__' | '/' | '/reparo'
+  to: '/' | '/rede' | '/reparo'
+  id: '__root__' | '/' | '/rede' | '/reparo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/reparo'
       fullPath: '/reparo'
       preLoaderRoute: typeof ReparoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rede': {
+      id: '/rede'
+      path: '/rede'
+      fullPath: '/rede'
+      preLoaderRoute: typeof RedeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
 }
 export const routeTree = rootRouteImport
