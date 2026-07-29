@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as RedeRouteImport } from './routes/rede'
+import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,6 +30,11 @@ const ReparoRoute = ReparoRouteImport.update({
 const RedeRoute = RedeRouteImport.update({
   id: '/rede',
   path: '/rede',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoramentoRoute = MonitoramentoRouteImport.update({
+  id: '/monitoramento',
+  path: '/monitoramento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LimpezaRoute = LimpezaRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
@@ -68,20 +76,36 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/disco': typeof DiscoRoute
   '/limpeza': typeof LimpezaRoute
+  '/monitoramento': typeof MonitoramentoRoute
   '/rede': typeof RedeRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/disco' | '/limpeza' | '/rede' | '/reparo' | '/sistema'
+  fullPaths:
+    | '/'
+    | '/disco'
+    | '/limpeza'
+    | '/monitoramento'
+    | '/rede'
+    | '/reparo'
+    | '/sistema'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/disco' | '/limpeza' | '/rede' | '/reparo' | '/sistema'
+  to:
+    | '/'
+    | '/disco'
+    | '/limpeza'
+    | '/monitoramento'
+    | '/rede'
+    | '/reparo'
+    | '/sistema'
   id:
     | '__root__'
     | '/'
     | '/disco'
     | '/limpeza'
+    | '/monitoramento'
     | '/rede'
     | '/reparo'
     | '/sistema'
@@ -91,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiscoRoute: typeof DiscoRoute
   LimpezaRoute: typeof LimpezaRoute
+  MonitoramentoRoute: typeof MonitoramentoRoute
   RedeRoute: typeof RedeRoute
   ReparoRoute: typeof ReparoRoute
   SistemaRoute: typeof SistemaRoute
@@ -117,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/rede'
       fullPath: '/rede'
       preLoaderRoute: typeof RedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoramento': {
+      id: '/monitoramento'
+      path: '/monitoramento'
+      fullPath: '/monitoramento'
+      preLoaderRoute: typeof MonitoramentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/limpeza': {
@@ -147,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiscoRoute: DiscoRoute,
   LimpezaRoute: LimpezaRoute,
+  MonitoramentoRoute: MonitoramentoRoute,
   RedeRoute: RedeRoute,
   ReparoRoute: ReparoRoute,
   SistemaRoute: SistemaRoute,
