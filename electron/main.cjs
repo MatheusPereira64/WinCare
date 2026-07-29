@@ -1,9 +1,18 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, protocol, net } = require("electron");
 const { spawn, exec } = require("child_process");
 const path = require("path");
+const url = require("url");
 const os = require("os");
 
 let mainWindow = null;
+
+const DIST = path.join(__dirname, "..", "dist");
+
+// ES modules can't be loaded over file:// (blocked by CORS), so the built SPA
+// is served through a custom app:// protocol instead.
+protocol.registerSchemesAsPrivileged([
+  { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -20,12 +29,21 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
+  mainWindow.loadURL("app://wincare/index.html");
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  protocol.handle("app", (request) => {
+    const { pathname } = new URL(request.url);
+    const filePath = path.join(DIST, decodeURIComponent(pathname));
+    const safePath = filePath.startsWith(DIST) ? filePath : path.join(DIST, "index.html");
+    return net.fetch(url.pathToFileURL(safePath).toString());
+  });
+  createWindow();
+});
 app.on("window-all-closed", () => process.platform !== "darwin" && app.quit());
 app.on("activate", () => BrowserWindow.getAllWindows().length === 0 && createWindow());
+
 
 /** Runs a command through cmd.exe and streams stdout/stderr back to the renderer. */
 ipcMain.handle("wincare:run", async (event, { command, runId }) => {
