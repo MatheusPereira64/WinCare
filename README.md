@@ -1,316 +1,194 @@
-# System Guardian Pro
+# WinCare
 
-Crie um aplicativo desktop moderno chamado WinCare (nome temporário), desenvolvido para Windows, cujo objetivo é centralizar ferramentas nativas de diagnóstico, reparo e otimização do sistema operacional.
+Central de manutenção do Windows com interface moderna. O WinCare reúne diagnóstico, reparo, rede, limpeza e monitoramento em um único app — sem precisar abrir CMD ou PowerShell manualmente.
 
-O aplicativo deve possuir uma interface moderna inspirada no Windows 11, utilizando tons escuros, azul como cor principal, cantos arredondados, animações suaves e indicadores de progresso.
+> Especificação completa do produto (documento original do projeto): [docs/ESPECIFICACAO-ORIGINAL.md](docs/ESPECIFICACAO-ORIGINAL.md)
 
-Objetivo
+---
 
-Eliminar a necessidade de abrir CMD ou PowerShell para executar comandos técnicos.
+## Requisitos
 
-Cada funcionalidade deve possuir:
+- **Windows 10 ou 11**
+- **Node.js 20+** e npm — [instalar com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Conexão com internet (para alguns comandos, como DISM RestoreHealth e teste de velocidade)
 
- Nome amigável
+---
 
- Explicação do que faz
+## Dois modos de uso
 
- Nível de risco (Seguro, Atenção ou Avançado)
+| Modo | Como abrir | Comportamento |
+| --- | --- | --- |
+| **Demonstração** | `npm run dev` | Abre no navegador. Métricas e comandos são **simulados**. |
+| **Nativo (recomendado)** | `npm run wincare:dev` | App desktop. Executa comandos **reais** no Windows. |
 
- Botão Executar
+No modo nativo, a barra superior exibe o badge **Modo nativo**. Comandos como SFC, DISM, `ipconfig` e ping rodam de verdade no sistema.
 
- Barra de progresso
+---
 
- Log em tempo real
+## Instalação e execução no seu PC
 
- Resultado final
+### 1. Clonar e instalar
 
- Botão para copiar o log
+```powershell
+git clone <url-do-repositorio>
+cd WinCare
+npm install
+```
 
-Tela Inicial
+### 2. Rodar o app desktop (uso normal)
 
-Exibir um dashboard contendo:
+```powershell
+npm run wincare:dev
+```
 
- Nome do computador
+Na primeira execução no Windows, o script prepara a pasta `.electron-dev/` com o runtime do Electron. O processo aparece como **WinCare** no Gerenciador de Tarefas.
 
- Versão do Windows
+### 3. Preview no navegador (opcional)
 
- Build
-
- Uso de CPU
-
- Uso de memória
-
- Espaço em disco
-
- Tempo ligado
-
- Status do Windows Defender
-
- Última atualização do Windows
-
- Saúde geral do sistema
-
-Ferramentas de Reparo
-
-Cada ferramenta deve executar o comando correspondente.
-
-Verificar arquivos do sistema
-
-Executa
-
-sfc /scannow
-
-Restaurar imagem do Windows
-
-Executa
-
-DISM /Online /Cleanup-Image /RestoreHealth
-
-ScanHealth
-
-DISM /Online /Cleanup-Image /ScanHealth
-
-CheckHealth
-
-DISM /Online /Cleanup-Image /CheckHealth
-
-Verificar Disco
-
-chkdsk C:
-
-Opcionalmente oferecer
-
-chkdsk /f
-
-com confirmação.
-
-Limpar DNS
-
-ipconfig /flushdns
-
-Renovar IP
-
-ipconfig /release
-
-ipconfig /renew
-
-Reset Winsock
-
-netsh winsock reset
-
-Reset TCP/IP
-
-netsh int ip reset
-
-Limpar cache do Windows Update
-
-Criar uma rotina automática que pare os serviços necessários, limpe as pastas e reinicie os serviços.
-
-Ferramentas de Rede
-
-Adicionar:
-
-Teste de Internet
-
-ping google.com
-
-Ping personalizado
-
-Traceroute
-
-tracert
-
-Consulta DNS
-
-Velocidade da conexão (caso exista API)
-
-Ferramentas do Sistema
-
-Abrir rapidamente:
-
-Gerenciador de Dispositivos
-
-devmgmt.msc
-
-Gerenciamento de Disco
-
-diskmgmt.msc
-
-Serviços
-
-services.msc
-
-Editor de Registro
-
-regedit
-
-Visualizador de Eventos
-
-eventvwr
-
-Gerenciador de Tarefas
-
-Painel de Controle
-
-Configurações
-
-Ferramentas de Limpeza
-
-Limpeza de arquivos temporários
-
-Abrir Limpeza de Disco
-
-cleanmgr
-
-Excluir:
-
-Temp
-
-%temp%
-
-Prefetch
-
-Cache do Windows
-
-Integridade
-
-Mostrar:
-
-Status SMART do HD
-
-Saúde do SSD
-
-Espaço livre
-
-Temperatura (caso possível)
-
-Logs
-
-Toda ação deve ficar registrada.
-
-Exemplo:
-
-19:10
-
-Executando:
-
-sfc /scannow
-
-Resultado:
-
-Windows Resource Protection found no integrity violations.
-
-Permitir:
-
-Exportar TXT
-
-Exportar PDF
-
-Copiar Log
-
-Segurança
-
-Antes de executar comandos críticos:
-
-Mostrar confirmação.
-
-Executar sempre como Administrador.
-
-Informar riscos.
-
-Interface
-
-Sidebar com:
-
-🏠 Dashboard
-
-🛠 Reparo
-
-🌐 Rede
-
-🧹 Limpeza
-
-💽 Disco
-
-📊 Monitoramento
-
-📜 Logs
-
-⚙ Configurações
-
-Funcionalidades Extras
-
-Adicionar um botão chamado:
-
-Verificação Completa
-
-Ele executa automaticamente:
-
- SFC
-
- DISM CheckHealth
-
- DISM ScanHealth
-
- DISM RestoreHealth
-
- Flush DNS
-
- Winsock Reset
-
- Verificação de Disco
-
-Exibindo uma barra de progresso única.
-
-Diferenciais
-
-Adicionar:
-
-Histórico de execuções
-
-Favoritos
-
-Pesquisa por ferramenta
-
-Tema claro/escuro
-
-Atalhos de teclado
-
-Indicador visual da saúde do computador (0–100%)
-
-Verificação automática ao iniciar o aplicativo
-
-Tecnologias sugeridas
-
-Frontend: React + TypeScript + Tailwind CSS + shadcn/ui
-
-Desktop: Tauri (preferível, por ser leve e seguro) ou Electron
-
-Backend: Rust (Tauri) ou Node.js (Electron)
-
-Gráficos: Recharts
-
-Gerenciamento de estado: Zustand
-
-Ícones: Lucide React
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/b5908917-eb4b-4cdd-9077-908409109966).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```powershell
 npm run dev
 ```
+
+Abra a URL exibida no terminal (geralmente `http://localhost:5173`). Útil para desenvolver a interface; **não** executa comandos reais.
+
+### 4. Gerar executável `.exe`
+
+```powershell
+npm run wincare:package
+```
+
+Saída em `electron-release/WinCare-win32-x64/WinCare.exe`. Para comandos administrativos, clique com o botão direito → **Executar como administrador**.
+
+---
+
+## Scripts npm
+
+| Comando | Descrição |
+| --- | --- |
+| `npm run wincare:dev` | Compila e abre o WinCare (desktop) |
+| `npm run wincare:dev:debug` | Igual ao dev, com DevTools (F12) |
+| `npm run wincare:build` | Compila só a interface em `dist/` |
+| `npm run wincare:package` | Gera o `.exe` para distribuição |
+| `npm run wincare:clear-data` | Limpa histórico salvo localmente |
+| `npm run wincare:test-network` | Testa comandos de rede fora da UI |
+| `npm run dev` | Preview web (modo demonstração) |
+| `npm run build` | Build web para produção |
+| `npm run lint` | Verifica o código com ESLint |
+
+---
+
+## Funcionalidades do app
+
+### Dashboard
+
+Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atualização e **saúde geral (0–100%)**. Ferramentas favoritas e **Verificação completa** (SFC + DISM + DNS + disco em sequência).
+
+### Reparo
+
+- Verificação de arquivos do sistema (`sfc /scannow`)
+- DISM CheckHealth, ScanHealth e RestoreHealth
+- Verificação de disco (`chkdsk`) e correção com confirmação
+- Limpeza do cache do Windows Update
+
+### Rede *(Beta — em desenvolvimento)*
+
+Ping, traceroute, consulta DNS, renovar IP, reset Winsock/TCP/IP, limpar DNS e teste de velocidade. A aba Rede no modo nativo ainda pode apresentar instabilidade; use as demais abas normalmente.
+
+### Limpeza
+
+Arquivos temporários, Prefetch, cache de ícones e atalho para a Limpeza de Disco nativa (`cleanmgr`).
+
+### Disco
+
+Status SMART, espaço por unidade e informações dos volumes.
+
+### Sistema
+
+Atalhos para Gerenciador de Dispositivos, Discos, Serviços, Registro, Eventos, Tarefas, Painel de Controle e Configurações do Windows.
+
+### Monitoramento
+
+Gráficos de CPU e memória em tempo real (modo nativo usa dados reais).
+
+### Logs
+
+Histórico das execuções com opção de copiar logs.
+
+### Configurações
+
+Tema claro/escuro, confirmação de comandos críticos, verificação ao iniciar, **Executar como administrador** e limpeza de dados locais.
+
+---
+
+## Cada ferramenta inclui
+
+- Nome e descrição em português
+- Nível de risco: **Seguro**, **Atenção** ou **Avançado**
+- Barra de progresso e log em tempo real
+- Resultado final e botão **Copiar log**
+- Confirmação antes de ações críticas (configurável)
+
+Atalho global: **Ctrl + K** foca a busca de ferramentas na página atual.
+
+---
+
+## Privilégios de administrador
+
+Várias ferramentas (SFC, DISM, `netsh`, limpeza do Windows Update etc.) exigem elevação. No app:
+
+1. Use **Executar como admin** na barra superior, ou
+2. Clique com o botão direito no `WinCare.exe` → **Executar como administrador**
+
+O Windows exibirá o prompt UAC quando necessário.
+
+---
+
+## Dados e logs locais
+
+- Histórico e preferências ficam em `localStorage` do app
+- Logs do processo principal: `%APPDATA%\WinCare\logs\wincare.log`
+- Menu **WinCare → Abrir arquivo de log** (no app desktop)
+- Limpar histórico: **Configurações → Dados locais** ou `npm run wincare:clear-data`
+
+---
+
+## Solução de problemas
+
+| Problema | O que fazer |
+| --- | --- |
+| Processo aparece como "Electron" | Feche todas as instâncias e rode `npm run wincare:dev` de novo |
+| Erro de cache / ICU | Feche o app, apague `.electron-dev/` e execute `wincare:dev` novamente |
+| Ferramenta presa em "Executando..." | `npm run wincare:clear-data` e reinicie o app |
+| Comandos não rodam de verdade | Use `wincare:dev`, não `npm run dev` (navegador) |
+| Duas janelas / app não abre | Só uma instância é permitida; foque a janela existente |
+
+---
+
+## Estrutura do projeto (resumo)
+
+```
+WinCare/
+├── src/                 # Interface React (rotas, componentes, lógica)
+├── electron/            # Shell desktop (main, preload, renderer)
+├── scripts/             # Launcher dev, limpeza de dados, testes
+├── docs/                # Documentação (especificação original)
+└── dist/                # Build da interface (gerado)
+```
+
+Detalhes técnicos do Electron: [electron/README.md](electron/README.md).
+
+---
+
+## Desenvolvimento
+
+```powershell
+npm run lint          # ESLint
+npm run format        # Prettier
+npm run wincare:dev   # App desktop com hot rebuild da UI
+```
+
+---
+
+## Licença e origem
+
+Projeto iniciado com [Lovable](https://lovable.dev). O código é seu; alterações no repositório podem ser sincronizadas de volta ao editor Lovable conforme o fluxo do time.
