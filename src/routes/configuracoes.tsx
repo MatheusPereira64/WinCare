@@ -28,11 +28,9 @@ export const Route = createFileRoute("/configuracoes")({
 });
 
 function SettingsPage() {
-  const { theme, autoCheck, confirmCritical } = useStore((s) => ({
-    theme: s.theme,
-    autoCheck: s.autoCheck,
-    confirmCritical: s.confirmCritical,
-  }));
+  const theme = useStore((s) => s.theme);
+  const autoCheck = useStore((s) => s.autoCheck);
+  const confirmCritical = useStore((s) => s.confirmCritical);
 
   return (
     <div className="max-w-3xl space-y-6">

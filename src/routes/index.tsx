@@ -43,10 +43,8 @@ export const Route = createFileRoute("/")({
 
 function Dashboard() {
   const info = useSystemInfo();
-  const { favorites, autoCheck } = useStore((s) => ({
-    favorites: s.favorites,
-    autoCheck: s.autoCheck,
-  }));
+  const favorites = useStore((s) => s.favorites);
+  const autoCheck = useStore((s) => s.autoCheck);
 
   useEffect(() => {
     if (autoCheck) {
