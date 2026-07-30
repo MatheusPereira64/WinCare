@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 .electron-dev
+electron-release
+*.zip
 dist-ssr
 .output
 .vinxi

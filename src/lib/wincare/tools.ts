@@ -83,103 +83,13 @@ export const TOOLS: Tool[] = [
     estimate: 15000,
   },
 
-  // ---------------- Rede ----------------
-  {
-    id: "flushdns",
-    name: "Limpar DNS",
-    description: "Apaga o cache de resolução de nomes, corrigindo sites que não abrem.",
-    command: "ipconfig /flushdns",
-    category: "network",
-    risk: "safe",
-    estimate: 3000,
-  },
-  {
-    id: "renew-ip",
-    name: "Renovar IP",
-    description: "Libera o endereço IP atual e solicita um novo ao servidor DHCP.",
-    command: "ipconfig /release && ipconfig /renew",
-    category: "network",
-    risk: "warning",
-    requiresConfirmation: true,
-    estimate: 12000,
-    timeoutMs: 90000,
-  },
-  {
-    id: "winsock",
-    name: "Reset Winsock",
-    description:
-      "Restaura o catálogo Winsock para o padrão. Reinicie o computador após executar.",
-    command: "netsh winsock reset",
-    category: "network",
-    risk: "warning",
-    requiresAdmin: true,
-    requiresConfirmation: true,
-    estimate: 5000,
-  },
-  {
-    id: "tcpip",
-    name: "Reset TCP/IP",
-    description: "Reinstala a pilha TCP/IP, resolvendo problemas persistentes de conexão.",
-    command: "netsh int ip reset",
-    category: "network",
-    risk: "advanced",
-    requiresAdmin: true,
-    requiresConfirmation: true,
-    estimate: 6000,
-  },
-  {
-    id: "ping",
-    name: "Teste de Internet",
-    description: "Envia 4 pacotes para um servidor e mede a latência e a perda de pacotes.",
-    command: "ping -n 4 -w 2000 8.8.8.8",
-    category: "network",
-    risk: "safe",
-    estimate: 9000,
-    timeoutMs: 15000,
-    input: { label: "Destino", placeholder: "8.8.8.8 ou google.com", defaultValue: "8.8.8.8" },
-  },
-  {
-    id: "tracert",
-    name: "Traceroute",
-    description: "Mostra os saltos de rede até o destino (máx. 12 saltos, timeout 1,5 s por salto).",
-    command: "tracert -h 12 -w 1500 -d google.com",
-    category: "network",
-    risk: "safe",
-    estimate: 35000,
-    timeoutMs: 90000,
-    input: { label: "Destino", placeholder: "google.com", defaultValue: "google.com" },
-  },
-  {
-    id: "nslookup",
-    name: "Consulta DNS",
-    description: "Consulta os registros DNS de um domínio e mostra qual servidor respondeu.",
-    command: "nslookup google.com",
-    category: "network",
-    risk: "safe",
-    estimate: 4000,
-    timeoutMs: 10000,
-    input: { label: "Domínio", placeholder: "google.com", defaultValue: "google.com" },
-  },
-  {
-    id: "speedtest",
-    name: "Velocidade da conexão",
-    description: "Baixa 1 MB de um servidor de teste e calcula a velocidade de download.",
-    command:
-      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; $sw=[Diagnostics.Stopwatch]::StartNew(); Invoke-WebRequest -Uri 'https://speed.cloudflare.com/__down?bytes=1048576' -UseBasicParsing | Out-Null; $sw.Stop(); $s=$sw.Elapsed.TotalSeconds; $mb=[math]::Round(8/$s,1); Write-Output ('Download: ' + $mb + ' Mbps em ' + [math]::Round($s,1) + 's')\"",
-    commandPreview: "powershell … download de teste Cloudflare (1 MB)",
-    category: "network",
-    risk: "safe",
-    estimate: 15000,
-    timeoutMs: 45000,
-  },
-
   // ---------------- Limpeza ----------------
   {
     id: "temp",
     name: "Limpar arquivos temporários",
     description: "Remove o conteúdo de %temp% e da pasta Temp do Windows.",
     command:
-      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -LiteralPath ($env:TEMP + \'\\*\') -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath ($env:WINDIR + \'\\Temp\\*\') -Recurse -Force -ErrorAction SilentlyContinue; Write-Output \'Limpeza de temporarios concluida.\'"',
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath ($env:TEMP + '\\*') -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath ($env:WINDIR + '\\Temp\\*') -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Limpeza de temporarios concluida.'\"",
     category: "cleanup",
     risk: "safe",
     estimate: 9000,
@@ -190,7 +100,7 @@ export const TOOLS: Tool[] = [
     description:
       "Apaga os arquivos de pré-carregamento. O Windows recria conforme você usa os programas.",
     command:
-      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -LiteralPath ($env:WINDIR + \'\\Prefetch\\*\') -Force -ErrorAction SilentlyContinue; Write-Output \'Prefetch limpo.\'"',
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath ($env:WINDIR + '\\Prefetch\\*') -Force -ErrorAction SilentlyContinue; Write-Output 'Prefetch limpo.'\"",
     category: "cleanup",
     risk: "warning",
     requiresAdmin: true,
@@ -202,7 +112,7 @@ export const TOOLS: Tool[] = [
     name: "Limpar cache do Windows",
     description: "Recria o cache de ícones e miniaturas, corrigindo imagens quebradas.",
     command:
-      'powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -LiteralPath ($env:LOCALAPPDATA + \'\\Microsoft\\Windows\\Explorer\\*.db\') -Force -ErrorAction SilentlyContinue; Start-Process explorer; Write-Output \'Cache de icones recriado.\'"',
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -LiteralPath ($env:LOCALAPPDATA + '\\Microsoft\\Windows\\Explorer\\*.db') -Force -ErrorAction SilentlyContinue; Start-Process explorer; Write-Output 'Cache de icones recriado.'\"",
     category: "cleanup",
     risk: "warning",
     requiresConfirmation: true,
@@ -323,15 +233,7 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-export const FULL_CHECK_IDS = [
-  "sfc",
-  "dism-check",
-  "dism-scan",
-  "dism-restore",
-  "flushdns",
-  "winsock",
-  "chkdsk",
-];
+export const FULL_CHECK_IDS = ["sfc", "dism-check", "dism-scan", "dism-restore", "chkdsk"];
 
 export const getTool = (id: string) => TOOLS.find((t) => t.id === id);
 

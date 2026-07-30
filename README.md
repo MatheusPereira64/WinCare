@@ -1,67 +1,81 @@
 # WinCare
 
-Central de manutenção do Windows com interface moderna. O WinCare reúne diagnóstico, reparo, rede, limpeza e monitoramento em um único app — sem precisar abrir CMD ou PowerShell manualmente.
+Central de manutenção do Windows com interface moderna. O WinCare reúne diagnóstico, reparo, limpeza e monitoramento em um único app — sem precisar abrir CMD ou PowerShell manualmente.
 
-> Especificação completa do produto (documento original do projeto): [docs/ESPECIFICACAO-ORIGINAL.md](docs/ESPECIFICACAO-ORIGINAL.md)
+[![Baixar última versão](https://img.shields.io/github/v/release/MatheusPereira64/WinCare?label=Baixar&color=2ea44f)](https://github.com/MatheusPereira64/WinCare/releases/latest)
+[![Licença](https://img.shields.io/github/license/MatheusPereira64/WinCare)](https://github.com/MatheusPereira64/WinCare)
 
 ---
 
-## Requisitos
+## Baixar o aplicativo (usuários)
+
+Não precisa instalar Node.js nem clonar o projeto.
+
+1. Abra a página de **[Releases](https://github.com/MatheusPereira64/WinCare/releases/latest)**
+2. Baixe o arquivo **`WinCare-Windows-x64.zip`**
+3. Extraia a pasta (botão direito → **Extrair tudo**)
+4. Abra **`WinCare.exe`**
+
+### Dicas rápidas
+
+| Situação | O que fazer |
+| --- | --- |
+| SmartScreen: “Windows protegeu seu PC” | **Mais informações** → **Executar assim mesmo** (o app ainda não tem assinatura digital) |
+| Ferramentas que pedem administrador (SFC, DISM…) | Botão direito em `WinCare.exe` → **Executar como administrador** |
+| Atualizar | Baixe o ZIP da release mais nova e substitua a pasta antiga |
+
+**Requisito:** Windows 10 ou 11 (64 bits).
+
+---
+
+## Publicar uma nova versão (desenvolvedores)
+
+Quando o código estiver pronto na branch principal:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+O GitHub Actions gera o ZIP automaticamente e publica em **Releases**.
+
+Para testar o pacote localmente:
+
+```powershell
+npm run wincare:package
+```
+
+Saída: `electron-release/WinCare-Windows-x64.zip`.
+
+---
+
+## Desenvolvimento (modo nativo / demonstração)
+
+> Especificação completa do produto (documento original): [docs/ESPECIFICACAO-ORIGINAL.md](docs/ESPECIFICACAO-ORIGINAL.md)
+
+### Requisitos
 
 - **Windows 10 ou 11**
-- **Node.js 20+** e npm — [instalar com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-- Conexão com internet (para alguns comandos, como DISM RestoreHealth e teste de velocidade)
+- **Node.js 20+** e npm
+- Conexão com internet (para alguns comandos, como DISM RestoreHealth)
 
----
-
-## Dois modos de uso
+### Dois modos
 
 | Modo | Como abrir | Comportamento |
 | --- | --- | --- |
 | **Demonstração** | `npm run dev` | Abre no navegador. Métricas e comandos são **simulados**. |
 | **Nativo (recomendado)** | `npm run wincare:dev` | App desktop. Executa comandos **reais** no Windows. |
 
-No modo nativo, a barra superior exibe o badge **Modo nativo**. Comandos como SFC, DISM, `ipconfig` e ping rodam de verdade no sistema.
-
----
-
-## Instalação e execução no seu PC
-
-### 1. Clonar e instalar
+### Instalação
 
 ```powershell
-git clone <url-do-repositorio>
+git clone https://github.com/MatheusPereira64/WinCare.git
 cd WinCare
 npm install
-```
-
-### 2. Rodar o app desktop (uso normal)
-
-```powershell
 npm run wincare:dev
 ```
 
-Na primeira execução no Windows, o script prepara a pasta `.electron-dev/` com o runtime do Electron. O processo aparece como **WinCare** no Gerenciador de Tarefas.
-
-### 3. Preview no navegador (opcional)
-
-```powershell
-npm run dev
-```
-
-Abra a URL exibida no terminal (geralmente `http://localhost:5173`). Útil para desenvolver a interface; **não** executa comandos reais.
-
-### 4. Gerar executável `.exe`
-
-```powershell
-npm run wincare:package
-```
-
-Saída em `electron-release/WinCare-win32-x64/WinCare.exe`. Para comandos administrativos, clique com o botão direito → **Executar como administrador**.
-
----
-
-## Scripts npm
+### Scripts npm
 
 | Comando | Descrição |
 | --- | --- |
@@ -69,9 +83,8 @@ Saída em `electron-release/WinCare-win32-x64/WinCare.exe`. Para comandos admini
 | `npm run wincare:admin` | Compila e abre o WinCare **como administrador** |
 | `npm run wincare:dev:debug` | Igual ao dev, com DevTools (F12) |
 | `npm run wincare:build` | Compila só a interface em `dist/` |
-| `npm run wincare:package` | Gera o `.exe` para distribuição |
+| `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` para distribuição |
 | `npm run wincare:clear-data` | Limpa histórico salvo localmente |
-| `npm run wincare:test-network` | Testa comandos de rede fora da UI |
 | `npm run dev` | Preview web (modo demonstração) |
 | `npm run build` | Build web para produção |
 | `npm run lint` | Verifica o código com ESLint |
@@ -82,7 +95,7 @@ Saída em `electron-release/WinCare-win32-x64/WinCare.exe`. Para comandos admini
 
 ### Dashboard
 
-Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atualização e **saúde geral (0–100%)**. Ferramentas favoritas e **Verificação completa** (SFC + DISM + DNS + disco em sequência).
+Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atualização e **saúde geral (0–100%)**. Ferramentas favoritas e **Verificação completa** (SFC + DISM + disco em sequência).
 
 ### Reparo
 
@@ -90,10 +103,6 @@ Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atua
 - DISM CheckHealth, ScanHealth e RestoreHealth
 - Verificação de disco (`chkdsk`) e correção com confirmação
 - Limpeza do cache do Windows Update
-
-### Rede *(Beta — em desenvolvimento)*
-
-Ping, traceroute, consulta DNS, renovar IP, reset Winsock/TCP/IP, limpar DNS e teste de velocidade. A aba Rede no modo nativo ainda pode apresentar instabilidade; use as demais abas normalmente.
 
 ### Limpeza
 
@@ -135,7 +144,9 @@ Atalho global: **Ctrl + K** foca a busca de ferramentas na página atual.
 
 ## Privilégios de administrador
 
-Várias ferramentas (SFC, DISM, `netsh`, limpeza do Windows Update etc.) exigem elevação. **No modo desenvolvimento**, use uma destas opções:
+Várias ferramentas (SFC, DISM, limpeza do Windows Update etc.) exigem elevação.
+
+**No modo desenvolvimento**, use:
 
 1. **`npm run wincare:admin`** — recomendado
 2. **`WinCare-Admin.cmd`** na raiz do projeto (duplo clique)
@@ -143,9 +154,7 @@ Várias ferramentas (SFC, DISM, `netsh`, limpeza do Windows Update etc.) exigem 
 
 > **Não** execute diretamente `.electron-dev\WinCare.exe` como administrador — sem o caminho do projeto, o Electron abre a tela padrão vazia.
 
-Após **`npm run wincare:package`**, use o `WinCare.exe` em `electron-release/` — clique com o botão direito → **Executar como administrador**.
-
-O Windows exibirá o prompt UAC quando necessário.
+Após baixar o ZIP da Release (ou `npm run wincare:package`), use o `WinCare.exe` — clique com o botão direito → **Executar como administrador**.
 
 ---
 
@@ -168,6 +177,7 @@ O Windows exibirá o prompt UAC quando necessário.
 | Ferramenta presa em "Executando..." | `npm run wincare:clear-data` e reinicie o app |
 | Comandos não rodam de verdade | Use `wincare:dev`, não `npm run dev` (navegador) |
 | Duas janelas / app não abre | Só uma instância é permitida; foque a janela existente |
+| SmartScreen ao abrir o .exe da Release | **Mais informações** → **Executar assim mesmo** |
 
 ---
 
@@ -177,22 +187,13 @@ O Windows exibirá o prompt UAC quando necessário.
 WinCare/
 ├── src/                 # Interface React (rotas, componentes, lógica)
 ├── electron/            # Shell desktop (main, preload, renderer)
-├── scripts/             # Launcher dev, limpeza de dados, testes
+├── scripts/             # Launcher, empacote ZIP, limpeza de dados
+├── .github/workflows/   # Release automática no GitHub
 ├── docs/                # Documentação (especificação original)
 └── dist/                # Build da interface (gerado)
 ```
 
 Detalhes técnicos do Electron: [electron/README.md](electron/README.md).
-
----
-
-## Desenvolvimento
-
-```powershell
-npm run lint          # ESLint
-npm run format        # Prettier
-npm run wincare:dev   # App desktop com hot rebuild da UI
-```
 
 ---
 

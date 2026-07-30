@@ -16,7 +16,7 @@ const MAX_LINES_PER_RUN = 30;
 
 const initial: State = {
   runs: [],
-  favorites: ["sfc", "flushdns"],
+  favorites: ["sfc", "temp"],
   theme: "dark",
   autoCheck: true,
   confirmCritical: true,

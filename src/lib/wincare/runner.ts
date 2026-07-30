@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getNative, simulateRun } from "./bridge";
-import { sanitizeNetworkTarget } from "./network";
 import { actions } from "./store";
 import { resolveCommand } from "./tools";
 import type { LogLine, RunRecord, Tool } from "./types";
@@ -35,24 +34,7 @@ export function useToolRunner(tool: Tool) {
   const run = useCallback(
     async (rawTarget?: string) => {
       const token = ++runToken.current;
-      let target = rawTarget?.trim();
-
-      if (tool.category === "network" && tool.input && target) {
-        try {
-          target = sanitizeNetworkTarget(target);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Destino inválido.";
-          setState({
-            running: false,
-            progress: 0,
-            lines: [{ time: now(), text: message, kind: "error" }],
-            result: message,
-            status: "error",
-          });
-          return;
-        }
-      }
-
+      const target = rawTarget?.trim();
       const command = resolveCommand(tool, target);
       const id = `${tool.id}-${Date.now()}`;
       const started = Date.now();
@@ -76,12 +58,15 @@ export function useToolRunner(tool: Tool) {
         setState((s) => ({ ...s, progress: Math.min(94, s.progress + 100 / (estimate / 260)) }));
       }, 260);
 
-      // Deixa a UI renderizar "Executando..." antes do IPC bloquear o fluxo async.
+      // Deixa a UI renderizar "Executando..." antes do IPC.
       await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
       });
+      await new Promise<void>((resolve) => setTimeout(resolve, 30));
 
-      let pendingChunkLines: string[] = [];
+      const pendingChunkLines: string[] = [];
       let chunkFrame: number | null = null;
 
       const flushChunkLines = () => {
@@ -124,15 +109,7 @@ export function useToolRunner(tool: Tool) {
             push("Solicitando elevação via UAC (Executar como administrador)...", "warn");
           }
         }
-        if (native?.runNetwork && tool.category === "network") {
-          const out = await native.runNetwork(tool.id, target, {
-            elevated,
-            timeoutMs: tool.timeoutMs,
-          });
-          code = out.code;
-          result = out.result;
-          if (out.output) pushChunk(out.output);
-        } else if (native) {
+        if (native) {
           const out = await native.run(command, (chunk) => pushChunk(chunk), {
             elevated,
             timeoutMs: tool.timeoutMs,
@@ -147,6 +124,7 @@ export function useToolRunner(tool: Tool) {
       } catch (err) {
         code = 1;
         result = err instanceof Error ? err.message : "Falha ao executar o comando.";
+        console.error("[WinCare] falha ao executar", tool.id, err);
       } finally {
         if (timer.current) clearInterval(timer.current);
         if (chunkFrame !== null) cancelAnimationFrame(chunkFrame);

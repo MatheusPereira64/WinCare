@@ -95,8 +95,8 @@ export function FullCheckCard() {
           <div>
             <h2 className="text-lg font-semibold">Verificação Completa</h2>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Executa em sequência SFC, DISM CheckHealth, ScanHealth, RestoreHealth, limpeza de DNS,
-              reset do Winsock e verificação de disco, com uma única barra de progresso.
+              Executa em sequência SFC, DISM CheckHealth, ScanHealth, RestoreHealth e verificação de
+              disco, com uma única barra de progresso.
             </p>
           </div>
         </div>

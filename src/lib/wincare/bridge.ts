@@ -26,12 +26,6 @@ export interface NativeBridge {
     onData: (chunk: string) => void,
     options?: RunOptions,
   ) => Promise<RunResult>;
-  /** Executa ferramentas de rede por ID — caminho estável no Electron. */
-  runNetwork: (
-    toolId: string,
-    target?: string,
-    options?: RunOptions,
-  ) => Promise<RunResult>;
   systemInfo: () => Promise<SystemInfo>;
   disks: () => Promise<DiskDrive[]>;
   isElevated: () => Promise<boolean>;
@@ -96,49 +90,6 @@ const SIM_OUTPUT: Record<string, string[]> = {
     "Iniciando serviços novamente...",
     "Cache do Windows Update limpo com êxito.",
   ],
-  flushdns: ["Configuração de IP do Windows", "Cache do Resolvedor de DNS liberado com êxito."],
-  "renew-ip": [
-    "Adaptador Ethernet: endereço liberado.",
-    "Solicitando novo endereço ao DHCP...",
-    "Endereço IPv4: 192.168.0.24",
-    "Gateway padrão: 192.168.0.1",
-  ],
-  winsock: [
-    "Catálogo Winsock redefinido com êxito.",
-    "Você deve reiniciar o computador para concluir a redefinição.",
-  ],
-  tcpip: [
-    "Redefinindo Interface, OK!",
-    "Redefinindo Vizinho, OK!",
-    "Reinicie o computador para concluir esta ação.",
-  ],
-  ping: [
-    "Disparando contra google.com [142.250.218.174] com 32 bytes de dados:",
-    "Resposta de 142.250.218.174: bytes=32 tempo=12ms TTL=115",
-    "Resposta de 142.250.218.174: bytes=32 tempo=11ms TTL=115",
-    "Resposta de 142.250.218.174: bytes=32 tempo=13ms TTL=115",
-    "Pacotes: Enviados = 4, Recebidos = 4, Perdidos = 0 (0% de perda), Média = 12ms",
-  ],
-  tracert: [
-    "Rastreando a rota para google.com com no máximo 30 saltos",
-    "  1     1 ms     1 ms     1 ms  192.168.0.1",
-    "  2     8 ms     9 ms     8 ms  10.20.0.1",
-    "  3    11 ms    12 ms    11 ms  core-router.isp.net",
-    "  4    12 ms    12 ms    12 ms  142.250.218.174",
-    "Rastreamento concluído.",
-  ],
-  nslookup: [
-    "Servidor:  dns.google",
-    "Address:  8.8.8.8",
-    "Resposta não autoritativa:",
-    "Nome:    google.com",
-    "Addresses: 2800:3f0:4001:830::200e, 142.250.218.174",
-  ],
-  speedtest: [
-    "Baixando 1 MB para medir a velocidade...",
-    "Download: 248,6 Mbps em 0,3s",
-    "Teste concluído.",
-  ],
   temp: [
     "Removendo C:\\Users\\Usuario\\AppData\\Local\\Temp\\...",
     "1.842 arquivos removidos",
@@ -173,14 +124,6 @@ const SIM_RESULT: Record<string, string> = {
   chkdsk: "Sistema de arquivos sem problemas.",
   "chkdsk-fix": "Verificação agendada para a próxima reinicialização.",
   "wu-cache": "Cache do Windows Update limpo (1,8 GB).",
-  flushdns: "Cache DNS liberado.",
-  "renew-ip": "Novo IP obtido: 192.168.0.24",
-  winsock: "Winsock redefinido. Reinicie o computador.",
-  tcpip: "TCP/IP redefinido. Reinicie o computador.",
-  ping: "0% de perda, latência média 12 ms.",
-  tracert: "Rota completa em 4 saltos.",
-  nslookup: "Domínio resolvido com sucesso.",
-  speedtest: "248,6 Mbps download (1 MB baixado).",
   temp: "2,7 GB liberados.",
   prefetch: "142 MB liberados.",
   "icon-cache": "Cache de ícones recriado.",

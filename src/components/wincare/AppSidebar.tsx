@@ -5,7 +5,6 @@ import {
   Gauge,
   HardDrive,
   LayoutDashboard,
-  Network,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -19,28 +18,14 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const items: {
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  badge?: string;
-  badgeTitle?: string;
-}[] = [
+const items: { title: string; url: string; icon: typeof LayoutDashboard }[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Reparo", url: "/reparo", icon: Wrench },
-  {
-    title: "Rede",
-    url: "/rede",
-    icon: Network,
-    badge: "Beta",
-    badgeTitle: "Em desenvolvimento — instabilidade conhecida no modo nativo",
-  },
   { title: "Limpeza", url: "/limpeza", icon: Brush },
   { title: "Disco", url: "/disco", icon: HardDrive },
   { title: "Sistema", url: "/sistema", icon: Gauge },
@@ -81,14 +66,6 @@ export function AppSidebar() {
                       {!collapsed && <span>{item.title}</span>}
                     </Link>
                   </SidebarMenuButton>
-                  {item.badge && (
-                    <SidebarMenuBadge
-                      className="border border-warning/40 bg-warning/15 text-[10px] text-warning"
-                      title={item.badgeTitle}
-                    >
-                      {item.badge}
-                    </SidebarMenuBadge>
-                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

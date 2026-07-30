@@ -1,0 +1,92 @@
+name: Release
+
+# Publica o WinCare no GitHub Releases quando você cria uma tag v*.
+# Exemplo:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão sem o 'v' (ex.: 1.0.0). Só para disparo manual."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package WinCare (ZIP)
+        run: npm run wincare:package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinCare-Windows-x64
+          path: electron-release/WinCare-Windows-x64.zip
+          if-no-files-found: error
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.version }}" ]]; then
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: WinCare ${{ steps.ver.outputs.tag }}
+          draft: false
+          prerelease: ${{ contains(steps.ver.outputs.tag, '-') }}
+          generate_release_notes: true
+          files: electron-release/WinCare-Windows-x64.zip
+          body: |
+            ## Baixar o WinCare para Windows
+
+            1. Baixe **`WinCare-Windows-x64.zip`** abaixo
+            2. Extraia a pasta (clique com o botão direito → Extrair tudo)
+            3. Abra **`WinCare.exe`**
+
+            ### Dicas
+
+            - Windows 10 ou 11 (64 bits)
+            - Para ferramentas administrativas (SFC, DISM…): clique com o botão direito em `WinCare.exe` → **Executar como administrador**
+            - Se o SmartScreen avisar (“Windows protegeu seu PC”), escolha **Mais informações** → **Executar assim mesmo** (o app ainda não é assinado digitalmente)
+
+            ### Requisitos
+
+            - Não precisa instalar Node.js
+            - Não precisa clonar o repositório
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

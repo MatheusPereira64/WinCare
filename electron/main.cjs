@@ -251,76 +251,30 @@ function execBuffered(command, limitMs) {
       },
     );
 
-    setTimeout(() => {
+    // Safety kill — alguns comandos (nslookup/ipconfig) ignoram o timeout do exec.
+    const killTimer = setTimeout(() => {
       if (settled) return;
       try {
-        child.kill();
+        if (process.platform === "win32") {
+          exec(`taskkill /PID ${child.pid} /T /F`, { windowsHide: true });
+        } else {
+          child.kill("SIGKILL");
+        }
       } catch {
         /* ignore */
       }
+      finish({
+        code: 1,
+        result: `Comando encerrado após ${Math.round(limitMs / 1000)} segundos.`,
+        output: "",
+      });
     }, limitMs + 1500);
+
+    child.on("exit", () => clearTimeout(killTimer));
   });
 }
 
-const sanitizeNetworkHost = (value, fallback) => {
-  const host = String(value || fallback || "").trim();
-  if (!/^[a-zA-Z0-9.\-_]+$/.test(host)) {
-    throw new Error("Destino inválido. Use apenas letras, números, pontos e hífens.");
-  }
-  return host;
-};
-
-const SPEEDTEST_SCRIPT = [
-  "$ErrorActionPreference = 'Stop'",
-  "$sw = [Diagnostics.Stopwatch]::StartNew()",
-  "Invoke-WebRequest -Uri 'https://speed.cloudflare.com/__down?bytes=1048576' -UseBasicParsing | Out-Null",
-  "$sw.Stop()",
-  "$s = $sw.Elapsed.TotalSeconds",
-  "if ($s -le 0) { throw 'Tempo inválido' }",
-  "$mb = [math]::Round(8 / $s, 1)",
-  "Write-Output ('Download: ' + $mb + ' Mbps em ' + [math]::Round($s, 1) + 's')",
-].join("; ");
-
-async function runNetworkTool({ toolId, target, elevated, timeoutMs }) {
-  const limitMs = timeoutMs || DEFAULT_RUN_TIMEOUT_MS;
-
-  switch (toolId) {
-    case "flushdns":
-      return execBuffered("ipconfig /flushdns", limitMs || 15000);
-    case "ping":
-      return execBuffered(
-        `ping -n 4 -w 2000 ${sanitizeNetworkHost(target, "8.8.8.8")}`,
-        limitMs || 15000,
-      );
-    case "tracert":
-      return execBuffered(
-        `tracert -h 12 -w 1500 -d ${sanitizeNetworkHost(target, "google.com")}`,
-        limitMs || 90000,
-      );
-    case "nslookup":
-      return execBuffered(
-        `nslookup ${sanitizeNetworkHost(target, "google.com")}`,
-        limitMs || 10000,
-      );
-    case "renew-ip":
-      return execBuffered("ipconfig /release & ipconfig /renew", limitMs || 90000);
-    case "winsock":
-      if (elevated) return runElevatedBuffered("netsh winsock reset", limitMs || 60000);
-      return execBuffered("netsh winsock reset", limitMs || 30000);
-    case "tcpip":
-      if (elevated) return runElevatedBuffered("netsh int ip reset", limitMs || 60000);
-      return execBuffered("netsh int ip reset", limitMs || 30000);
-    case "speedtest":
-      return execBuffered(
-        `powershell -NoProfile -ExecutionPolicy Bypass -Command ${JSON.stringify(SPEEDTEST_SCRIPT)}`,
-        limitMs || 45000,
-      );
-    default:
-      return { code: 1, result: "Ferramenta de rede desconhecida.", output: "" };
-  }
-}
-
-/** Short network/diagnostic commands — one exec, no streaming pipe issues. */
+/** Short diagnostic commands — one exec, no streaming pipe issues. */
 function runBufferedCommand(_event, { command, limitMs }) {
   return execBuffered(command, limitMs);
 }
@@ -591,30 +545,6 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
     return {
       code: 1,
       result: error instanceof Error ? error.message : "Falha ao executar o comando.",
-    };
-  }
-});
-
-ipcMain.handle("wincare:runNetwork", async (_event, payload) => {
-  logger.log("network", "IPC runNetwork", payload);
-  try {
-    const result = await runNetworkTool(payload);
-    logger.log("network", "IPC runNetwork OK", {
-      toolId: payload.toolId,
-      code: result.code,
-      result: result.result?.slice(0, 160),
-    });
-    return result;
-  } catch (error) {
-    logger.error(
-      "network",
-      "IPC runNetwork falhou",
-      error instanceof Error ? error.message : error,
-    );
-    return {
-      code: 1,
-      result: error instanceof Error ? error.message : "Falha ao executar teste de rede.",
-      output: "",
     };
   }
 });

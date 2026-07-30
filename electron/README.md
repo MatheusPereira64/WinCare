@@ -51,6 +51,5 @@ npm run wincare:package
 | `npm run wincare:dev` | Compila e abre a janela do WinCare (desktop) |
 | `npm run wincare:admin` | Abre o WinCare como administrador (desenvolvimento) |
 | `npm run wincare:dev:debug` | Igual ao dev, com DevTools aberto |
-| `npm run wincare:package` | Gera o executável Windows em `electron-release/` |
+| `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` em `electron-release/` |
 | `npm run wincare:clear-data` | Limpa histórico local do app |
-| `npm run wincare:test-network` | Testa comandos de rede fora da UI |

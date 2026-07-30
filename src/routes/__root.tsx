@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
 import { isNative } from "@/lib/wincare/bridge";
+import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 
 function NotFoundComponent() {
@@ -143,7 +144,9 @@ function TopBar() {
       return;
     }
     toast.error("Não foi possível solicitar elevação.", {
-      description: out.reason ?? "Tente clicar com o botão direito no app e escolher Executar como administrador.",
+      description:
+        out.reason ??
+        "Tente clicar com o botão direito no app e escolher Executar como administrador.",
     });
   };
 
@@ -168,7 +171,12 @@ function TopBar() {
       </div>
       <div className="ml-auto flex items-center gap-2">
         {native && elevated === false && (
-          <Button variant="secondary" size="sm" className="hidden sm:inline-flex" onClick={() => void handleRestartAsAdmin()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={() => void handleRestartAsAdmin()}
+          >
             <ShieldCheck className="size-4" /> Executar como admin
           </Button>
         )}
@@ -189,16 +197,11 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Segurança leve: limpa locks órfãos do Radix ao trocar de rota (sem loop agressivo).
   useEffect(() => {
-    const unlock = () => {
-      document.body.style.removeProperty("pointer-events");
-      document.body.style.removeProperty("overflow");
-      document.body.removeAttribute("data-scroll-locked");
-      document.documentElement.removeAttribute("data-scroll-locked");
-    };
-    unlock();
-    const id = requestAnimationFrame(unlock);
-    return () => cancelAnimationFrame(id);
+    unlockUi();
+    const t = window.setTimeout(unlockUi, 100);
+    return () => clearTimeout(t);
   }, [pathname]);
 
   useEffect(() => {

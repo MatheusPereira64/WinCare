@@ -148,9 +148,9 @@ function SettingsPage() {
               {elevated ? "Executando como administrador" : "Executando como usuário padrão"}
             </Badge>
             <p className="text-sm text-muted-foreground">
-              Ferramentas como SFC, DISM, Prefetch e reset de rede exigem privilégios elevados. Você
-              pode reiniciar o app inteiro como administrador (sem UAC a cada comando) ou aprovar o
-              UAC apenas quando executar uma ferramenta específica.
+              Ferramentas como SFC, DISM e Prefetch exigem privilégios elevados. Você pode reiniciar
+              o app inteiro como administrador (sem UAC a cada comando) ou aprovar o UAC apenas
+              quando executar uma ferramenta específica.
             </p>
             {elevated === false && (
               <Button className="w-fit" onClick={() => void handleRestartAsAdmin()}>
@@ -160,7 +160,8 @@ function SettingsPage() {
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Disponível apenas no aplicativo desktop (Electron). No navegador os comandos são simulados.
+            Disponível apenas no aplicativo desktop (Electron). No navegador os comandos são
+            simulados.
           </p>
         )}
       </Card>
@@ -171,8 +172,8 @@ function SettingsPage() {
           <h2 className="font-semibold">Dados locais</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Limpa o histórico de execuções salvo neste computador. Use se alguma ferramenta ficou presa
-          em &quot;Executando...&quot;.
+          Limpa o histórico de execuções salvo neste computador. Use se alguma ferramenta ficou
+          presa em &quot;Executando...&quot;.
         </p>
         <Button
           variant="secondary"
@@ -202,7 +203,8 @@ function SettingsPage() {
         </Badge>
         <p className="text-sm text-muted-foreground">
           No navegador os comandos são simulados com saídas realistas. No aplicativo desktop, cada
-          botão executa o comando real no Windows — com elevação automática via UAC quando necessário.
+          botão executa o comando real no Windows — com elevação automática via UAC quando
+          necessário.
         </p>
       </Card>
     </div>

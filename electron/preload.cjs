@@ -51,21 +51,6 @@ contextBridge.exposeInMainWorld("wincare", {
         streamHandlers.delete(runId);
       });
   },
-  runNetwork: (toolId, target, options = {}) => {
-    const limitMs = options.timeoutMs || 60000;
-    return withTimeout(
-      ipcRenderer.invoke("wincare:runNetwork", {
-        toolId,
-        target,
-        elevated: !!options.elevated,
-        timeoutMs: options.timeoutMs,
-      }),
-      limitMs,
-    ).catch((err) => {
-      console.error("[wincare:runNetwork]", toolId, err);
-      throw err;
-    });
-  },
   getLogPath: () => ipcRenderer.invoke("wincare:getLogPath"),
   systemInfo: () => ipcRenderer.invoke("wincare:systemInfo"),
   disks: () => ipcRenderer.invoke("wincare:disks"),
