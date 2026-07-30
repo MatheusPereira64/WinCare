@@ -56,7 +56,7 @@ Saída: `electron-release/WinCare-Windows-x64.zip`.
 ### Requisitos
 
 - **Windows 10 ou 11**
-- **Node.js 20+** e npm
+- **Node.js 22+** e npm
 - Conexão com internet (para alguns comandos, como DISM RestoreHealth)
 
 ### Dois modos
