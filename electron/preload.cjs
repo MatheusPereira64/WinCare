@@ -52,6 +52,20 @@ contextBridge.exposeInMainWorld("wincare", {
       });
   },
   getLogPath: () => ipcRenderer.invoke("wincare:getLogPath"),
+  getAppVersion: () => ipcRenderer.invoke("wincare:getAppVersion"),
+  checkForUpdate: () => ipcRenderer.invoke("wincare:checkForUpdate"),
+  applyUpdate: () => ipcRenderer.invoke("wincare:applyUpdate"),
+  openReleasePage: () => ipcRenderer.invoke("wincare:openReleasePage"),
+  onUpdateProgress: (handler) => {
+    const listener = (_e, payload) => handler(payload);
+    ipcRenderer.on("wincare:updateProgress", listener);
+    return () => ipcRenderer.removeListener("wincare:updateProgress", listener);
+  },
+  onUpdateAvailable: (handler) => {
+    const listener = (_e, payload) => handler(payload);
+    ipcRenderer.on("wincare:updateAvailable", listener);
+    return () => ipcRenderer.removeListener("wincare:updateAvailable", listener);
+  },
   systemInfo: () => ipcRenderer.invoke("wincare:systemInfo"),
   disks: () => ipcRenderer.invoke("wincare:disks"),
   isElevated: () => ipcRenderer.invoke("wincare:isElevated"),

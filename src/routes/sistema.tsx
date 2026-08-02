@@ -20,7 +20,7 @@ export const Route = createFileRoute("/sistema")({
   component: () => (
     <ToolSection
       title="Sistema"
-      subtitle="Acesso rápido às consoles administrativas nativas do Windows."
+      subtitle="Acesso rápido às consoles administrativas e energia do Windows."
       categories={["system"]}
     />
   ),

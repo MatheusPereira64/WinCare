@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { UpdateCard } from "@/components/wincare/UpdateCard";
 import { actions, useStore } from "@/lib/wincare/store";
 import { isNative, getNative } from "@/lib/wincare/bridge";
 import { useAdmin } from "@/lib/wincare/useAdmin";
@@ -110,6 +111,8 @@ function SettingsPage() {
           <Switch id="auto" checked={autoCheck} onCheckedChange={actions.setAutoCheck} />
         </div>
       </Card>
+
+      <UpdateCard />
 
       <Card className="surface-panel gap-3 border-border/60 p-6">
         <div className="flex items-center gap-2">

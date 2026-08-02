@@ -23,6 +23,7 @@ import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
 import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
+import { useAppUpdater } from "@/lib/wincare/useUpdate";
 
 function NotFoundComponent() {
   return (
@@ -193,9 +194,20 @@ function TopBar() {
   );
 }
 
+function StartupUpdateCheck() {
+  const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
+  useAppUpdater({ autoCheck: autoCheckUpdates });
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
+  useEffect(() => {
+    hydrateStore();
+  }, []);
 
   // Segurança leve: limpa locks órfãos do Radix ao trocar de rota (sem loop agressivo).
   useEffect(() => {
@@ -205,7 +217,6 @@ function RootComponent() {
   }, [pathname]);
 
   useEffect(() => {
-    hydrateStore();
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -230,6 +241,7 @@ function RootComponent() {
           </div>
         </div>
         <Toaster />
+        <StartupUpdateCheck />
       </SidebarProvider>
     </QueryClientProvider>
   );

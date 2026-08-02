@@ -5,6 +5,7 @@ const path = require("path");
 const url = require("url");
 const os = require("os");
 const logger = require("./logger.cjs");
+const updater = require("./updater.cjs");
 
 let mainWindow = null;
 
@@ -80,6 +81,37 @@ function buildAppMenu() {
           label: "Abrir arquivo de log",
           click: () => {
             if (logFile) shell.openPath(logFile);
+          },
+        },
+        {
+          label: "Verificar atualizações",
+          click: async () => {
+            try {
+              const info = await updater.checkForUpdate();
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send("wincare:updateAvailable", info);
+              }
+            } catch (error) {
+              logger.error(
+                "updater",
+                "Falha ao verificar atualizações (menu)",
+                error instanceof Error ? error.message : error,
+              );
+            }
+          },
+        },
+        {
+          label: "Abrir página de releases",
+          click: async () => {
+            try {
+              await updater.openLatestReleasePage();
+            } catch (error) {
+              logger.error(
+                "updater",
+                "Falha ao abrir releases",
+                error instanceof Error ? error.message : error,
+              );
+            }
           },
         },
         { type: "separator" },
@@ -550,6 +582,48 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
 });
 
 ipcMain.handle("wincare:getLogPath", () => logger.getLogPaths());
+
+ipcMain.handle("wincare:getAppVersion", () => updater.getAppVersion());
+
+ipcMain.handle("wincare:checkForUpdate", async () => {
+  try {
+    return await updater.checkForUpdate();
+  } catch (error) {
+    logger.error("updater", "checkForUpdate", error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      currentVersion: updater.getAppVersion(),
+      latestVersion: "",
+      updateAvailable: false,
+      canAutoUpdate: false,
+      packaged: updater.isReleaseBuild(),
+      reason: "failed",
+      message: error instanceof Error ? error.message : "Falha ao consultar o GitHub.",
+    };
+  }
+});
+
+ipcMain.handle("wincare:applyUpdate", async (event) => {
+  const sendProgress = (payload) => {
+    try {
+      event.sender.send("wincare:updateProgress", payload);
+    } catch {
+      /* ignore */
+    }
+  };
+  return updater.downloadAndApplyUpdate(sendProgress);
+});
+
+ipcMain.handle("wincare:openReleasePage", async () => {
+  try {
+    return await updater.openLatestReleasePage();
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Não foi possível abrir a página.",
+    };
+  }
+});
 
 /** Opens a native Windows console/app (devmgmt.msc, regedit, ms-settings:, ...). */
 ipcMain.handle("wincare:open", async (_e, target) => {

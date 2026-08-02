@@ -20,6 +20,7 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
   const [query, setQuery] = useState("");
   const [pendingExecute, setPendingExecute] = useState<(() => void) | null>(null);
   const [pendingTool, setPendingTool] = useState<Tool | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<string>("");
   const confirmCritical = useStore((s) => s.confirmCritical);
 
   const tools = useMemo(() => {
@@ -37,11 +38,13 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
   const closeConfirm = () => {
     setPendingTool(null);
     setPendingExecute(null);
+    setPendingCommand("");
   };
 
-  const requestConfirm = (tool: Tool, execute: () => void) => {
+  const requestConfirm = (tool: Tool, execute: () => void, command: string) => {
     setPendingTool(tool);
     setPendingExecute(() => execute);
+    setPendingCommand(command);
   };
 
   return (
@@ -80,7 +83,7 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
             key={tool.id}
             tool={tool}
             confirmCritical={confirmCritical}
-            onRequestConfirm={(execute) => requestConfirm(tool, execute)}
+            onRequestConfirm={(execute, command) => requestConfirm(tool, execute, command)}
           />
         ))}
       </div>
@@ -104,7 +107,7 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
             <p>
               {pendingTool.name} executa{" "}
               <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-xs">
-                {getCommandPreview(pendingTool)}
+                {pendingCommand || getCommandPreview(pendingTool)}
               </code>
               .
             </p>

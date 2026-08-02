@@ -20,12 +20,50 @@ export interface RunResult {
   output?: string;
 }
 
+export interface UpdateProgress {
+  phase: "check" | "download" | "extract" | "apply";
+  percent: number;
+  received?: number;
+  total?: number;
+}
+
+export interface UpdateInfo {
+  ok: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  updateAvailable: boolean;
+  releaseName?: string;
+  releaseNotes?: string;
+  htmlUrl?: string;
+  downloadUrl?: string | null;
+  assetName?: string | null;
+  assetSize?: number | null;
+  canAutoUpdate?: boolean;
+  packaged?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+export interface ApplyUpdateResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  info?: UpdateInfo;
+  logFile?: string;
+}
+
 export interface NativeBridge {
   run: (
     command: string,
     onData: (chunk: string) => void,
     options?: RunOptions,
   ) => Promise<RunResult>;
+  getAppVersion?: () => Promise<string>;
+  checkForUpdate?: () => Promise<UpdateInfo>;
+  applyUpdate?: () => Promise<ApplyUpdateResult>;
+  openReleasePage?: () => Promise<{ ok: boolean; message?: string; info?: UpdateInfo }>;
+  onUpdateProgress?: (handler: (progress: UpdateProgress) => void) => () => void;
+  onUpdateAvailable?: (handler: (info: UpdateInfo) => void) => () => void;
   systemInfo: () => Promise<SystemInfo>;
   disks: () => Promise<DiskDrive[]>;
   isElevated: () => Promise<boolean>;
@@ -114,6 +152,14 @@ const SIM_OUTPUT: Record<string, string[]> = {
     "C:       142857483264   511101108224",
     "D:       1204857483264  2000398934016",
   ],
+  shutdown: [
+    "Uma conta de usuário está usando este computador.",
+    "O sistema será desligado em breve.",
+    "Desligamento agendado com êxito.",
+  ],
+  "shutdown-abort": [
+    "O desligamento foi cancelado.",
+  ],
 };
 
 const SIM_RESULT: Record<string, string> = {
@@ -129,6 +175,8 @@ const SIM_RESULT: Record<string, string> = {
   "icon-cache": "Cache de ícones recriado.",
   smart: "Todos os discos com status OK.",
   "disk-space": "2 unidades analisadas.",
+  shutdown: "Desligamento agendado.",
+  "shutdown-abort": "Desligamento cancelado.",
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -19,8 +19,17 @@ export interface Tool {
   timeoutMs?: number;
   /** true when the tool just opens a native Windows app */
   launcher?: boolean;
-  /** accepts a free-text target (host, domain...) */
-  input?: { label: string; placeholder: string; defaultValue?: string };
+  /** accepts a free-text target (host, domain, minutes...) */
+  input?: {
+    label: string;
+    placeholder: string;
+    defaultValue?: string;
+    /** Multiply UI value before injecting into the command (e.g. minutes → seconds = 60). */
+    toCommandFactor?: number;
+    /** Hint shown next to the field (e.g. "minutos"). */
+    unitLabel?: string;
+    presets?: { label: string; value: string }[];
+  };
 }
 
 export interface LogLine {

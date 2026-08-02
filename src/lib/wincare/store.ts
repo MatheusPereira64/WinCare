@@ -6,6 +6,7 @@ interface State {
   favorites: string[];
   theme: "dark" | "light";
   autoCheck: boolean;
+  autoCheckUpdates: boolean;
   confirmCritical: boolean;
 }
 
@@ -19,6 +20,7 @@ const initial: State = {
   favorites: ["sfc", "temp"],
   theme: "dark",
   autoCheck: true,
+  autoCheckUpdates: true,
   confirmCritical: true,
 };
 
@@ -59,6 +61,7 @@ function persist() {
           favorites: state.favorites,
           theme: state.theme,
           autoCheck: state.autoCheck,
+          autoCheckUpdates: state.autoCheckUpdates,
           confirmCritical: state.confirmCritical,
         }),
       );
@@ -152,6 +155,9 @@ export const actions = {
   },
   setAutoCheck(autoCheck: boolean) {
     setState({ autoCheck });
+  },
+  setAutoCheckUpdates(autoCheckUpdates: boolean) {
+    setState({ autoCheckUpdates });
   },
   setConfirmCritical(confirmCritical: boolean) {
     setState({ confirmCritical });

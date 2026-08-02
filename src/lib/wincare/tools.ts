@@ -211,6 +211,41 @@ export const TOOLS: Tool[] = [
     launcher: true,
     estimate: 1000,
   },
+  {
+    id: "shutdown",
+    name: "Agendar desligamento",
+    description:
+      "Agenda o desligamento do Windows com shutdown /s /t. Escolha o atraso em minutos (ou use os atalhos). Para cancelar depois, use Cancelar desligamento.",
+    command: "shutdown /s /t 300",
+    commandPreview: "shutdown /s /t <segundos>",
+    category: "system",
+    risk: "advanced",
+    requiresConfirmation: true,
+    estimate: 2000,
+    input: {
+      label: "Desligar após",
+      placeholder: "5",
+      defaultValue: "5",
+      unitLabel: "minutos",
+      toCommandFactor: 60,
+      presets: [
+        { label: "1 min", value: "1" },
+        { label: "5 min", value: "5" },
+        { label: "15 min", value: "15" },
+        { label: "30 min", value: "30" },
+        { label: "1 h", value: "60" },
+      ],
+    },
+  },
+  {
+    id: "shutdown-abort",
+    name: "Cancelar desligamento",
+    description: "Cancela um desligamento ou reinício já agendado (shutdown /a).",
+    command: "shutdown /a",
+    category: "system",
+    risk: "safe",
+    estimate: 1500,
+  },
 
   // ---------------- Disco / integridade ----------------
   {
@@ -241,11 +276,19 @@ export function getCommandPreview(tool: Tool) {
   return tool.commandPreview ?? tool.command;
 }
 
-/** Substitui o host/domínio final quando a ferramenta aceita um destino customizado. */
+/** Substitui o último token do comando quando a ferramenta aceita um parâmetro (host, minutos…). */
 export function resolveCommand(tool: Tool, target?: string): string {
-  const host = target?.trim();
-  if (!host || !tool.input) return tool.command;
-  return tool.command.replace(/[^ ]+$/, host);
+  const raw = target?.trim();
+  if (!raw || !tool.input) return tool.command;
+
+  const factor = tool.input.toCommandFactor ?? 1;
+  const n = Number(raw.replace(",", "."));
+  const value =
+    Number.isFinite(n) && factor !== 1
+      ? String(Math.max(0, Math.round(n * factor)))
+      : raw;
+
+  return tool.command.replace(/[^ ]+$/, value);
 }
 
 export const RISK_LABEL: Record<string, string> = {
