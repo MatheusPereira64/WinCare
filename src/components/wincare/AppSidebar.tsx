@@ -8,7 +8,6 @@ import {
   Network,
   ScrollText,
   Settings,
-  ShieldCheck,
   Wrench,
 } from "lucide-react";
 
@@ -23,6 +22,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+
+const LOGO_SRC = "/wincare-icon.png";
 
 const items: { title: string; url: string; icon: typeof LayoutDashboard }[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -45,9 +46,14 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent className="pt-3">
         <div className="mb-2 flex items-center gap-2 px-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary glow-ring">
-            <ShieldCheck className="size-5" />
-          </div>
+          <img
+            src={LOGO_SRC}
+            alt="WinCare"
+            width={36}
+            height={36}
+            className="size-9 shrink-0 rounded-xl object-cover shadow-sm"
+            draggable={false}
+          />
           {!collapsed && (
             <div className="leading-tight">
               <p className="text-sm font-semibold">WinCare</p>

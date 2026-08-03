@@ -141,6 +141,7 @@ function buildAppMenu() {
 }
 
 function createWindow() {
+  const iconPath = path.join(__dirname, "icon.ico");
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -148,6 +149,7 @@ function createWindow() {
     backgroundColor: "#0d1117",
     title: APP_NAME,
     autoHideMenuBar: false,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
