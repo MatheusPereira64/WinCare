@@ -1,53 +1,112 @@
-/** Limpa locks de pointer/scroll/inert deixados pelo Radix (Dialog, AlertDialog, Sheet). */
+/**
+ * Limpa locks de pointer/scroll/inert deixados pelo Radix (Dialog/Sheet).
+ *
+ * IMPORTANTE: nunca remove nós do DOM gerenciados pelo React — isso no Electron
+ * deixa a UI “morta” (scroll nativo ainda funciona, cliques não).
+ */
 export function unlockUi() {
   if (typeof document === "undefined") return;
 
-  document.body.style.removeProperty("pointer-events");
-  document.body.style.pointerEvents = "";
+  const clearPe = (el: HTMLElement | null | undefined) => {
+    if (!el) return;
+    if (el.style.pointerEvents === "none") {
+      el.style.removeProperty("pointer-events");
+    }
+  };
+
+  clearPe(document.body);
+  clearPe(document.documentElement);
   document.body.style.removeProperty("overflow");
-  document.body.style.overflow = "";
+  document.documentElement.style.removeProperty("overflow");
   document.body.removeAttribute("data-scroll-locked");
   document.documentElement.removeAttribute("data-scroll-locked");
-  document.documentElement.style.removeProperty("overflow");
+  document.body.removeAttribute("inert");
 
   const root = document.getElementById("root");
-  if (root) {
+  if (root instanceof HTMLElement) {
     root.removeAttribute("inert");
     root.removeAttribute("aria-hidden");
     root.removeAttribute("data-aria-hidden");
-    if (root instanceof HTMLElement) {
-      root.style.pointerEvents = "";
+    clearPe(root);
+  }
+
+  for (const child of document.body.children) {
+    if (!(child instanceof HTMLElement)) continue;
+    clearPe(child);
+    if (child.hasAttribute("inert") && !child.hasAttribute("data-radix-portal")) {
+      child.removeAttribute("inert");
     }
   }
 
-  document.querySelectorAll<HTMLElement>("[inert]").forEach((el) => {
-    if (el.closest("[data-radix-portal]")) return;
-    el.removeAttribute("inert");
-  });
-
-  document.querySelectorAll<HTMLElement>('[aria-hidden="true"]').forEach((el) => {
-    if (el.closest("[data-radix-portal]")) return;
-    if (el.id === "root" || el.hasAttribute("data-aria-hidden")) {
-      el.removeAttribute("aria-hidden");
-      el.removeAttribute("data-aria-hidden");
-    }
-  });
-
-  // Remove overlays órfãos — inclusive com data-state=open se não houver content ativo.
+  // Overlays Radix fechados às vezes ficam com opacity 0 e ainda capturam clique.
   document
-    .querySelectorAll<HTMLElement>("[data-radix-alert-dialog-overlay], [data-radix-dialog-overlay]")
-    .forEach((el) => {
-      const portal = el.closest("[data-radix-portal]");
-      const hasOpenContent = portal?.querySelector(
-        '[data-radix-alert-dialog-content][data-state="open"], [data-radix-dialog-content][data-state="open"]',
-      );
-      if (!hasOpenContent) {
-        el.remove();
-        portal
-          ?.querySelectorAll("[data-radix-alert-dialog-content], [data-radix-dialog-content]")
-          .forEach((n) => {
-            if (n.getAttribute("data-state") !== "open") n.remove();
-          });
+    .querySelectorAll<HTMLElement>(
+      "[data-radix-dialog-overlay], [data-radix-alert-dialog-overlay], [data-vaul-overlay]",
+    )
+    .forEach((overlay) => {
+      const state = overlay.getAttribute("data-state");
+      if (state !== "open") {
+        overlay.style.pointerEvents = "none";
       }
     });
+
+  document.querySelectorAll<HTMLElement>("[inert]").forEach((el) => {
+    if (el.closest('[data-state="open"]')) return;
+    el.removeAttribute("inert");
+  });
+}
+
+/** Reaplica unlock após navegação, sem destruir árvore React. */
+export function watchAndUnlockUi(durationMs = 2500): () => void {
+  if (typeof document === "undefined") return () => undefined;
+
+  let muted = false;
+  const run = () => {
+    if (muted) return;
+    muted = true;
+    try {
+      unlockUi();
+    } finally {
+      window.setTimeout(() => {
+        muted = false;
+      }, 30);
+    }
+  };
+
+  run();
+  const timers = [0, 100, 400, 1000, durationMs].map((ms) => window.setTimeout(run, ms));
+
+  const obs = new MutationObserver((mutations) => {
+    // Só reage a mudanças de atributos de lock — não a childList (evita loops).
+    const relevant = mutations.some(
+      (m) =>
+        m.type === "attributes" &&
+        (m.attributeName === "style" ||
+          m.attributeName === "inert" ||
+          m.attributeName === "data-scroll-locked" ||
+          m.attributeName === "aria-hidden"),
+    );
+    if (relevant) run();
+  });
+
+  obs.observe(document.body, {
+    attributes: true,
+    attributeFilter: ["style", "data-scroll-locked", "inert", "aria-hidden"],
+  });
+  if (rootExists()) {
+    obs.observe(document.getElementById("root")!, {
+      attributes: true,
+      attributeFilter: ["style", "inert", "aria-hidden", "data-aria-hidden"],
+    });
+  }
+
+  return () => {
+    timers.forEach((id) => window.clearTimeout(id));
+    obs.disconnect();
+    unlockUi();
+  };
+}
+
+function rootExists() {
+  return !!document.getElementById("root");
 }

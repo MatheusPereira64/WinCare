@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { TriangleAlert } from "lucide-react";
 
@@ -16,6 +17,7 @@ interface Props {
 /**
  * Confirmação sem Radix AlertDialog — evita scroll-lock / inert que
  * no Electron costuma prender a UI (scroll ok, cliques mortos).
+ * Renderiza em portal no body para não herdar transform/filter dos cards.
  */
 export function ConfirmModal({
   open,
@@ -26,11 +28,12 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+      style={{ pointerEvents: "auto" }}
       role="presentation"
       onClick={onCancel}
       onKeyDown={(e) => {
@@ -42,6 +45,7 @@ export function ConfirmModal({
         aria-modal="true"
         aria-labelledby="wincare-confirm-title"
         className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg"
+        style={{ pointerEvents: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="wincare-confirm-title" className="flex items-center gap-2 text-lg font-semibold">
@@ -58,6 +62,7 @@ export function ConfirmModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

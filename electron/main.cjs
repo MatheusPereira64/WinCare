@@ -170,6 +170,43 @@ function createWindow() {
 
   mainWindow.loadURL("app://wincare/index.html");
   logger.log("window", "Janela criada", { url: "app://wincare/index.html" });
+
+  // Diagnóstico silencioso: a cada 2s amostra o que está sob o mouse / locks CSS.
+  // Aparece em %APPDATA%/WinCare/logs/wincare.log mesmo sem erro no renderer.
+  const diagTimer = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents
+      .executeJavaScript(
+        `(() => {
+          const root = document.getElementById("root");
+          const hitSide = document.elementFromPoint(36, 200);
+          const hitMain = document.elementFromPoint(420, 200);
+          const cls = (el) => (el && el.className != null ? String(el.className).slice(0, 90) : "");
+          return {
+            hash: location.hash,
+            bodyPe: document.body.style.pointerEvents || "",
+            bodyInert: document.body.hasAttribute("inert"),
+            rootInert: !!(root && root.hasAttribute("inert")),
+            rootPe: root && root.style ? root.style.pointerEvents : "",
+            portals: document.querySelectorAll("[data-radix-portal]").length,
+            overlays: document.querySelectorAll("[data-radix-dialog-overlay],[data-radix-alert-dialog-overlay]").length,
+            side: hitSide ? hitSide.tagName + "." + cls(hitSide) : "null",
+            main: hitMain ? hitMain.tagName + "." + cls(hitMain) : "null",
+          };
+        })()`,
+        true,
+      )
+      .then((info) => {
+        if (!info || (!String(info.hash || "").includes("sistema") && !String(info.hash || "").includes("configuracoes")))
+          return;
+        logger.warn("ui-diag", "amostra", info);
+      })
+      .catch((err) => {
+        logger.error("ui-diag", "falha ao amostrar", err instanceof Error ? err.message : err);
+      });
+  }, 2000);
+
+  mainWindow.on("closed", () => clearInterval(diagTimer));
 }
 
 // ES modules can't be loaded over file:// (blocked by CORS), so the built SPA

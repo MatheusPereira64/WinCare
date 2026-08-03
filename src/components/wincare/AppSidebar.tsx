@@ -35,7 +35,7 @@ const items: { title: string; url: string; icon: typeof LayoutDashboard }[] = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (r) => r.location.pathname });
 
@@ -61,7 +61,13 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={path === item.url}>
-                    <Link to={item.url} className="flex items-center gap-2">
+                    <Link
+                      to={item.url}
+                      className="flex items-center gap-2"
+                      onClick={() => {
+                        if (isMobile) setOpenMobile(false);
+                      }}
+                    >
                       <item.icon className="size-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </Link>

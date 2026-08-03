@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppSidebar } from "@/components/wincare/AppSidebar";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
@@ -152,7 +152,7 @@ function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur">
+    <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur pointer-events-auto">
       <SidebarTrigger />
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">WinCare</span>
@@ -200,21 +200,28 @@ function StartupUpdateCheck() {
   return null;
 }
 
+/** Fecha o Sheet mobile e remove locks Radix em toda navegação. */
+function RouteUiGuard() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    setOpenMobile(false);
+    unlockUi();
+    const t = window.setTimeout(unlockUi, 250);
+    return () => window.clearTimeout(t);
+  }, [pathname, setOpenMobile]);
+
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
   useEffect(() => {
     hydrateStore();
   }, []);
-
-  // Segurança leve: limpa locks órfãos do Radix ao trocar de rota (sem loop agressivo).
-  useEffect(() => {
-    unlockUi();
-    const t = window.setTimeout(unlockUi, 100);
-    return () => clearTimeout(t);
-  }, [pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -230,11 +237,11 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background">
+        <div className="flex min-h-svh w-full bg-background">
           <AppSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
-            <main className="flex-1 p-6">
+            <main className="relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
               {/* Required: nested routes render here. */}
               <Outlet />
             </main>
@@ -242,6 +249,7 @@ function RootComponent() {
         </div>
         <Toaster />
         <StartupUpdateCheck />
+        <RouteUiGuard />
       </SidebarProvider>
     </QueryClientProvider>
   );

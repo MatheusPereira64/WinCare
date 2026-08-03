@@ -152,14 +152,11 @@ const SIM_OUTPUT: Record<string, string[]> = {
     "C:       142857483264   511101108224",
     "D:       1204857483264  2000398934016",
   ],
-  shutdown: [
-    "Uma conta de usuário está usando este computador.",
-    "O sistema será desligado em breve.",
-    "Desligamento agendado com êxito.",
-  ],
-  "shutdown-abort": [
-    "O desligamento foi cancelado.",
-  ],
+  "shutdown-1": ["Desligamento agendado para daqui a 60 segundos."],
+  "shutdown-5": ["Desligamento agendado para daqui a 5 minutos."],
+  "shutdown-15": ["Desligamento agendado para daqui a 15 minutos."],
+  "shutdown-60": ["Desligamento agendado para daqui a 1 hora."],
+  "shutdown-abort": ["O desligamento foi cancelado."],
 };
 
 const SIM_RESULT: Record<string, string> = {
@@ -175,7 +172,10 @@ const SIM_RESULT: Record<string, string> = {
   "icon-cache": "Cache de ícones recriado.",
   smart: "Todos os discos com status OK.",
   "disk-space": "2 unidades analisadas.",
-  shutdown: "Desligamento agendado.",
+  "shutdown-1": "Desligamento agendado (1 min).",
+  "shutdown-5": "Desligamento agendado (5 min).",
+  "shutdown-15": "Desligamento agendado (15 min).",
+  "shutdown-60": "Desligamento agendado (1 h).",
   "shutdown-abort": "Desligamento cancelado.",
 };
 

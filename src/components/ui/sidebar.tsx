@@ -106,6 +106,13 @@ const SidebarProvider = React.forwardRef<
       return () => window.removeEventListener("keydown", handleKeyDown);
     }, [toggleSidebar]);
 
+    // Fecha o Sheet mobile ao voltar para desktop — evita overlay Radix com cliques mortos.
+    React.useEffect(() => {
+      if (!isMobile && openMobile) {
+        setOpenMobile(false);
+      }
+    }, [isMobile, openMobile, setOpenMobile]);
+
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed";
@@ -188,7 +195,7 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+        <Sheet open={openMobile} onOpenChange={setOpenMobile} modal={false} {...props}>
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
@@ -232,7 +239,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+            "fixed inset-y-0 z-[60] hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex pointer-events-auto",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",

@@ -77,7 +77,7 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
   };
 
   return (
-    <Card className="surface-panel relative z-0 gap-4 border-border/60 p-5">
+    <Card className="surface-panel flex flex-col gap-4 border-border/60 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -136,10 +136,9 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
           )}
           <Input
             id={`${tool.id}-input`}
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
+            type="text"
+            inputMode={tool.input.toCommandFactor ? "numeric" : "text"}
+            pattern={tool.input.toCommandFactor ? "[0-9]*" : undefined}
             value={target}
             placeholder={tool.input.placeholder}
             disabled={state.running}
@@ -148,7 +147,7 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
         </div>
       )}
 
-      <div className="relative z-10 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={start} disabled={state.running} className="hover-lift">
           {state.running ? <Loader2 className="animate-spin" /> : <Play />}
           {state.running ? "Executando..." : tool.launcher ? "Abrir" : "Executar"}

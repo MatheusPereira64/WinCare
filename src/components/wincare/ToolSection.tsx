@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TOOLS, getCommandPreview, RISK_LABEL } from "@/lib/wincare/tools";
 import { useStore } from "@/lib/wincare/store";
+import { unlockUi } from "@/lib/wincare/unlockUi";
 import type { Tool, ToolCategory } from "@/lib/wincare/types";
 import { ConfirmModal } from "./ConfirmModal";
 import { ToolCard } from "./ToolCard";
@@ -14,18 +15,27 @@ interface Props {
   subtitle: string;
   categories: ToolCategory[];
   developmentBadge?: string;
+  /** Conteúdo opcional acima do grid de ferramentas. */
+  leading?: ReactNode;
 }
 
-export function ToolSection({ title, subtitle, categories, developmentBadge }: Props) {
+export function ToolSection({ title, subtitle, categories, developmentBadge, leading }: Props) {
   const [query, setQuery] = useState("");
   const [pendingExecute, setPendingExecute] = useState<(() => void) | null>(null);
   const [pendingTool, setPendingTool] = useState<Tool | null>(null);
   const [pendingCommand, setPendingCommand] = useState<string>("");
   const confirmCritical = useStore((s) => s.confirmCritical);
 
+  useEffect(() => {
+    unlockUi();
+    const t = window.setTimeout(unlockUi, 200);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const tools = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return TOOLS.filter((t) => categories.includes(t.category)).filter(
+    const allowed = new Set(categories);
+    return TOOLS.filter((t) => allowed.has(t.category)).filter(
       (t) =>
         !q ||
         t.name.toLowerCase().includes(q) ||
@@ -39,6 +49,7 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
     setPendingTool(null);
     setPendingExecute(null);
     setPendingCommand("");
+    unlockUi();
   };
 
   const requestConfirm = (tool: Tool, execute: () => void, command: string) => {
@@ -76,6 +87,8 @@ export function ToolSection({ title, subtitle, categories, developmentBadge }: P
           />
         </div>
       </header>
+
+      {leading}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tools.map((tool) => (
