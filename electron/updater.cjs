@@ -62,78 +62,155 @@ function stripVersion(tag) {
   return String(tag || "").replace(/^v/i, "").trim();
 }
 
+function githubHeaders() {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": USER_AGENT,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  // Token opcional: repo privado ou rate-limit. Nunca embutir no ZIP público.
+  const token = process.env.WINCARE_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+class GitHubHttpError extends Error {
+  constructor(status, body) {
+    super(`GitHub API ${status}: ${(body || "").slice(0, 200)}`);
+    this.name = "GitHubHttpError";
+    this.status = status;
+    this.body = body || "";
+  }
+}
+
 async function githubJson(apiPath) {
   const url = `https://api.github.com${apiPath}`;
+  const headers = githubHeaders();
+
   if (typeof net.fetch === "function") {
-    const res = await net.fetch(url, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "User-Agent": USER_AGENT,
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200) || res.statusText}`);
-    }
-    return res.json();
+    const res = await net.fetch(url, { headers });
+    const body = await res.text().catch(() => "");
+    if (!res.ok) throw new GitHubHttpError(res.status, body || res.statusText);
+    return body ? JSON.parse(body) : null;
   }
 
   return new Promise((resolve, reject) => {
     https
-      .get(
-        url,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            "User-Agent": USER_AGENT,
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        },
-        (res) => {
-          let data = "";
-          res.on("data", (c) => {
-            data += c;
-          });
-          res.on("end", () => {
-            if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(`GitHub API ${res.statusCode}: ${data.slice(0, 200)}`));
-              return;
-            }
-            try {
-              resolve(JSON.parse(data));
-            } catch (err) {
-              reject(err);
-            }
-          });
-        },
-      )
+      .get(url, { headers }, (res) => {
+        let data = "";
+        res.on("data", (c) => {
+          data += c;
+        });
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new GitHubHttpError(res.statusCode, data));
+            return;
+          }
+          try {
+            resolve(data ? JSON.parse(data) : null);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      })
       .on("error", reject);
   });
 }
 
-async function checkForUpdate() {
-  const currentVersion = getAppVersion();
-  const release = await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`);
-  const latestVersion = stripVersion(release.tag_name);
-  const assets = Array.isArray(release.assets) ? release.assets : [];
-  const asset = assets.find((a) => a && a.name === ASSET_NAME) || null;
-  const updateAvailable = compareVersions(currentVersion, latestVersion) < 0;
+function pickAsset(release) {
+  const assets = Array.isArray(release?.assets) ? release.assets : [];
+  return assets.find((a) => a && a.name === ASSET_NAME) || null;
+}
 
+function releaseToInfo(release, currentVersion) {
+  const latestVersion = stripVersion(release.tag_name);
+  const asset = pickAsset(release);
   return {
     ok: true,
     currentVersion,
     latestVersion,
-    updateAvailable,
+    updateAvailable: compareVersions(currentVersion, latestVersion) < 0,
     releaseName: release.name || `WinCare ${release.tag_name}`,
     releaseNotes: typeof release.body === "string" ? release.body.slice(0, 4000) : "",
-    htmlUrl: release.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+    htmlUrl: release.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
     downloadUrl: asset?.browser_download_url || null,
     assetName: asset?.name || null,
     assetSize: asset?.size || null,
     canAutoUpdate: isReleaseBuild() && !!asset?.browser_download_url,
     packaged: isReleaseBuild(),
   };
+}
+
+/** Escolhe o release publicado mais novo (evita drafts; prefere estável). */
+function pickBestRelease(list) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const published = list.filter((r) => r && !r.draft);
+  if (!published.length) return null;
+  const stable = published.filter((r) => !r.prerelease);
+  const pool = stable.length ? stable : published;
+  return pool.sort((a, b) => compareVersions(stripVersion(b.tag_name), stripVersion(a.tag_name)))[0];
+}
+
+function unavailableResult(currentVersion, reason, message) {
+  return {
+    ok: false,
+    currentVersion,
+    latestVersion: "",
+    updateAvailable: false,
+    canAutoUpdate: false,
+    packaged: isReleaseBuild(),
+    htmlUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
+    reason,
+    message,
+  };
+}
+
+async function fetchLatestRelease() {
+  try {
+    return await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`);
+  } catch (error) {
+    if (!(error instanceof GitHubHttpError) || error.status !== 404) throw error;
+    // /latest ignora prereleases e some em repo privado sem token → tenta a lista.
+    const list = await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=15`);
+    const best = pickBestRelease(list);
+    if (!best) {
+      throw new GitHubHttpError(
+        404,
+        "Nenhum release publicado encontrado (repo privado, ainda sem release, ou só draft).",
+      );
+    }
+    return best;
+  }
+}
+
+async function checkForUpdate() {
+  const currentVersion = getAppVersion();
+  try {
+    const release = await fetchLatestRelease();
+    return releaseToInfo(release, currentVersion);
+  } catch (error) {
+    const status = error instanceof GitHubHttpError ? error.status : 0;
+    if (status === 404) {
+      logger.warn(
+        "updater",
+        "Releases indisponíveis via API (404). Repo privado sem token, ou ainda sem release público.",
+      );
+      return unavailableResult(
+        currentVersion,
+        "not-found",
+        "Não foi possível consultar releases. Se o repositório for privado, torne-o público ou defina WINCARE_GITHUB_TOKEN. Confira também se o release já foi publicado.",
+      );
+    }
+    if (status === 401 || status === 403) {
+      logger.warn("updater", `GitHub API ${status} (auth/rate-limit)`);
+      return unavailableResult(
+        currentVersion,
+        "auth",
+        "Sem permissão para ler releases do GitHub. Use um token com acesso de leitura ou deixe o repositório público.",
+      );
+    }
+    throw error;
+  }
 }
 
 function downloadFile(fileUrl, destPath, onProgress) {
@@ -351,9 +428,18 @@ async function downloadAndApplyUpdate(onProgress) {
 
 async function openLatestReleasePage() {
   const { shell } = require("electron");
-  const info = await checkForUpdate();
-  await shell.openExternal(info.htmlUrl);
-  return { ok: true, info };
+  const fallback = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
+  try {
+    const info = await checkForUpdate();
+    await shell.openExternal(info.htmlUrl || fallback);
+    return { ok: true, info };
+  } catch (error) {
+    await shell.openExternal(fallback);
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Abriu a lista de releases.",
+    };
+  }
 }
 
 module.exports = {

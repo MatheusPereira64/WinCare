@@ -91,6 +91,9 @@ function buildAppMenu() {
               if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send("wincare:updateAvailable", info);
               }
+              if (!info.ok) {
+                logger.warn("updater", "Verificação sem release", info.message || info.reason);
+              }
             } catch (error) {
               logger.error(
                 "updater",
@@ -597,6 +600,7 @@ ipcMain.handle("wincare:checkForUpdate", async () => {
       updateAvailable: false,
       canAutoUpdate: false,
       packaged: updater.isReleaseBuild(),
+      htmlUrl: `https://github.com/${updater.GITHUB_OWNER}/${updater.GITHUB_REPO}/releases`,
       reason: "failed",
       message: error instanceof Error ? error.message : "Falha ao consultar o GitHub.",
     };
