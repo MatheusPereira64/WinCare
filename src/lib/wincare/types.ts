@@ -1,6 +1,6 @@
 export type RiskLevel = "safe" | "warning" | "advanced";
 
-export type ToolCategory = "repair" | "system" | "cleanup" | "disk";
+export type ToolCategory = "repair" | "system" | "cleanup" | "disk" | "network";
 
 export interface Tool {
   id: string;

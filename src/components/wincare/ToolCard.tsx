@@ -1,11 +1,10 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { Copy, Loader2, Play, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { formatLog, useToolRunner } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
@@ -26,30 +25,18 @@ interface ToolCardProps {
   onRequestConfirm?: (execute: () => void, command: string) => void;
 }
 
+/** Sem campo de texto no card — inputs livres travam a UI no Electron. */
 function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProps) {
   const { state, run, reset } = useToolRunner(tool);
   const { isFavorite, toggle } = useFavorite(tool.id);
   const storeConfirmCritical = useStore((s) => s.confirmCritical);
-  const [target, setTarget] = useState(tool.input?.defaultValue ?? "");
   const [confirming, setConfirming] = useState(false);
   const shouldConfirm = confirmCritical ?? storeConfirmCritical;
 
-  const command = useMemo(
-    () => resolveCommand(tool, target || undefined),
-    [tool, target],
-  );
+  const resolvedCommand = () => resolveCommand(tool);
 
   const execute = () => {
-    if (tool.input?.toCommandFactor) {
-      const raw = target.trim().replace(",", ".");
-      const n = Number(raw);
-      if (!raw || !Number.isFinite(n) || n < 0) {
-        toast.error("Informe um valor válido para o atraso.");
-        return;
-      }
-    }
-
-    void run(target || undefined).then((finished) => {
+    void run().then((finished) => {
       if (!finished) return;
       if (finished.status === "error") {
         toast.error(finished.result || "Falha na execução");
@@ -62,7 +49,7 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
   const start = () => {
     if (tool.requiresConfirmation && shouldConfirm) {
       if (onRequestConfirm) {
-        onRequestConfirm(execute, command);
+        onRequestConfirm(execute, resolvedCommand());
         return;
       }
       setConfirming(true);
@@ -94,9 +81,9 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
           <p className="mt-2 text-sm text-muted-foreground">{tool.description}</p>
           <code
             className="mt-3 block truncate rounded-md bg-muted/60 px-2 py-1 font-mono text-xs text-muted-foreground"
-            title={command}
+            title={getCommandPreview(tool)}
           >
-            {tool.input ? command : getCommandPreview(tool)}
+            {getCommandPreview(tool)}
           </code>
         </div>
         <Button
@@ -110,42 +97,6 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
           <Star className={isFavorite ? "fill-current" : ""} />
         </Button>
       </div>
-
-      {tool.input && (
-        <div className="grid gap-2">
-          <label className="text-xs text-muted-foreground" htmlFor={`${tool.id}-input`}>
-            {tool.input.label}
-            {tool.input.unitLabel ? ` (${tool.input.unitLabel})` : ""}
-          </label>
-          {tool.input.presets && tool.input.presets.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {tool.input.presets.map((preset) => (
-                <Button
-                  key={preset.value}
-                  type="button"
-                  size="sm"
-                  variant={target === preset.value ? "default" : "outline"}
-                  disabled={state.running}
-                  className="h-8 px-2.5 text-xs"
-                  onClick={() => setTarget(preset.value)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          <Input
-            id={`${tool.id}-input`}
-            type="text"
-            inputMode={tool.input.toCommandFactor ? "numeric" : "text"}
-            pattern={tool.input.toCommandFactor ? "[0-9]*" : undefined}
-            value={target}
-            placeholder={tool.input.placeholder}
-            disabled={state.running}
-            onChange={(e) => setTarget(e.target.value)}
-          />
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={start} disabled={state.running} className="hover-lift">
@@ -190,7 +141,10 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
         >
           <p>
             {tool.name} executa{" "}
-            <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-xs">{command}</code>.
+            <code className="rounded bg-muted/60 px-1 py-0.5 font-mono text-xs">
+              {resolvedCommand()}
+            </code>
+            .
           </p>
           {tool.requiresAdmin && <p>Pode aparecer o prompt UAC se o app não estiver elevado.</p>}
           <p>Nível de risco: {RISK_LABEL[tool.risk]}.</p>

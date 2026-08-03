@@ -1,0 +1,46 @@
+---
+description: Electron — não usar campos de texto livres na UI (congelam o app)
+alwaysApply: true
+---
+
+# Electron: campos de texto travam a UI
+
+No app desktop WinCare (`npm run wincare:dev` / Electron), **campos `<input>` de texto livres** (controlados ou não) já causaram freeze silencioso:
+
+- cliques mortos (sidebar, topbar, botões)
+- scroll ainda funciona
+- sem overlay/`inert`/`pointer-events` óbvio
+- sem erro no console do renderer
+
+Páginas afetadas no passado: **Sistema** (timer com input) e **Redes** (host customizado).
+
+## O que NÃO fazer
+
+```tsx
+// ❌ BAD — input livre (mesmo defaultValue / ref / uncontrolled)
+<input value={host} onChange={(e) => setHost(e.target.value)} />
+<input defaultValue="8.8.8.8" ref={hostRef} />
+<Input value={minutes} onChange={...} />   // shadcn
+tool.input = { label: "Destino", defaultValue: "8.8.8.8" } // ToolCard
+```
+
+## O que fazer
+
+```tsx
+// ✅ GOOD — só presets / tools com comando fixo
+<Button onClick={() => runPing("8.8.8.8")}>Google DNS</Button>
+// ou entrada em tools.ts sem campo `input`:
+{ id: "ping-google", command: "ping -n 4 -w 2000 8.8.8.8", ... }
+```
+
+Exceções já estáveis (não proliferar):
+
+- campo de **busca** do `ToolSection` (já existe; não copie o padrão para novos cards)
+
+## Checklist ao adicionar UI em Electron
+
+1. Preferir botões/presets com valores fixos
+2. Não adicionar `tool.input` em `tools.ts`
+3. Não montar `<input>` / `<Input>` em cards de ferramenta (ping, shutdown, etc.)
+4. Após mudanças de UI: rebuild com `npm run wincare:dev` (build estático)
+5. Testar cliques na sidebar + na página logo ao abrir a aba

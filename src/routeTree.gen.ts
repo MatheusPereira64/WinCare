@@ -15,6 +15,7 @@ import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
+import { Route as RedesRouteImport } from './routes/redes'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as SistemaRouteImport } from './routes/sistema'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -49,6 +50,11 @@ const MonitoramentoRoute = MonitoramentoRouteImport.update({
   path: '/monitoramento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RedesRoute = RedesRouteImport.update({
+  id: '/redes',
+  path: '/redes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReparoRoute = ReparoRouteImport.update({
   id: '/reparo',
   path: '/reparo',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/redes'
     | '/reparo'
     | '/sistema'
     | '/sitemap.xml'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/redes'
     | '/reparo'
     | '/sistema'
     | '/sitemap.xml'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/redes'
     | '/reparo'
     | '/sistema'
     | '/sitemap.xml'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   LimpezaRoute: typeof LimpezaRoute
   LogsRoute: typeof LogsRoute
   MonitoramentoRoute: typeof MonitoramentoRoute
+  RedesRoute: typeof RedesRoute
   ReparoRoute: typeof ReparoRoute
   SistemaRoute: typeof SistemaRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MonitoramentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/redes': {
+      id: '/redes'
+      path: '/redes'
+      fullPath: '/redes'
+      preLoaderRoute: typeof RedesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reparo': {
       id: '/reparo'
       path: '/reparo'
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   LimpezaRoute: LimpezaRoute,
   LogsRoute: LogsRoute,
   MonitoramentoRoute: MonitoramentoRoute,
+  RedesRoute: RedesRoute,
   ReparoRoute: ReparoRoute,
   SistemaRoute: SistemaRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
