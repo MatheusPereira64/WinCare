@@ -57,6 +57,8 @@ export interface SystemInfo {
   cpuUsage: number;
   memoryUsage: number;
   memoryTotalGb: number;
+  /** Memória física em uso (GB). */
+  memoryUsedGb?: number | null;
   diskUsage: number;
   diskTotalGb: number;
   uptime: string;
@@ -64,6 +66,16 @@ export interface SystemInfo {
   lastUpdate: string;
   health: number;
   simulated: boolean;
+  /** °C via zona térmica ACPI — nem sempre disponível. */
+  cpuTemperature?: number | null;
+  /** Quase nunca exposta no Windows sem sensor dedicado. */
+  memoryTemperature?: number | null;
+  gpuName?: string | null;
+  gpuUsage?: number | null;
+  gpuTemperature?: number | null;
+  gpuMemoryUsedMb?: number | null;
+  gpuMemoryTotalMb?: number | null;
+  gpuMemoryUsage?: number | null;
 }
 
 export interface DiskDrive {

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  CircuitBoard,
   Clock,
   Cpu,
   HardDrive,
@@ -20,7 +21,7 @@ import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
 import { useStore } from "@/lib/wincare/store";
 import { TOOLS } from "@/lib/wincare/tools";
-import { useSystemInfo } from "@/lib/wincare/useSystem";
+import { useSystemInfo, isSystemInfoLoading } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/")({
 
 function Dashboard() {
   const info = useSystemInfo();
+  const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
   const autoCheck = useStore((s) => s.autoCheck);
 
@@ -61,7 +63,9 @@ function Dashboard() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Estado atual de {info.hostname} — atualizado a cada 3 segundos.
+          {loading
+            ? "Lendo informações do sistema…"
+            : `Estado atual de ${info.hostname} — atualizado a cada 3 segundos.`}
         </p>
       </header>
 
@@ -69,7 +73,11 @@ function Dashboard() {
         <Card className="surface-panel items-center justify-center border-border/60 p-6">
           <HealthRing value={info.health} />
           <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
-            {info.health >= 80 ? "Sistema saudável" : "Requer atenção"}
+            {loading
+              ? "Carregando…"
+              : info.health >= 80
+                ? "Sistema saudável"
+                : "Requer atenção"}
           </Badge>
         </Card>
 
@@ -84,14 +92,35 @@ function Dashboard() {
             icon={<Cpu className="size-4" />}
             label="Uso de CPU"
             value={`${info.cpuUsage}%`}
+            hint={
+              typeof info.cpuTemperature === "number"
+                ? `${info.cpuTemperature} °C`
+                : "Temperatura indisponível"
+            }
             progress={info.cpuUsage}
           />
           <StatCard
             icon={<MemoryStick className="size-4" />}
             label="Memória"
             value={`${info.memoryUsage}%`}
-            hint={`${info.memoryTotalGb} GB instalados`}
+            hint={
+              typeof info.memoryUsedGb === "number"
+                ? `${info.memoryUsedGb} / ${info.memoryTotalGb} GB`
+                : `${info.memoryTotalGb} GB instalados`
+            }
             progress={info.memoryUsage}
+          />
+          <StatCard
+            icon={<CircuitBoard className="size-4" />}
+            label="GPU"
+            value={typeof info.gpuUsage === "number" ? `${info.gpuUsage}%` : "—"}
+            hint={[
+              info.gpuName,
+              typeof info.gpuTemperature === "number" ? `${info.gpuTemperature} °C` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Sensor indisponível"}
+            progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
           />
           <StatCard
             icon={<HardDrive className="size-4" />}

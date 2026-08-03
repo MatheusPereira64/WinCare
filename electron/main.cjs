@@ -6,6 +6,41 @@ const url = require("url");
 const os = require("os");
 const logger = require("./logger.cjs");
 const updater = require("./updater.cjs");
+const { enrichSystemInfo } = require("./system-metrics.cjs");
+
+/** Espaço de uma unidade via Node (mais confiável que WMI no Electron). */
+function readDriveSpace(rootPath) {
+  try {
+    const s = fs.statfsSync(rootPath);
+    const total = Number(s.blocks) * Number(s.bsize);
+    const free = Number(s.bfree) * Number(s.bsize);
+    if (!Number.isFinite(total) || total <= 0) return null;
+    return {
+      totalBytes: total,
+      freeBytes: free,
+      usedPct: Math.round(((total - free) / total) * 100),
+      freeGb: Math.round(free / 1024 ** 3),
+      totalGb: Math.round(total / 1024 ** 3),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function listFixedDriveLetters() {
+  const letters = [];
+  for (let i = 67; i <= 90; i++) {
+    // C..Z
+    const letter = String.fromCharCode(i);
+    const root = `${letter}:\\`;
+    try {
+      if (fs.existsSync(root)) letters.push(letter);
+    } catch {
+      /* ignore */
+    }
+  }
+  return letters;
+}
 
 let mainWindow = null;
 
@@ -757,11 +792,10 @@ ipcMain.handle("wincare:systemInfo", async () => {
       (await psJson(
         "$os = Get-CimInstance Win32_OperatingSystem; " +
           "$cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average; " +
-          "$disk = Get-CimInstance Win32_LogicalDisk -Filter \\\"DeviceID='C:'\\\"; " +
           "$def = try { (Get-MpComputerStatus).RealTimeProtectionEnabled } catch { $null }; " +
           "$hf = try { (Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn.ToString('dd/MM/yyyy') } catch { 'Desconhecida' }; " +
           "@{ osName = $os.Caption; build = $os.BuildNumber; cpu = [int]$cpu; " +
-          "diskFree = [double]$disk.FreeSpace; diskSize = [double]$disk.Size; defender = $def; lastUpdate = $hf } | ConvertTo-Json -Compress",
+          "defender = $def; lastUpdate = $hf } | ConvertTo-Json -Compress",
       )) || {};
   } catch {
     extra = {};
@@ -769,16 +803,17 @@ ipcMain.handle("wincare:systemInfo", async () => {
 
   const totalMem = os.totalmem();
   const memoryUsage = Math.round(((totalMem - os.freemem()) / totalMem) * 100);
-  const diskUsage = extra.diskSize
-    ? Math.round(((extra.diskSize - extra.diskFree) / extra.diskSize) * 100)
-    : 0;
-  const cpuUsage = typeof extra.cpu === "number" ? extra.cpu : 0;
+  const cDrive = readDriveSpace("C:\\");
+  const diskUsage = cDrive?.usedPct ?? 0;
+  const diskTotalGb = cDrive?.totalGb ?? 0;
+  const cpuFromWmi = typeof extra.cpu === "number" ? extra.cpu : null;
+  const cpuUsage = cpuFromWmi ?? 0;
   const health = Math.max(
     0,
     Math.round(100 - cpuUsage * 0.2 - memoryUsage * 0.2 - Math.max(0, diskUsage - 70) * 1.2),
   );
 
-  return {
+  const base = {
     hostname: os.hostname(),
     osName: extra.osName || `${os.type()} ${os.release()}`,
     build: extra.build || os.release(),
@@ -786,7 +821,7 @@ ipcMain.handle("wincare:systemInfo", async () => {
     memoryUsage,
     memoryTotalGb: Math.round(totalMem / 1024 ** 3),
     diskUsage,
-    diskTotalGb: extra.diskSize ? Math.round(extra.diskSize / 1024 ** 3) : 0,
+    diskTotalGb,
     uptime: `${days} dias, ${hours}:${minutes}`,
     defenderStatus:
       extra.defender === true
@@ -798,28 +833,40 @@ ipcMain.handle("wincare:systemInfo", async () => {
     health,
     simulated: false,
   };
+
+  try {
+    return await enrichSystemInfo(base, { cpuFromWmi });
+  } catch (error) {
+    logger.warn("metrics", "Falha ao enriquecer métricas", error instanceof Error ? error.message : error);
+    return base;
+  }
 });
 
 ipcMain.handle("wincare:disks", async () => {
+  const letters = listFixedDriveLetters();
+  let driveMeta = [];
   try {
     const rows = await psJson(
       "Get-CimInstance Win32_DiskDrive | ForEach-Object { @{ model = $_.Model; status = $_.Status; size = [double]$_.Size } } | ConvertTo-Json -Compress",
     );
-    const volumes = await psJson(
-      "Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { @{ letter = $_.DeviceID; free = [double]$_.FreeSpace; size = [double]$_.Size } } | ConvertTo-Json -Compress",
-    );
-    const vols = Array.isArray(volumes) ? volumes : [volumes].filter(Boolean);
-    const drives = Array.isArray(rows) ? rows : [rows].filter(Boolean);
-
-    return vols.map((v, i) => ({
-      letter: v.letter,
-      model: drives[i]?.model ?? "Unidade",
-      type: /ssd|nvme/i.test(drives[i]?.model ?? "") ? "SSD" : "HDD",
-      smart: drives[i]?.status ?? "OK",
-      freeGb: Math.round(v.free / 1024 ** 3),
-      totalGb: Math.round(v.size / 1024 ** 3),
-    }));
+    driveMeta = Array.isArray(rows) ? rows : [rows].filter(Boolean);
   } catch {
-    return [];
+    driveMeta = [];
   }
+
+  return letters
+    .map((letter, i) => {
+      const space = readDriveSpace(`${letter}:\\`);
+      if (!space || space.totalGb <= 0) return null;
+      const meta = driveMeta[i] || driveMeta[0] || {};
+      return {
+        letter: `${letter}:`,
+        model: meta.model || `Unidade ${letter}:`,
+        type: /ssd|nvme/i.test(String(meta.model || "")) ? "SSD" : "HDD",
+        smart: meta.status || "OK",
+        freeGb: space.freeGb,
+        totalGb: space.totalGb,
+      };
+    })
+    .filter(Boolean);
 });

@@ -292,6 +292,7 @@ export const SIMULATED_SYSTEM: SystemInfo = {
   cpuUsage: 23,
   memoryUsage: 46,
   memoryTotalGb: 32,
+  memoryUsedGb: 14.7,
   diskUsage: 72,
   diskTotalGb: 476,
   uptime: "2 dias, 06:14",
@@ -299,6 +300,14 @@ export const SIMULATED_SYSTEM: SystemInfo = {
   lastUpdate: "24/07/2026",
   health: 87,
   simulated: true,
+  cpuTemperature: 48,
+  memoryTemperature: null,
+  gpuName: "NVIDIA GeForce RTX 4060",
+  gpuUsage: 18,
+  gpuTemperature: 52,
+  gpuMemoryUsedMb: 2048,
+  gpuMemoryTotalMb: 8192,
+  gpuMemoryUsage: 25,
 };
 
 export const SIMULATED_DISKS: DiskDrive[] = [
