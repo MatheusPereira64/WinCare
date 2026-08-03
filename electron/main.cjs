@@ -250,12 +250,15 @@ if (hasSingleInstanceLock) {
 
 const MAX_STREAM_LINES = 300;
 const DEFAULT_RUN_TIMEOUT_MS = 60000;
+const LONG_REPAIR_TIMEOUT_MS = 30 * 60 * 1000;
 const SPAWN_OPTS = { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] };
 
 const commandTimeoutMs = (command, timeoutMs) => {
   if (typeof timeoutMs === "number" && timeoutMs > 0) return timeoutMs;
   if (/^tracert(\.exe)?\s/i.test(command)) return 90000;
   if (/^ping(\.exe)?\s/i.test(command)) return 15000;
+  // SFC / DISM / CHKDSK — demoram muitos minutos; 60s padrão abortava no meio.
+  if (/^(sfc|dism|chkdsk)(\.exe)?(\s|$)/i.test(command.trim())) return LONG_REPAIR_TIMEOUT_MS;
   return DEFAULT_RUN_TIMEOUT_MS;
 };
 
@@ -421,7 +424,7 @@ function runElevatedBuffered(command, limitMs = 120000) {
 }
 
 /** Runs a single command elevated via UAC and streams output from temp log files. */
-function runElevatedCommand(event, { command, runId }) {
+function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEOUT_MS }) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const outFile = path.join(os.tmpdir(), `wincare-${id}.out.log`);
   const errFile = path.join(os.tmpdir(), `wincare-${id}.err.log`);
@@ -436,6 +439,15 @@ function runElevatedCommand(event, { command, runId }) {
     let pollTimer = null;
     let sentLines = 0;
     let truncated = false;
+    let settled = false;
+
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      if (pollTimer) clearInterval(pollTimer);
+      cleanupFiles([outFile, errFile, batFile]);
+      resolve(payload);
+    };
 
     const streamFile = (file, getLast, setLast) => {
       if (!fs.existsSync(file)) return;
@@ -482,23 +494,36 @@ function runElevatedCommand(event, { command, runId }) {
     };
 
     const ps = `Start-Process -FilePath '${batFile.replace(/'/g, "''")}' -Verb RunAs -Wait -WindowStyle Hidden`;
-    exec(
+    const child = exec(
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps.replace(/"/g, '\\"')}"`,
+      { timeout: limitMs, windowsHide: true, maxBuffer: 1024 * 1024 },
       (err) => {
-        if (pollTimer) clearInterval(pollTimer);
         poll();
 
         const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8").trim() : "";
         const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8").trim() : "";
-        cleanupFiles([outFile, errFile, batFile]);
+
+        if (err && err.killed) {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send("wincare:data", {
+              runId,
+              chunk: `[Tempo limite de ${Math.round(limitMs / 1000)}s atingido — comando encerrado.]\n`,
+            });
+          }
+          finish({
+            code: 1,
+            result: `Comando encerrado após ${Math.round(limitMs / 1000)} segundos.`,
+          });
+          return;
+        }
 
         if (!stdout && !stderr && err) {
-          resolve({ code: 1, result: "Permissão de administrador negada ou cancelada." });
+          finish({ code: 1, result: "Permissão de administrador negada ou cancelada." });
           return;
         }
 
         const tail = (stdout || stderr).split(/\r?\n/).filter(Boolean).pop() || "";
-        resolve({
+        finish({
           code: err && !stdout ? 1 : 0,
           result:
             tail ||
@@ -507,6 +532,31 @@ function runElevatedCommand(event, { command, runId }) {
       },
     );
 
+    // Safety kill — Start-Process -Wait às vezes ignora o timeout do exec.
+    const killTimer = setTimeout(() => {
+      if (settled) return;
+      try {
+        if (child.pid && process.platform === "win32") {
+          exec(`taskkill /PID ${child.pid} /T /F`, { windowsHide: true });
+        } else {
+          child.kill("SIGKILL");
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("wincare:data", {
+          runId,
+          chunk: `[Tempo limite de ${Math.round(limitMs / 1000)}s atingido — comando encerrado.]\n`,
+        });
+      }
+      finish({
+        code: 1,
+        result: `Comando encerrado após ${Math.round(limitMs / 1000)} segundos.`,
+      });
+    }, limitMs + 1500);
+
+    child.on("exit", () => clearTimeout(killTimer));
     pollTimer = setInterval(poll, 400);
   });
 }
@@ -514,11 +564,11 @@ function runElevatedCommand(event, { command, runId }) {
 /** Runs a command through cmd.exe and streams stdout/stderr back to the renderer. */
 ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutMs }) => {
   try {
-    if (elevated && process.platform === "win32") {
-      return await runElevatedCommand(event, { command, runId });
-    }
-
     const limitMs = commandTimeoutMs(command, timeoutMs);
+
+    if (elevated && process.platform === "win32") {
+      return await runElevatedCommand(event, { command, runId, limitMs });
+    }
 
     if (isBufferedCommand(command)) {
       return await runBufferedCommand(event, { command, runId, limitMs });

@@ -32,14 +32,16 @@ contextBridge.exposeInMainWorld("wincare", {
     }
 
     streamHandlers.set(runId, onData);
-    const limitMs = options.timeoutMs || 60000;
+    // Alinha com o main: reparos longos (sfc/dism/chkdsk) têm 30 min sem timeoutMs explícito.
+    const isLongRepair = /^(sfc|dism|chkdsk)(\.exe)?(\s|$)/i.test(String(command || "").trim());
+    const limitMs = options.timeoutMs || (isLongRepair ? 30 * 60 * 1000 : 60000);
 
     return withTimeout(
       ipcRenderer.invoke("wincare:run", {
         command,
         runId,
         elevated: !!options.elevated,
-        timeoutMs: options.timeoutMs,
+        timeoutMs: options.timeoutMs || (isLongRepair ? limitMs : undefined),
       }),
       limitMs,
     )
