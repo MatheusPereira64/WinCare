@@ -15,13 +15,14 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
 import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
 import { useStore } from "@/lib/wincare/store";
 import { TOOLS } from "@/lib/wincare/tools";
-import { useSystemInfo, isSystemInfoLoading } from "@/lib/wincare/useSystem";
+import { isSystemInfoLoading, useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/")({
 
 function Dashboard() {
   const info = useSystemInfo();
+  const disks = useDisks();
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
   const autoCheck = useStore((s) => s.autoCheck);
@@ -143,6 +145,8 @@ function Dashboard() {
           />
         </div>
       </div>
+
+      <DiagnosticReportCard system={info} disks={disks} />
 
       <FullCheckCard />
 

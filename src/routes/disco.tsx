@@ -4,6 +4,7 @@ import { HardDrive, Thermometer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import { useDisks } from "@/lib/wincare/useSystem";
 
@@ -13,13 +14,12 @@ export const Route = createFileRoute("/disco")({
       { title: "Integridade e saúde dos discos | WinCare" },
       {
         name: "description",
-        content:
-          "Status SMART, saúde do SSD, espaço livre e temperatura de cada unidade instalada no computador.",
+        content: "Status SMART, espaço livre, análise de pastas grandes e limpeza direcionada.",
       },
       { property: "og:title", content: "Integridade e saúde dos discos | WinCare" },
       {
         property: "og:description",
-        content: "Acompanhe SMART, espaço livre e temperatura dos seus discos.",
+        content: "Acompanhe SMART, espaço livre e limpe pastas que ocupam disco.",
       },
     ],
   }),
@@ -35,7 +35,7 @@ function DiskPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Disco</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Integridade das unidades instaladas e espaço disponível.
+            Integridade das unidades instaladas, espaço disponível e pastas que mais ocupam.
           </p>
         </header>
 
@@ -84,6 +84,8 @@ function DiskPage() {
           })}
         </div>
       </section>
+
+      <DiskSpaceAnalyzer />
 
       <ToolSection
         title="Diagnóstico de armazenamento"

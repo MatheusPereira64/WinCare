@@ -87,3 +87,31 @@ export interface DiskDrive {
   totalGb: number;
   temperature?: number;
 }
+
+export type StartupLocation = "hkcu-run" | "hklm-run" | "startup-folder";
+
+export interface StartupItem {
+  id: string;
+  name: string;
+  command: string;
+  location: StartupLocation;
+  enabled: boolean;
+  /** itens HKLM exigem admin para alterar */
+  requiresAdmin?: boolean;
+}
+
+export interface TopProcess {
+  name: string;
+  pid: number;
+  cpu: number;
+  memMb: number;
+}
+
+export interface DiskUsageFolder {
+  id: string;
+  label: string;
+  path: string;
+  sizeBytes: number;
+  clearable: boolean;
+  hint?: string;
+}

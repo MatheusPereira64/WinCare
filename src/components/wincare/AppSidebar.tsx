@@ -6,6 +6,7 @@ import {
   HardDrive,
   LayoutDashboard,
   Network,
+  Rocket,
   ScrollText,
   Settings,
   Wrench,
@@ -22,14 +23,14 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-const LOGO_SRC = "/wincare-icon.png";
+import appLogo from "@/assets/wincare-icon.png";
 
 const items: { title: string; url: string; icon: typeof LayoutDashboard }[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Reparo", url: "/reparo", icon: Wrench },
   { title: "Limpeza", url: "/limpeza", icon: Brush },
   { title: "Disco", url: "/disco", icon: HardDrive },
+  { title: "Inicialização", url: "/inicializacao", icon: Rocket },
   { title: "Sistema", url: "/sistema", icon: Gauge },
   { title: "Redes", url: "/redes", icon: Network },
   { title: "Monitoramento", url: "/monitoramento", icon: Activity },
@@ -47,11 +48,11 @@ export function AppSidebar() {
       <SidebarContent className="pt-3">
         <div className="mb-2 flex items-center gap-2 px-3">
           <img
-            src={LOGO_SRC}
+            src={appLogo}
             alt="WinCare"
             width={36}
             height={36}
-            className="size-9 shrink-0 rounded-xl object-cover shadow-sm"
+            className="size-9 shrink-0 rounded-xl object-cover glow-ring shadow-sm"
             draggable={false}
           />
           {!collapsed && (

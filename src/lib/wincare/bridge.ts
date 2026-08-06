@@ -1,4 +1,11 @@
-import type { DiskDrive, SystemInfo, Tool } from "./types";
+import type {
+  DiskDrive,
+  DiskUsageFolder,
+  StartupItem,
+  SystemInfo,
+  Tool,
+  TopProcess,
+} from "./types";
 
 /**
  * Bridge to the native layer.
@@ -66,6 +73,15 @@ export interface NativeBridge {
   onUpdateAvailable?: (handler: (info: UpdateInfo) => void) => () => void;
   systemInfo: () => Promise<SystemInfo>;
   disks: () => Promise<DiskDrive[]>;
+  listStartup: () => Promise<StartupItem[]>;
+  setStartupEnabled: (id: string, enabled: boolean) => Promise<{ ok: boolean; reason?: string }>;
+  topProcesses?: () => Promise<TopProcess[]>;
+  diskUsage: () => Promise<DiskUsageFolder[]>;
+  clearDiskFolder: (id: string) => Promise<{ ok: boolean; reason?: string; freedBytes?: number }>;
+  saveTextFile?: (
+    content: string,
+    defaultName?: string,
+  ) => Promise<{ ok: boolean; path?: string; reason?: string }>;
   isElevated: () => Promise<boolean>;
   restartAsAdmin: () => Promise<{ ok: boolean; reason?: string }>;
   clearStorage?: () => Promise<{ ok: boolean }>;
@@ -328,5 +344,77 @@ export const SIMULATED_DISKS: DiskDrive[] = [
     freeGb: 1122,
     totalGb: 1863,
     temperature: 38,
+  },
+];
+
+export const SIMULATED_STARTUP: StartupItem[] = [
+  {
+    id: "hkcu-run:OneDrive",
+    name: "OneDrive",
+    command: '"C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe" /background',
+    location: "hkcu-run",
+    enabled: true,
+  },
+  {
+    id: "hkcu-run:Discord",
+    name: "Discord",
+    command: '"C:\\Users\\Usuario\\AppData\\Local\\Discord\\Update.exe" --processStart Discord.exe',
+    location: "hkcu-run",
+    enabled: true,
+  },
+  {
+    id: "hkcu-run:Steam",
+    name: "Steam",
+    command: '"C:\\Program Files (x86)\\Steam\\steam.exe" -silent',
+    location: "hkcu-run",
+    enabled: false,
+  },
+  {
+    id: "hklm-run:SecurityHealth",
+    name: "SecurityHealth",
+    command: "%windir%\\system32\\SecurityHealthSystray.exe",
+    location: "hklm-run",
+    enabled: true,
+    requiresAdmin: true,
+  },
+];
+
+export const SIMULATED_DISK_USAGE: DiskUsageFolder[] = [
+  {
+    id: "temp-user",
+    label: "Temporários do usuário",
+    path: "C:\\Users\\Usuario\\AppData\\Local\\Temp",
+    sizeBytes: 2_450_000_000,
+    clearable: true,
+    hint: "%TEMP%",
+  },
+  {
+    id: "temp-win",
+    label: "Temp do Windows",
+    path: "C:\\Windows\\Temp",
+    sizeBytes: 820_000_000,
+    clearable: true,
+  },
+  {
+    id: "downloads",
+    label: "Downloads",
+    path: "C:\\Users\\Usuario\\Downloads",
+    sizeBytes: 6_100_000_000,
+    clearable: false,
+    hint: "Revise manualmente antes de apagar",
+  },
+  {
+    id: "recycle",
+    label: "Lixeira",
+    path: "RecycleBin",
+    sizeBytes: 1_200_000_000,
+    clearable: true,
+  },
+  {
+    id: "inet-cache",
+    label: "Cache do Internet Explorer/Edge legado",
+    path: "C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\Windows\\INetCache",
+    sizeBytes: 340_000_000,
+    clearable: true,
   },
 ];

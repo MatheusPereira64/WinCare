@@ -58,7 +58,7 @@ function main() {
     `--out=${outDir}`,
     "--overwrite",
     "--executable-name=WinCare",
-    "--icon=electron/icon.ico",
+    "--icon=electron/assets/icon.ico",
     "--win32metadata.ProductName=WinCare",
     "--win32metadata.FileDescription=WinCare — Central de manutenção do Windows",
     "--win32metadata.InternalName=WinCare",

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, protocol, net, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, protocol, net, Menu, dialog } = require("electron");
 const { spawn, exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -175,8 +175,20 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+function resolveAppIcon() {
+  const ico = path.join(__dirname, "assets", "icon.ico");
+  const png256 = path.join(__dirname, "assets", "icon-256.png");
+  const png = path.join(__dirname, "assets", "icon.png");
+  if (fs.existsSync(ico)) return ico;
+  if (fs.existsSync(png256)) return png256;
+  if (fs.existsSync(png)) return png;
+  return undefined;
+}
+
 function createWindow() {
-  const iconPath = path.join(__dirname, "icon.ico");
+  const icon = resolveAppIcon() || (fs.existsSync(path.join(__dirname, "icon.ico"))
+    ? path.join(__dirname, "icon.ico")
+    : undefined);
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -184,13 +196,20 @@ function createWindow() {
     backgroundColor: "#0d1117",
     title: APP_NAME,
     autoHideMenuBar: false,
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  if (icon && process.platform === "win32") {
+    try {
+      mainWindow.setIcon(icon);
+    } catch {
+      /* ignore */
+    }
+  }
 
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.key === "F12") {
@@ -830,6 +849,33 @@ const psJson = (script, timeoutMs = 20000) =>
     );
   });
 
+/** Scripts longos: evita escaping quebrado via arquivo .ps1 temporário. */
+const psFileJson = (scriptBody, timeoutMs = 60000) =>
+  new Promise((resolve, reject) => {
+    const ps1 = path.join(os.tmpdir(), `wincare-ps-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`);
+    fs.writeFileSync(ps1, scriptBody, "utf8");
+    exec(
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}"`,
+      { maxBuffer: 1024 * 1024 * 16, timeout: timeoutMs, windowsHide: true },
+      (err, stdout) => {
+        try {
+          fs.unlinkSync(ps1);
+        } catch {
+          /* ignore */
+        }
+        if (err && !stdout) {
+          reject(err);
+          return;
+        }
+        try {
+          resolve(JSON.parse(String(stdout || "null").trim() || "null"));
+        } catch (parseErr) {
+          reject(parseErr);
+        }
+      },
+    );
+  });
+
 ipcMain.handle("wincare:systemInfo", async () => {
   const uptimeSec = os.uptime();
   const days = Math.floor(uptimeSec / 86400);
@@ -919,4 +965,398 @@ ipcMain.handle("wincare:disks", async () => {
       };
     })
     .filter(Boolean);
+});
+
+/** Lista programas de inicialização (Run HKCU/HKLM + pasta Startup + desabilitados pelo WinCare). */
+ipcMain.handle("wincare:listStartup", async () => {
+  if (process.platform !== "win32") return [];
+  try {
+    const rows = await psFileJson(
+      `
+$ErrorActionPreference = 'SilentlyContinue'
+$items = @()
+
+function Add-RunKey($path, $location, $requiresAdmin) {
+  if (-not (Test-Path $path)) { return }
+  $props = Get-ItemProperty -Path $path
+  foreach ($p in $props.PSObject.Properties) {
+    if ($p.Name -match '^(PS|\\\\)') { continue }
+    $items += [ordered]@{
+      id = ($location + ':' + $p.Name)
+      name = $p.Name
+      command = [string]$p.Value
+      location = $location
+      enabled = $true
+      requiresAdmin = [bool]$requiresAdmin
+    }
+  }
+}
+
+Add-RunKey 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' 'hkcu-run' $false
+Add-RunKey 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' 'hklm-run' $true
+
+$startup = [Environment]::GetFolderPath('Startup')
+Get-ChildItem -LiteralPath $startup -Force | ForEach-Object {
+  $enabled = -not $_.Name.ToLower().EndsWith('.disabled')
+  $display = $_.Name
+  if ($display.ToLower().EndsWith('.disabled')) { $display = $display.Substring(0, $display.Length - 9) }
+  $display = [System.IO.Path]::GetFileNameWithoutExtension($display)
+  $items += [ordered]@{
+    id = ('startup-folder:' + $_.Name)
+    name = $display
+    command = $_.FullName
+    location = 'startup-folder'
+    enabled = $enabled
+    requiresAdmin = $false
+  }
+}
+
+$disabled = 'HKCU:\\Software\\WinCare\\DisabledStartup'
+if (Test-Path $disabled) {
+  $props = Get-ItemProperty -Path $disabled
+  foreach ($p in $props.PSObject.Properties) {
+    if ($p.Name -match '^(PS|\\\\)') { continue }
+    $raw = [string]$p.Value
+    $sep = $raw.IndexOf('||')
+    $cmd = if ($sep -ge 0) { $raw.Substring($sep + 2) } else { $raw }
+    $loc = if ($sep -ge 0) { $raw.Substring(0, $sep) } else { 'hkcu-run' }
+    $items += [ordered]@{
+      id = ($loc + ':' + $p.Name)
+      name = $p.Name
+      command = $cmd
+      location = $loc
+      enabled = $false
+      requiresAdmin = ($loc -eq 'hklm-run')
+    }
+  }
+}
+
+,@($items) | ConvertTo-Json -Compress -Depth 4
+`,
+      45000,
+    );
+    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+    return list;
+  } catch (error) {
+    logger.error("startup", "listStartup falhou", error instanceof Error ? error.message : error);
+    return [];
+  }
+});
+
+function getUserStartupDir() {
+  return path.join(
+    process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
+    "Microsoft",
+    "Windows",
+    "Start Menu",
+    "Programs",
+    "Startup",
+  );
+}
+
+/** Resolve caminho do item da pasta Inicializar (nome do arquivo ou caminho absoluto legado). */
+function resolveStartupFolderPath(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  if (/^[A-Za-z]:[\\/]/.test(value) || value.includes("/") || value.includes("\\")) {
+    return value;
+  }
+  return path.join(getUserStartupDir(), value);
+}
+
+function regQueryValue(key, name) {
+  return new Promise((resolve) => {
+    exec(
+      `reg query "${key}" /v "${name.replace(/"/g, "")}"`,
+      { windowsHide: true, timeout: 8000 },
+      (err, stdout) => {
+        if (err) {
+          resolve(null);
+          return;
+        }
+        const lines = String(stdout || "")
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        for (const line of lines) {
+          const m = line.match(/^(\S+)\s+REG_\w+\s+(.*)$/i);
+          if (m && m[1].toLowerCase() === name.toLowerCase()) {
+            resolve(m[2]);
+            return;
+          }
+        }
+        resolve(null);
+      },
+    );
+  });
+}
+
+function regSetValue(key, name, value) {
+  return new Promise((resolve, reject) => {
+    const safeName = String(name).replace(/"/g, "");
+    const safeValue = String(value).replace(/"/g, '\\"');
+    exec(
+      `reg add "${key}" /v "${safeName}" /t REG_SZ /d "${safeValue}" /f`,
+      { windowsHide: true, timeout: 8000 },
+      (err) => (err ? reject(err) : resolve()),
+    );
+  });
+}
+
+function regDeleteValue(key, name) {
+  return new Promise((resolve) => {
+    const safeName = String(name).replace(/"/g, "");
+    exec(`reg delete "${key}" /v "${safeName}" /f`, { windowsHide: true, timeout: 8000 }, () =>
+      resolve(),
+    );
+  });
+}
+
+function ensureRegKey(key) {
+  return new Promise((resolve) => {
+    exec(`reg add "${key}" /f`, { windowsHide: true, timeout: 8000 }, () => resolve());
+  });
+}
+
+/** Ativa/desativa item de inicialização (HKCU e pasta Startup) em Node — sem PowerShell. */
+ipcMain.handle("wincare:setStartupEnabled", async (_e, { id, enabled }) => {
+  if (process.platform !== "win32") return { ok: false, reason: "not-windows" };
+  try {
+    const safeId = String(id || "");
+    const wantEnabled = !!enabled;
+
+    if (safeId.startsWith("startup-folder:")) {
+      const raw = safeId.slice("startup-folder:".length);
+      const target = resolveStartupFolderPath(raw);
+      if (!target) return { ok: false, reason: "Caminho de inicializacao invalido." };
+
+      const asDisabled = target.toLowerCase().endsWith(".disabled")
+        ? target
+        : `${target}.disabled`;
+      const asEnabled = target.toLowerCase().endsWith(".disabled")
+        ? target.slice(0, -".disabled".length)
+        : target;
+
+      if (wantEnabled) {
+        const src = fs.existsSync(asDisabled)
+          ? asDisabled
+          : fs.existsSync(target) && target.toLowerCase().endsWith(".disabled")
+            ? target
+            : null;
+        if (!src) {
+          if (fs.existsSync(asEnabled)) return { ok: true };
+          return { ok: false, reason: "Arquivo de inicializacao nao encontrado." };
+        }
+        fs.renameSync(src, asEnabled);
+        return { ok: true };
+      }
+
+      const src = fs.existsSync(asEnabled)
+        ? asEnabled
+        : fs.existsSync(target) && !target.toLowerCase().endsWith(".disabled")
+          ? target
+          : null;
+      if (!src) {
+        if (fs.existsSync(asDisabled)) return { ok: true };
+        return { ok: false, reason: "Arquivo de inicializacao nao encontrado." };
+      }
+      fs.renameSync(src, `${src}.disabled`);
+      return { ok: true };
+    }
+
+    if (safeId.startsWith("hklm-run:")) {
+      return {
+        ok: false,
+        reason: "Itens do sistema (HKLM) exigem administrador. Use Executar como admin.",
+      };
+    }
+
+    if (!safeId.startsWith("hkcu-run:")) {
+      return { ok: false, reason: "Tipo de item nao suportado." };
+    }
+
+    const name = safeId.slice("hkcu-run:".length);
+    if (!name || /[\\/]/.test(name)) {
+      return { ok: false, reason: "Nome de item invalido." };
+    }
+
+    const runKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    const disabledKey = "HKCU\\Software\\WinCare\\DisabledStartup";
+    await ensureRegKey("HKCU\\Software\\WinCare");
+    await ensureRegKey(disabledKey);
+
+    if (wantEnabled) {
+      const saved = await regQueryValue(disabledKey, name);
+      if (!saved) {
+        return { ok: false, reason: "Nao ha valor salvo para reativar este item." };
+      }
+      const cmd = saved.includes("||") ? saved.split("||").slice(1).join("||") : saved;
+      await regSetValue(runKey, name, cmd);
+      await regDeleteValue(disabledKey, name);
+      return { ok: true };
+    }
+
+    const current = await regQueryValue(runKey, name);
+    if (!current) {
+      return { ok: false, reason: "Item ja nao esta na inicializacao do usuario." };
+    }
+    await regSetValue(disabledKey, name, `hkcu-run||${current}`);
+    await regDeleteValue(runKey, name);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao alterar inicializacao.",
+    };
+  }
+});
+
+/** Processos com maior uso de CPU/memoria (amostra). */
+ipcMain.handle("wincare:topProcesses", async () => {
+  if (process.platform !== "win32") return [];
+  try {
+    const rows = await psJson(
+      "Get-Process | Where-Object { $_.Name -ne 'Idle' -and $_.Name -ne 'System' } | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 10 @{N='name';E={$_.ProcessName}}, @{N='pid';E={$_.Id}}, @{N='cpu';E={[math]::Round(([double]($_.CPU)),1)}}, @{N='memMb';E={[math]::Round($_.WorkingSet64/1MB,0)}} | ConvertTo-Json -Compress",
+    );
+    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+    return list.map((p) => ({
+      name: String(p.name || "?"),
+      pid: Number(p.pid) || 0,
+      cpu: typeof p.cpu === "number" ? p.cpu : 0,
+      memMb: typeof p.memMb === "number" ? p.memMb : 0,
+    }));
+  } catch {
+    return [];
+  }
+});
+
+/** Mede pastas que costumam ocupam espaço (C:) — timeouts curtos por pasta. */
+ipcMain.handle("wincare:diskUsage", async () => {
+  if (process.platform !== "win32") return [];
+  try {
+    const rows = await psFileJson(
+      `
+$ErrorActionPreference = 'SilentlyContinue'
+
+function Get-DirSize([string]$path) {
+  if (-not $path) { return 0 }
+  if (-not (Test-Path -LiteralPath $path)) { return 0 }
+  $sum = 0L
+  try {
+    Get-ChildItem -LiteralPath $path -Force -Recurse -File -ErrorAction SilentlyContinue |
+      ForEach-Object { $sum += $_.Length }
+  } catch {}
+  return [double]$sum
+}
+
+$targets = @(
+  @{ id = 'temp-user'; label = 'Temporários do usuário'; path = $env:TEMP; clearable = $true; hint = '%TEMP%' },
+  @{ id = 'temp-win'; label = 'Temp do Windows'; path = (Join-Path $env:WINDIR 'Temp'); clearable = $true; hint = 'C:\\Windows\\Temp' },
+  @{ id = 'downloads'; label = 'Downloads'; path = (Join-Path $env:USERPROFILE 'Downloads'); clearable = $false; hint = 'Revise manualmente antes de apagar' },
+  @{ id = 'recycle'; label = 'Lixeira'; path = 'RecycleBin'; clearable = $true; hint = 'Itens na Lixeira' },
+  @{ id = 'inet-cache'; label = 'Cache do Internet Explorer/Edge legado'; path = (Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\INetCache'); clearable = $true },
+  @{ id = 'thumb-cache'; label = 'Cache de miniaturas'; path = (Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Explorer'); clearable = $false; hint = 'Use Limpar cache do Windows na aba Limpeza' },
+  @{ id = 'wu-download'; label = 'Download do Windows Update'; path = (Join-Path $env:WINDIR 'SoftwareDistribution\\Download'); clearable = $false; hint = 'Use Limpar cache do Windows Update' }
+)
+
+$result = @()
+foreach ($t in $targets) {
+  $size = 0
+  if ($t.id -eq 'recycle') {
+    try {
+      $shell = New-Object -ComObject Shell.Application
+      $ns = $shell.NameSpace(0xA)
+      if ($ns) { foreach ($i in $ns.Items()) { $size += [double]$i.Size } }
+    } catch { $size = 0 }
+  } else {
+    $size = Get-DirSize $t.path
+  }
+  $result += [ordered]@{
+    id = $t.id
+    label = $t.label
+    path = $t.path
+    sizeBytes = [double]$size
+    clearable = [bool]$t.clearable
+    hint = $t.hint
+  }
+}
+
+,@($result) | ConvertTo-Json -Compress -Depth 4
+`,
+      120000,
+    );
+    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+    return list;
+  } catch (error) {
+    logger.error("disk", "diskUsage falhou", error instanceof Error ? error.message : error);
+    return [];
+  }
+});
+
+const CLEARABLE_FOLDERS = new Set(["temp-user", "temp-win", "recycle", "inet-cache"]);
+
+ipcMain.handle("wincare:clearDiskFolder", async (_e, { id }) => {
+  if (process.platform !== "win32") return { ok: false, reason: "not-windows" };
+  const folderId = String(id || "");
+  if (!CLEARABLE_FOLDERS.has(folderId)) {
+    return { ok: false, reason: "Esta pasta não pode ser limpa automaticamente." };
+  }
+  try {
+    const result = await psFileJson(
+      `
+$ErrorActionPreference = 'SilentlyContinue'
+$id = ${JSON.stringify(folderId)}
+$freed = 0
+
+function Clear-Dir([string]$path) {
+  if (-not (Test-Path -LiteralPath $path)) { return 0 }
+  $before = 0L
+  Get-ChildItem -LiteralPath $path -Force -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $before += $_.Length }
+  Get-ChildItem -LiteralPath $path -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+  return [double]$before
+}
+
+switch ($id) {
+  'temp-user' { $freed = Clear-Dir $env:TEMP }
+  'temp-win' { $freed = Clear-Dir (Join-Path $env:WINDIR 'Temp') }
+  'inet-cache' { $freed = Clear-Dir (Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\INetCache') }
+  'recycle' {
+    try { Clear-RecycleBin -Force -ErrorAction Stop; $freed = 1 } catch { $freed = 0 }
+  }
+}
+
+@{ ok = $true; freedBytes = [double]$freed } | ConvertTo-Json -Compress
+`,
+      90000,
+    );
+    if (result && typeof result === "object") return result;
+    return { ok: true, freedBytes: 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao limpar pasta.",
+    };
+  }
+});
+
+ipcMain.handle("wincare:saveTextFile", async (_e, { content, defaultName }) => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const result = await dialog.showSaveDialog(win || undefined, {
+    title: "Salvar relatório WinCare",
+    defaultPath: defaultName || `WinCare-relatorio-${new Date().toISOString().slice(0, 10)}.txt`,
+    filters: [
+      { name: "Texto", extensions: ["txt"] },
+      { name: "Todos", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePath) return { ok: false, reason: "cancelled" };
+  try {
+    fs.writeFileSync(result.filePath, String(content ?? ""), "utf8");
+    return { ok: true, path: result.filePath };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao salvar arquivo.",
+    };
+  }
 });

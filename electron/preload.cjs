@@ -70,6 +70,14 @@ contextBridge.exposeInMainWorld("wincare", {
   },
   systemInfo: () => ipcRenderer.invoke("wincare:systemInfo"),
   disks: () => ipcRenderer.invoke("wincare:disks"),
+  listStartup: () => ipcRenderer.invoke("wincare:listStartup"),
+  setStartupEnabled: (id, enabled) =>
+    ipcRenderer.invoke("wincare:setStartupEnabled", { id, enabled }),
+  topProcesses: () => ipcRenderer.invoke("wincare:topProcesses"),
+  diskUsage: () => ipcRenderer.invoke("wincare:diskUsage"),
+  clearDiskFolder: (id) => ipcRenderer.invoke("wincare:clearDiskFolder", { id }),
+  saveTextFile: (content, defaultName) =>
+    ipcRenderer.invoke("wincare:saveTextFile", { content, defaultName }),
   isElevated: () => ipcRenderer.invoke("wincare:isElevated"),
   restartAsAdmin: () => ipcRenderer.invoke("wincare:restartAsAdmin"),
   clearStorage: () => ipcRenderer.invoke("wincare:clearStorage"),
