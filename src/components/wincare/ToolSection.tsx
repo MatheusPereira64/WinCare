@@ -64,10 +64,16 @@ export function ToolSection({ title, subtitle, categories, developmentBadge, lea
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/60 px-2.5 text-muted-foreground"
+            >
+              {tools.length} {tools.length === 1 ? "ferramenta" : "ferramentas"}
+            </Badge>
             {developmentBadge && (
               <Badge
                 variant="outline"
-                className="border-warning/40 bg-warning/10 text-warning"
+                className="rounded-full border-warning/30 bg-warning/10 text-warning"
                 title="Funcionalidade instável — correções em andamento"
               >
                 {developmentBadge}
@@ -82,7 +88,7 @@ export function ToolSection({ title, subtitle, categories, developmentBadge, lea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Pesquisar ferramenta (Ctrl + K)"
-            className="pl-9"
+            className="rounded-full border-border/60 bg-card/60 pl-9"
             data-wincare-search
           />
         </div>

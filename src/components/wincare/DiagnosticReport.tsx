@@ -73,7 +73,7 @@ export function DiagnosticReportCard({ system, disks }: Props) {
           type="button"
           onClick={() => void exportReport()}
           disabled={busy}
-          className="hover-lift"
+          className="rounded-full"
         >
           {busy ? <Loader2 className="animate-spin" /> : <Download />}
           {busy ? "Gerando…" : "Exportar relatório"}

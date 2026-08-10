@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Copy, Loader2, Play, Star } from "lucide-react";
+import { Brush, Copy, Gauge, HardDrive, Loader2, Network, Play, Star, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -9,14 +9,28 @@ import { Progress } from "@/components/ui/progress";
 import { formatLog, useToolRunner } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
 import { getCommandPreview, resolveCommand, RISK_LABEL } from "@/lib/wincare/tools";
-import type { Tool } from "@/lib/wincare/types";
+import type { Tool, ToolCategory } from "@/lib/wincare/types";
 import { ConfirmModal } from "./ConfirmModal";
 import { LogView } from "./LogView";
 
 const riskStyle: Record<string, string> = {
-  safe: "border-success/40 bg-success/10 text-success",
-  warning: "border-warning/40 bg-warning/10 text-warning",
-  advanced: "border-destructive/40 bg-destructive/10 text-destructive",
+  safe: "border-success/30 bg-success/10 text-success",
+  warning: "border-warning/30 bg-warning/10 text-warning",
+  advanced: "border-destructive/30 bg-destructive/10 text-destructive",
+};
+
+const riskChip: Record<string, string> = {
+  safe: "bg-primary/15 text-primary",
+  warning: "bg-warning/15 text-warning",
+  advanced: "bg-destructive/15 text-destructive",
+};
+
+const categoryIcon: Record<ToolCategory, typeof Wrench> = {
+  repair: Wrench,
+  cleanup: Brush,
+  disk: HardDrive,
+  network: Network,
+  system: Gauge,
 };
 
 interface ToolCardProps {
@@ -63,28 +77,40 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
     toast.success("Log copiado para a área de transferência");
   };
 
+  const CategoryIcon = categoryIcon[tool.category] ?? Wrench;
+
   return (
-    <Card className="surface-panel flex flex-col gap-4 border-border/60 p-5">
+    <Card className="surface-panel hover-lift flex flex-col gap-4 border-border/50 p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold">{tool.name}</h3>
-            <Badge variant="outline" className={riskStyle[tool.risk]}>
-              {RISK_LABEL[tool.risk]}
-            </Badge>
-            {tool.requiresAdmin && (
-              <Badge variant="outline" className="border-border/70 text-muted-foreground">
-                Administrador
-              </Badge>
-            )}
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">{tool.description}</p>
-          <code
-            className="mt-3 block truncate rounded-md bg-muted/60 px-2 py-1 font-mono text-xs text-muted-foreground"
-            title={getCommandPreview(tool)}
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl ${riskChip[tool.risk]}`}
           >
-            {getCommandPreview(tool)}
-          </code>
+            <CategoryIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold tracking-tight">{tool.name}</h3>
+              <Badge variant="outline" className={`rounded-full ${riskStyle[tool.risk]}`}>
+                {RISK_LABEL[tool.risk]}
+              </Badge>
+              {tool.requiresAdmin && (
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-border/70 text-muted-foreground"
+                >
+                  Administrador
+                </Badge>
+              )}
+            </div>
+            <p className="mt-1.5 text-sm text-muted-foreground">{tool.description}</p>
+            <code
+              className="mt-3 block truncate rounded-lg border border-border/40 bg-background/50 px-2.5 py-1.5 font-mono text-xs text-muted-foreground"
+              title={getCommandPreview(tool)}
+            >
+              {getCommandPreview(tool)}
+            </code>
+          </div>
         </div>
         <Button
           type="button"
@@ -92,14 +118,14 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
           size="icon"
           aria-label="Favoritar ferramenta"
           onClick={toggle}
-          className={isFavorite ? "text-warning" : "text-muted-foreground"}
+          className={`rounded-full ${isFavorite ? "text-warning" : "text-muted-foreground"}`}
         >
           <Star className={isFavorite ? "fill-current" : ""} />
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={start} disabled={state.running} className="hover-lift">
+        <Button type="button" onClick={start} disabled={state.running} className="rounded-full">
           {state.running ? <Loader2 className="animate-spin" /> : <Play />}
           {state.running ? "Executando..." : tool.launcher ? "Abrir" : "Executar"}
         </Button>

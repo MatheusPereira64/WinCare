@@ -86,14 +86,14 @@ export function FullCheckCard() {
   };
 
   return (
-    <Card className="surface-panel gap-4 border-primary/30 p-6 glow-ring">
+    <Card className="hero-panel gap-4 border-primary/25 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/20 text-primary">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/20 text-primary glow-ring">
             <ShieldCheck className="size-6" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Verificação Completa</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Verificação Completa</h2>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
               Executa em sequência SFC, DISM CheckHealth, ScanHealth, RestoreHealth e verificação de
               disco, com uma única barra de progresso.
@@ -101,13 +101,14 @@ export function FullCheckCard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => void start()} disabled={running} className="hover-lift">
+          <Button onClick={() => void start()} disabled={running} className="rounded-full">
             {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
             {running ? "Verificando..." : "Iniciar verificação"}
           </Button>
           {lines.length > 0 && (
             <Button
               variant="secondary"
+              className="rounded-full"
               onClick={async () => {
                 await navigator.clipboard.writeText(formatLog(lines));
                 toast.success("Log copiado");

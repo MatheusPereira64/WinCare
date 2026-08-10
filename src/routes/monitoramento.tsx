@@ -135,7 +135,7 @@ function MonitorPage() {
           },
         },
         labels: ["CPU", "RAM", "Disco C:"],
-        colors: ["#2dd4bf", "#38bdf8", "#f59e0b"],
+        colors: ["#548dfc", "#43c6f5", "#a78bfa"],
       }),
     [],
   );
@@ -144,7 +144,7 @@ function MonitorPage() {
     () =>
       chartTheme({
         chart: { type: "area", sparkline: { enabled: false } },
-        colors: ["#2dd4bf"],
+        colors: ["#548dfc"],
         fill: {
           type: "gradient",
           gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 },
@@ -168,7 +168,7 @@ function MonitorPage() {
     () =>
       chartTheme({
         chart: { type: "area" },
-        colors: ["#38bdf8"],
+        colors: ["#43c6f5"],
         fill: {
           type: "gradient",
           gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05 },
@@ -193,7 +193,7 @@ function MonitorPage() {
       chartTheme({
         chart: { type: "bar", stacked: false },
         plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: "55%" } },
-        colors: ["#f59e0b", "#334155"],
+        colors: ["#fbbf24", "#2e3650"],
         xaxis: {
           categories: disks.map((d) => d.letter),
           max: 100,
@@ -252,7 +252,13 @@ function MonitorPage() {
             {!nativeMode && " Modo demonstração."}
           </p>
         </div>
-        <Badge variant="outline">Atualização a cada 2s</Badge>
+        <Badge
+          variant="outline"
+          className="rounded-full border-primary/30 bg-primary/10 px-2.5 text-primary"
+        >
+          <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+          Ao vivo — 2s
+        </Badge>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -349,14 +355,16 @@ function MetricTile({
   hint: string;
 }) {
   return (
-    <Card className="surface-panel border-border/60 p-4">
+    <Card className="surface-panel hover-lift border-border/50 p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
           <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
         </div>
-        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
           <Icon className="size-4" />
         </div>
       </div>

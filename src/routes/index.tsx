@@ -59,6 +59,7 @@ function Dashboard() {
   }, [autoCheck]);
 
   const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
+  const healthy = info.health >= 80;
 
   return (
     <div className="space-y-6">
@@ -71,25 +72,42 @@ function Dashboard() {
         </p>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
-        <Card className="surface-panel items-center justify-center border-border/60 p-6">
+      <Card className="hero-panel border-border/50 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-8">
           <HealthRing value={info.health} />
-          <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
-            {loading
-              ? "Carregando…"
-              : info.health >= 80
-                ? "Sistema saudável"
-                : "Requer atenção"}
-          </Badge>
-        </Card>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={
+                  healthy
+                    ? "rounded-full border-success/30 bg-success/10 px-3 text-success"
+                    : "rounded-full border-warning/30 bg-warning/10 px-3 text-warning"
+                }
+              >
+                <span
+                  className={`size-1.5 rounded-full ${healthy ? "bg-success" : "bg-warning"}`}
+                />
+                {loading ? "Carregando…" : healthy ? "Sistema saudável" : "Requer atenção"}
+              </Badge>
+              <Badge variant="outline" className="rounded-full border-border/60 px-3 text-muted-foreground">
+                <Monitor className="size-3" /> {info.hostname}
+              </Badge>
+            </div>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              {info.osName} — Build {info.build}. Ligado há {info.uptime}. Última atualização do
+              Windows: {info.lastUpdate}.
+            </p>
+            <div className="grid max-w-2xl gap-x-8 gap-y-3 sm:grid-cols-3">
+              <HeroMeter label="CPU" value={info.cpuUsage} />
+              <HeroMeter label="Memória" value={info.memoryUsage} />
+              <HeroMeter label="Disco C:" value={info.diskUsage} />
+            </div>
+          </div>
+        </div>
+      </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
-            icon={<Monitor className="size-4" />}
-            label="Computador"
-            value={info.hostname}
-            hint={`${info.osName} — Build ${info.build}`}
-          />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard
             icon={<Cpu className="size-4" />}
             label="Uso de CPU"
@@ -143,7 +161,6 @@ function Dashboard() {
             value={info.defenderStatus}
             hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
           />
-        </div>
       </div>
 
       <DiagnosticReportCard system={info} disks={disks} />
@@ -164,6 +181,28 @@ function Dashboard() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** Medidor compacto usado dentro do painel hero. */
+function HeroMeter({ label, value }: { label: string; value: number }) {
+  const clamped = Math.min(100, Math.max(0, value));
+  const tone =
+    clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold tabular-nums">{clamped}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${tone}`}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
     </div>
   );
 }

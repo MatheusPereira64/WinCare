@@ -58,11 +58,11 @@ function DiskPage() {
                   </div>
                   <Badge
                     variant="outline"
-                    className={
+                    className={`rounded-full ${
                       disk.smart === "OK"
-                        ? "border-success/40 bg-success/10 text-success"
-                        : "border-destructive/40 bg-destructive/10 text-destructive"
-                    }
+                        ? "border-success/30 bg-success/10 text-success"
+                        : "border-destructive/30 bg-destructive/10 text-destructive"
+                    }`}
                   >
                     SMART {disk.smart}
                   </Badge>

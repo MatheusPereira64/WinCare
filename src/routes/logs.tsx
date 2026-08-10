@@ -118,13 +118,13 @@ function LogsPage() {
                 </span>
                 <Badge
                   variant="outline"
-                  className={
+                  className={`rounded-full ${
                     run.status === "success"
-                      ? "border-success/40 bg-success/10 text-success"
+                      ? "border-success/30 bg-success/10 text-success"
                       : run.status === "error"
-                        ? "border-destructive/40 bg-destructive/10 text-destructive"
-                        : "border-primary/40 bg-primary/10 text-primary"
-                  }
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-primary/30 bg-primary/10 text-primary"
+                  }`}
                 >
                   {run.status === "success"
                     ? "Sucesso"

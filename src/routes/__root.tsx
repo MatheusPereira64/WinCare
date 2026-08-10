@@ -132,9 +132,24 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Dashboard",
+  "/reparo": "Reparo",
+  "/limpeza": "Limpeza",
+  "/disco": "Disco",
+  "/inicializacao": "Inicialização",
+  "/sistema": "Sistema",
+  "/redes": "Redes",
+  "/monitoramento": "Monitoramento",
+  "/logs": "Logs",
+  "/configuracoes": "Configurações",
+};
+
 function TopBar() {
   const theme = useStore((s) => s.theme);
   const { native, elevated, restartAsAdmin } = useAdmin();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pageTitle = PAGE_TITLES[pathname];
 
   const handleRestartAsAdmin = async () => {
     const out = await restartAsAdmin();
@@ -154,30 +169,46 @@ function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur pointer-events-auto">
-      <SidebarTrigger />
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold">WinCare</span>
-        <Badge variant="outline" className="border-primary/40 text-primary">
-          {isNative() ? "Modo nativo" : "Modo demonstração"}
-        </Badge>
-        {native && elevated === true && (
-          <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
-            <ShieldCheck className="size-3" /> Administrador
-          </Badge>
-        )}
-        {native && elevated === false && (
-          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
-            <Shield className="size-3" /> Usuário padrão
-          </Badge>
+    <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border/50 bg-background/70 px-4 backdrop-blur-md pointer-events-auto">
+      <SidebarTrigger className="rounded-lg" />
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+        <span className="text-sm font-semibold tracking-tight">WinCare</span>
+        {pageTitle && (
+          <>
+            <span className="text-muted-foreground/40">/</span>
+            <span className="truncate text-sm text-muted-foreground">{pageTitle}</span>
+          </>
         )}
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <Badge
+          variant="outline"
+          className="hidden rounded-full border-primary/30 bg-primary/10 px-2.5 text-primary md:inline-flex"
+        >
+          <span className="size-1.5 rounded-full bg-primary" />
+          {isNative() ? "Nativo" : "Demonstração"}
+        </Badge>
+        {native && elevated === true && (
+          <Badge
+            variant="outline"
+            className="hidden rounded-full border-success/30 bg-success/10 px-2.5 text-success sm:inline-flex"
+          >
+            <ShieldCheck className="size-3" /> Admin
+          </Badge>
+        )}
+        {native && elevated === false && (
+          <Badge
+            variant="outline"
+            className="hidden rounded-full border-warning/30 bg-warning/10 px-2.5 text-warning sm:inline-flex"
+          >
+            <Shield className="size-3" /> Usuário padrão
+          </Badge>
+        )}
         {native && elevated === false && (
           <Button
             variant="secondary"
             size="sm"
-            className="hidden sm:inline-flex"
+            className="hidden rounded-full sm:inline-flex"
             onClick={() => void handleRestartAsAdmin()}
           >
             <ShieldCheck className="size-4" /> Executar como admin
@@ -187,6 +218,7 @@ function TopBar() {
           variant="ghost"
           size="icon"
           aria-label="Alternar tema"
+          className="rounded-full"
           onClick={() => actions.setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? <Sun /> : <Moon />}
@@ -243,7 +275,7 @@ function RootComponent() {
           <AppSidebar />
           <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
-            <main className="relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
+            <main className="app-ambient relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
               {/* Required: nested routes render here. */}
               <Outlet />
             </main>
