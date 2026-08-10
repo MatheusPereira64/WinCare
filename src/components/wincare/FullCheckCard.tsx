@@ -129,7 +129,7 @@ export function FullCheckCard() {
         </div>
       )}
 
-      {lines.length > 0 && <LogView lines={lines} className="max-h-72" />}
+      {lines.length > 0 && <LogView lines={lines} className="h-72" />}
     </Card>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LogLine } from "@/lib/wincare/types";
+import { AppScrollArea } from "./AppScrollArea";
 
 const kindStyle: Record<LogLine["kind"], string> = {
   info: "text-primary-glow",
@@ -12,10 +13,11 @@ const kindStyle: Record<LogLine["kind"], string> = {
 };
 
 export function LogView({ lines, className = "" }: { lines: LogLine[]; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    const vp = viewportRef.current;
+    if (vp) vp.scrollTop = vp.scrollHeight;
   }, [lines.length]);
 
   return (
@@ -29,9 +31,10 @@ export function LogView({ lines, className = "" }: { lines: LogLine[]; className
           {lines.length} {lines.length === 1 ? "linha" : "linhas"}
         </span>
       </div>
-      <div
-        ref={ref}
-        className={cn("max-h-56 overflow-y-auto p-3 font-mono text-xs leading-relaxed", className)}
+      <AppScrollArea
+        className={cn("h-56", className)}
+        viewportClassName="p-3 font-mono text-xs leading-relaxed"
+        viewportRef={viewportRef}
       >
         {lines.map((line, i) => (
           <div key={i} className="animate-fade-in flex gap-2">
@@ -39,7 +42,7 @@ export function LogView({ lines, className = "" }: { lines: LogLine[]; className
             <span className={kindStyle[line.kind]}>{line.text}</span>
           </div>
         ))}
-      </div>
+      </AppScrollArea>
     </div>
   );
 }

@@ -183,25 +183,25 @@ function TopBar() {
       <div className="ml-auto flex items-center gap-2">
         <Badge
           variant="outline"
-          className="hidden rounded-full border-primary/30 bg-primary/10 px-2.5 text-primary md:inline-flex"
+          className="hidden rounded-full border-primary/30 bg-primary/10 px-3 text-primary md:inline-flex"
         >
-          <span className="size-1.5 rounded-full bg-primary" />
+          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
           {isNative() ? "Nativo" : "Demonstração"}
         </Badge>
         {native && elevated === true && (
           <Badge
             variant="outline"
-            className="hidden rounded-full border-success/30 bg-success/10 px-2.5 text-success sm:inline-flex"
+            className="hidden rounded-full border-success/30 bg-success/10 px-3 text-success sm:inline-flex"
           >
-            <ShieldCheck className="size-3" /> Admin
+            <ShieldCheck className="size-3 shrink-0" /> Admin
           </Badge>
         )}
         {native && elevated === false && (
           <Badge
             variant="outline"
-            className="hidden rounded-full border-warning/30 bg-warning/10 px-2.5 text-warning sm:inline-flex"
+            className="hidden rounded-full border-warning/30 bg-warning/10 px-3 text-warning sm:inline-flex"
           >
-            <Shield className="size-3" /> Usuário padrão
+            <Shield className="size-3 shrink-0" /> Usuário padrão
           </Badge>
         )}
         {native && elevated === false && (
