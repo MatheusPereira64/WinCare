@@ -122,6 +122,14 @@ function pickAsset(release) {
   return assets.find((a) => a && a.name === ASSET_NAME) || null;
 }
 
+/** Escolhe a tag SemVer mais nova (ex.: v1.0.5 > v1.0.4). */
+function pickBestTag(list) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const named = list.filter((t) => t && t.name);
+  if (!named.length) return null;
+  return named.sort((a, b) => compareVersions(stripVersion(b.name), stripVersion(a.name)))[0];
+}
+
 function releaseToInfo(release, currentVersion) {
   const latestVersion = stripVersion(release.tag_name);
   const asset = pickAsset(release);
@@ -165,7 +173,33 @@ function unavailableResult(currentVersion, reason, message) {
   };
 }
 
+/**
+ * Resolve o release mais novo: primeiro pelas tags do GitHub (SemVer),
+ * depois /releases/latest e, se necessário, a lista de releases.
+ */
 async function fetchLatestRelease() {
+  try {
+    const tags = await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/tags?per_page=20`);
+    const bestTag = pickBestTag(tags);
+    if (bestTag?.name) {
+      try {
+        const release = await githubJson(
+          `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${encodeURIComponent(bestTag.name)}`,
+        );
+        logger.log("updater", "Release resolvido pela tag mais nova", { tag: bestTag.name });
+        return release;
+      } catch (error) {
+        if (!(error instanceof GitHubHttpError) || error.status !== 404) throw error;
+        logger.warn("updater", `Tag ${bestTag.name} sem GitHub Release; tentando /releases/latest`);
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof GitHubHttpError) || ![401, 403, 404].includes(error.status)) {
+      throw error;
+    }
+    logger.warn("updater", "Não foi possível listar tags; caindo para releases/latest");
+  }
+
   try {
     return await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`);
   } catch (error) {

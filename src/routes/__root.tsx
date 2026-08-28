@@ -24,6 +24,7 @@ import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
+import { UpdateAvailableModal } from "@/components/wincare/UpdateAvailableModal";
 
 function NotFoundComponent() {
   return (
@@ -230,8 +231,38 @@ function TopBar() {
 
 function StartupUpdateCheck() {
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
-  useAppUpdater({ autoCheck: autoCheckUpdates });
-  return null;
+  const {
+    version,
+    info,
+    applying,
+    progress,
+    promptOpen,
+    apply,
+    openReleasePage,
+    dismissPrompt,
+  } = useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
+
+  const handleConfirm = () => {
+    if (!info?.canAutoUpdate) {
+      dismissPrompt();
+      void openReleasePage();
+      return;
+    }
+    void apply();
+  };
+
+  return (
+    <UpdateAvailableModal
+      open={promptOpen}
+      currentVersion={info?.currentVersion || version}
+      latestVersion={info?.latestVersion || ""}
+      canAutoUpdate={!!info?.canAutoUpdate}
+      applying={applying}
+      progress={progress}
+      onConfirm={handleConfirm}
+      onCancel={dismissPrompt}
+    />
+  );
 }
 
 /** Fecha o Sheet mobile e remove locks Radix em toda navegação. */

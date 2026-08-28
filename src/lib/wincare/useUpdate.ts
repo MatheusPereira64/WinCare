@@ -9,14 +9,16 @@ import {
   type UpdateProgress,
 } from "./bridge";
 
-export function useAppUpdater(options?: { autoCheck?: boolean }) {
+export function useAppUpdater(options?: { autoCheck?: boolean; promptOnAvailable?: boolean }) {
   const native = getNative();
   const [version, setVersion] = useState<string>("");
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
+  const [promptOpen, setPromptOpen] = useState(false);
   const autoChecked = useRef(false);
+  const promptOnAvailable = !!options?.promptOnAvailable;
 
   useEffect(() => {
     if (!native?.getAppVersion) return;
@@ -32,14 +34,11 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
     if (!native?.onUpdateAvailable) return;
     return native.onUpdateAvailable((payload) => {
       setInfo(payload);
-      if (payload.updateAvailable) {
-        toast.message(`Nova versão ${payload.latestVersion} disponível`, {
-          description: "Abra Configurações para atualizar o WinCare.",
-          duration: 8000,
-        });
+      if (payload.ok && payload.updateAvailable && promptOnAvailable) {
+        setPromptOpen(true);
       }
     });
-  }, [native]);
+  }, [native, promptOnAvailable]);
 
   const check = useCallback(
     async (silent = false) => {
@@ -59,11 +58,15 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
               description: next.message,
             });
           } else if (next.updateAvailable) {
-            toast.message(`Nova versão ${next.latestVersion}`, {
-              description: next.canAutoUpdate
-                ? "Clique em Atualizar agora para baixar e instalar."
-                : "Baixe o ZIP na página de releases.",
-            });
+            if (promptOnAvailable) {
+              setPromptOpen(true);
+            } else {
+              toast.message(`Nova versão ${next.latestVersion}`, {
+                description: next.canAutoUpdate
+                  ? "Clique em Atualizar agora para baixar e instalar."
+                  : "Baixe o ZIP na página de releases.",
+              });
+            }
           } else {
             toast.success("Você já está na versão mais recente", {
               description: `WinCare ${next.currentVersion}`,
@@ -82,7 +85,7 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
         setChecking(false);
       }
     },
-    [native],
+    [native, promptOnAvailable],
   );
 
   const apply = useCallback(async (): Promise<ApplyUpdateResult | null> => {
@@ -99,9 +102,11 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
           description: "O WinCare vai fechar e reabrir na nova versão.",
         });
       } else if (result.reason === "auto-update-unavailable") {
+        setPromptOpen(false);
         toast.info(result.message || "Atualização automática indisponível neste modo.");
         await native.openReleasePage?.();
       } else if (result.reason === "up-to-date") {
+        setPromptOpen(false);
         toast.success(result.message || "Já atualizado.");
         if (result.info) setInfo(result.info);
       } else {
@@ -126,6 +131,11 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
     await native.openReleasePage();
   }, [native]);
 
+  const dismissPrompt = useCallback(() => {
+    if (applying) return;
+    setPromptOpen(false);
+  }, [applying]);
+
   useEffect(() => {
     if (!options?.autoCheck || !isNative() || autoChecked.current) return;
     const t = window.setTimeout(() => {
@@ -133,21 +143,12 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
       autoChecked.current = true;
       void check(true).then((next) => {
         if (next?.ok && next.updateAvailable) {
-          toast.message(`Nova versão ${next.latestVersion} disponível`, {
-            description: "Abra Configurações → Atualizações para instalar.",
-            duration: 10000,
-            action: {
-              label: "Atualizar",
-              onClick: () => {
-                void apply();
-              },
-            },
-          });
+          setPromptOpen(true);
         }
       });
-    }, 2800);
+    }, 1200);
     return () => window.clearTimeout(t);
-  }, [options?.autoCheck, check, apply]);
+  }, [options?.autoCheck, check]);
 
   return {
     native: !!native,
@@ -156,8 +157,10 @@ export function useAppUpdater(options?: { autoCheck?: boolean }) {
     checking,
     applying,
     progress,
+    promptOpen,
     check,
     apply,
     openReleasePage,
+    dismissPrompt,
   };
 }

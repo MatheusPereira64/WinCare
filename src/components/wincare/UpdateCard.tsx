@@ -67,7 +67,8 @@ export function UpdateCard() {
         <div>
           <Label htmlFor="auto-updates">Verificar ao iniciar</Label>
           <p className="text-sm text-muted-foreground">
-            Avisa com um toast quando houver uma versão mais nova.
+            Ao abrir o app, consulta as tags de release no GitHub e mostra um popup se houver
+            versão mais nova.
           </p>
         </div>
         <Switch
