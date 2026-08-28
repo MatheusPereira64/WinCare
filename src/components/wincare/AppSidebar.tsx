@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
+  Brain,
   Brush,
   Gauge,
   HardDrive,
@@ -39,6 +40,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
       { title: "Monitoramento", url: "/monitoramento", icon: Activity },
+      { title: "Inteligência", url: "/inteligencia", icon: Brain },
     ],
   },
   {

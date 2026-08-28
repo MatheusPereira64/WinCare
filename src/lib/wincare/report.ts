@@ -1,3 +1,4 @@
+import { diagnoseStartup, enrichStartupItems, IMPACT_LABEL } from "./startupAdvice";
 import type { DiskDrive, DiskUsageFolder, RunRecord, StartupItem, SystemInfo } from "./types";
 
 const LOCATION_LABEL: Record<string, string> = {
@@ -27,7 +28,8 @@ export function buildDiagnosticReport(input: {
 }) {
   const { system, disks, startup, diskUsage = [], runs = [] } = input;
   const now = new Date().toLocaleString("pt-BR");
-  const enabledStartup = startup.filter((s) => s.enabled);
+  const startupItems = enrichStartupItems(startup);
+  const enabledStartup = startupItems.filter((s) => s.enabled);
   const lines: string[] = [
     "══════════════════════════════════════════",
     "  WinCare — Relatório de diagnóstico",
@@ -71,16 +73,38 @@ export function buildDiagnosticReport(input: {
     }
   }
 
-  lines.push("", `▸ INICIALIZAÇÃO (${enabledStartup.length} ativos / ${startup.length} total)`);
-  if (startup.length === 0) {
+  const diagnosis = diagnoseStartup(startupItems);
+
+  lines.push(
+    "",
+    `▸ INICIALIZAÇÃO (${enabledStartup.length} ativos / ${startupItems.length} total)`,
+  );
+  lines.push(
+    `  Carga:          ${diagnosis.load === "heavy" ? "Pesada" : diagnosis.load === "moderate" ? "Moderada" : "Leve"} (score ${diagnosis.score}%)`,
+    `  RAM agora:      ${diagnosis.totalMemMb} MB (programas do boot em execução)`,
+    `  Impacto alto:   ${diagnosis.highImpactEnabled}`,
+    `  Diagnóstico:    ${diagnosis.summary}`,
+  );
+  if (startupItems.length === 0) {
     lines.push("  (nenhum item)");
   } else {
-    for (const s of startup) {
+    for (const s of startupItems) {
       const loc = LOCATION_LABEL[s.location] ?? s.location;
+      const mem = s.memMb && s.running ? ` · ${s.memMb} MB` : "";
+      const impact =
+        s.impact && s.impact !== "unknown" ? ` · impacto ${IMPACT_LABEL[s.impact]}` : "";
       lines.push(
-        `  [${s.enabled ? "ATIVO" : "OFF "}] ${s.name} — ${loc}`,
+        `  [${s.enabled ? "ATIVO" : "OFF "}] ${s.name} — ${loc}${mem}${impact}`,
         `           ${s.command}`,
       );
+    }
+  }
+
+  if (diagnosis.recommendations.length > 0) {
+    lines.push("", "▸ RECOMENDAÇÕES (desativar no boot)");
+    for (const rec of diagnosis.recommendations) {
+      const tag = rec.advice === "disable" ? "DESATIVAR" : "AVALIAR";
+      lines.push(`  [${tag}] ${rec.name}${rec.memMb ? ` (${rec.memMb} MB)` : ""} — ${rec.reason}`);
     }
   }
 

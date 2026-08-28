@@ -43,6 +43,28 @@ npm run wincare:package
 - `electron/preload.cjs` — expõe `window.wincare` com `contextIsolation: true` e sem `nodeIntegration`.
 - `src/lib/wincare/bridge.ts` — usa o bridge nativo quando existe; caso contrário, simula.
 
+## UI no Electron — o que trava a janela
+
+No Windows, a UI fica “morta” (scroll ainda funciona, cliques não) **assim que a aba monta**. Duas causas distintas:
+
+**1. Controles HTML/Radix (foco / overlay)**
+
+Não usar nestas páginas (e de preferência em lugar nenhum do desktop):
+
+- `<input>`, `<textarea>` e `<select>` nativos (o Chromium do Electron prende o foco)
+- Radix `Dialog` / `AlertDialog` / `Select` / `Tooltip` com portal (overlay `inert` / `pointer-events`)
+- Overlay em tela cheia (`ConfirmModal` / `createPortal` no `body`) na sub-aba Perfis e jogos — o clique na aba pode cair no card de perfil e o overlay prende o HUD. Confirmação fica inline, sem portal.
+
+No lugar: botões e presets (veja `NetworkProbeCard`, `PickerRow` na Inteligência e a aba Redes), `ConfirmModal` (portal próprio, sem Radix), e `unlockUi()` ao montar a página (`ToolSection` e Inteligência já chamam).
+
+Busca de ferramentas (`Ctrl + K`) é a única exceção controlada, em `ToolSection`.
+
+**2. IPC pesado no processo principal (Inteligência)**
+
+A aba Inteligência travava ao abrir porque montava `<select>` e disparava no mesmo instante `listStartup` (ícones via `app.getFileIcon`), `diskUsage` (PowerShell recursivo, timeout longo) e `topProcesses`.
+
+Regra: a rota `/inteligencia` **não** chama esses três no mount. Boot vem do coletor (`startupKnown`); disco/processos só na sub-aba Diagnóstico, com atraso. O coletor de jogos chama `topProcesses` no máximo a cada 15 s, sem reiniciar o intervalo a cada métrica.
+
 ## Scripts disponíveis
 
 | Script | O que faz |

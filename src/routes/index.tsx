@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CircuitBoard,
   Clock,
@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Star,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +18,16 @@ import { Card } from "@/components/ui/card";
 import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
+import { RecommendationList } from "@/components/wincare/RecommendationList";
+import { Sparkline } from "@/components/wincare/Sparkline";
 import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
+import { getNative, SIMULATED_DISK_USAGE, SIMULATED_STARTUP } from "@/lib/wincare/bridge";
+import { buildRecommendations } from "@/lib/wincare/intelligence";
+import { useIntel } from "@/lib/wincare/intelligenceStore";
 import { useStore } from "@/lib/wincare/store";
 import { TOOLS } from "@/lib/wincare/tools";
+import type { DiskUsageFolder, StartupItem } from "@/lib/wincare/types";
 import { isSystemInfoLoading, useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/")({
@@ -49,6 +55,15 @@ function Dashboard() {
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
   const autoCheck = useStore((s) => s.autoCheck);
+  const samples = useIntel((s) => s.samples);
+  const startupNewIds = useIntel((s) => s.startupNewIds);
+  const startupKnown = useIntel((s) => s.startupKnown);
+  const newcomers = useMemo(() => {
+    const ids = new Set(startupNewIds);
+    return startupKnown.filter((k) => ids.has(k.id));
+  }, [startupNewIds, startupKnown]);
+  const [startup, setStartup] = useState<StartupItem[]>([]);
+  const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
 
   useEffect(() => {
     if (autoCheck) {
@@ -57,6 +72,43 @@ function Dashboard() {
       });
     }
   }, [autoCheck]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const native = getNative();
+      try {
+        const [boot, disk] = await Promise.all([
+          native?.listStartup?.() ?? SIMULATED_STARTUP,
+          native?.diskUsage?.() ?? SIMULATED_DISK_USAGE,
+        ]);
+        if (cancelled) return;
+        setStartup(Array.isArray(boot) ? boot : SIMULATED_STARTUP);
+        setFolders(Array.isArray(disk) ? disk : SIMULATED_DISK_USAGE);
+      } catch {
+        if (!cancelled) {
+          setStartup(SIMULATED_STARTUP);
+          setFolders(SIMULATED_DISK_USAGE);
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const recs = useMemo(
+    () =>
+      buildRecommendations({
+        info,
+        startup,
+        folders,
+        newcomers,
+        trend: samples,
+      }).slice(0, 3),
+    [info, startup, folders, newcomers, samples],
+  );
 
   const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
   const healthy = info.health >= 80;
@@ -103,9 +155,27 @@ function Dashboard() {
               <HeroMeter label="Memória" value={info.memoryUsage} />
               <HeroMeter label="Disco C:" value={info.diskUsage} />
             </div>
+            {samples.length > 3 && (
+              <div className="max-w-md text-primary/80">
+                <p className="text-[11px] text-muted-foreground">Saúde nas últimas horas</p>
+                <Sparkline values={samples.map((s) => s.health)} />
+              </div>
+            )}
           </div>
         </div>
       </Card>
+
+      {recs.length > 0 && (
+        <Card className="surface-panel gap-3 border-border/60 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Recomendações</h2>
+            <Link to="/inteligencia" className="text-xs font-medium text-primary hover:underline">
+              Ver inteligência
+            </Link>
+          </div>
+          <RecommendationList items={recs} compact />
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard

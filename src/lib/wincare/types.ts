@@ -90,6 +90,10 @@ export interface DiskDrive {
 
 export type StartupLocation = "hkcu-run" | "hklm-run" | "startup-folder";
 
+export type StartupImpact = "high" | "medium" | "low" | "unknown";
+
+export type StartupAdvice = "keep" | "consider" | "disable";
+
 export interface StartupItem {
   id: string;
   name: string;
@@ -98,6 +102,18 @@ export interface StartupItem {
   enabled: boolean;
   /** itens HKLM exigem admin para alterar */
   requiresAdmin?: boolean;
+  /** Nome do processo (.exe sem extensão), quando identificável */
+  processName?: string;
+  /** Processo correspondente está na memória agora */
+  running?: boolean;
+  /** RAM atual do processo (MB), soma de todas as instâncias */
+  memMb?: number;
+  processCount?: number;
+  /** PNG em data URL extraído do .exe / .lnk no Windows */
+  iconDataUrl?: string;
+  impact?: StartupImpact;
+  recommendation?: StartupAdvice;
+  recommendationReason?: string;
 }
 
 export interface TopProcess {

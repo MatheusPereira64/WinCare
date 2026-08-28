@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getNative, isNative } from "@/lib/wincare/bridge";
 import { NETWORK_PRESETS } from "@/lib/wincare/network";
-import { LogView } from "@/components/wincare/LogView";
+import { CommandFeed } from "@/components/wincare/CommandFeed";
+import { normalizeCmdText } from "@/lib/wincare/commandFeed";
 import type { LogLine } from "@/lib/wincare/types";
 
 type ProbeKind = "ping" | "dns" | "tracert";
@@ -73,7 +74,9 @@ export function NetworkProbeCard() {
         (chunk) => {
           const parts = chunk.split(/\r?\n/).filter(Boolean);
           for (const text of parts) {
-            next.push({ time: now(), text, kind: "output" });
+            const clean = normalizeCmdText(text);
+            if (!clean) continue;
+            next.push({ time: now(), text: clean, kind: "output" });
           }
           setLines([...next]);
         },
@@ -108,7 +111,8 @@ export function NetworkProbeCard() {
         <h3 className="text-base font-semibold">Teste rápido</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Escolha o destino e execute Ping, DNS ou Tracert. (Sem campo de texto — evita travar o app no Electron.)
+        Escolha o destino e execute Ping, DNS ou Tracert. (Sem campo de texto — evita travar o app
+        no Electron.)
       </p>
 
       <div className="flex flex-wrap gap-1.5">
@@ -138,7 +142,12 @@ export function NetworkProbeCard() {
           {busy === "dns" ? <Loader2 className="animate-spin" /> : <Search />}
           DNS
         </Button>
-        <Button type="button" variant="secondary" disabled={!!busy} onClick={() => void run("tracert")}>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={!!busy}
+          onClick={() => void run("tracert")}
+        >
           {busy === "tracert" ? <Loader2 className="animate-spin" /> : <Radar />}
           Tracert
         </Button>
@@ -150,10 +159,7 @@ export function NetworkProbeCard() {
         </p>
       )}
 
-      {lines.length > 0 && <LogView lines={lines} />}
-      {result && !busy && (
-        <p className="text-sm font-medium text-muted-foreground">{result}</p>
-      )}
+      {lines.length > 0 && <CommandFeed lines={lines} running={!!busy} result={result} />}
     </Card>
   );
 }

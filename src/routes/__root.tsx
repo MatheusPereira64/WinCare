@@ -20,11 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
+import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
 import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
 import { UpdateAvailableModal } from "@/components/wincare/UpdateAvailableModal";
+import { IntelligenceCollector } from "@/components/wincare/IntelligenceCollector";
 
 function NotFoundComponent() {
   return (
@@ -144,6 +146,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/monitoramento": "Monitoramento",
   "/logs": "Logs",
   "/configuracoes": "Configurações",
+  "/inteligencia": "Inteligência",
 };
 
 function TopBar() {
@@ -231,16 +234,8 @@ function TopBar() {
 
 function StartupUpdateCheck() {
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
-  const {
-    version,
-    info,
-    applying,
-    progress,
-    promptOpen,
-    apply,
-    openReleasePage,
-    dismissPrompt,
-  } = useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
+  const { version, info, applying, progress, promptOpen, apply, openReleasePage, dismissPrompt } =
+    useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
 
   const handleConfirm = () => {
     if (!info?.canAutoUpdate) {
@@ -286,6 +281,7 @@ function RootComponent() {
   // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
   useEffect(() => {
     hydrateStore();
+    hydrateIntelligence();
   }, []);
 
   useEffect(() => {
@@ -314,6 +310,7 @@ function RootComponent() {
         </div>
         <Toaster />
         <StartupUpdateCheck />
+        <IntelligenceCollector />
         <RouteUiGuard />
       </SidebarProvider>
     </QueryClientProvider>

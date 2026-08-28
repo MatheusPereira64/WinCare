@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, protocol, net, Menu, dialog } = require("electron");
-const { spawn, exec } = require("child_process");
+const { spawn, exec, execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const url = require("url");
@@ -286,10 +286,70 @@ const isBufferedCommand = (command) => {
   return /^(ping|nslookup|ipconfig|tracert|netsh|wmic|powershell|cmd)\b/i.test(trimmed);
 };
 
-const toText = (chunk) => {
-  if (!chunk) return "";
-  return Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
-};
+const toText = (chunk) => decodeWindowsBuffer(chunk);
+
+function looksLikeUtf16(buf) {
+  const sampleLen = Math.min(buf.length, 240);
+  if (sampleLen < 16) return false;
+  let nuls = 0;
+  for (let i = 1; i < sampleLen; i += 2) if (buf[i] === 0) nuls++;
+  return nuls / Math.floor(sampleLen / 2) > 0.65;
+}
+
+/** SFC/DISM no Windows costumam gravar UTF-16; cmd comum usa ANSI. */
+function decodeWindowsBuffer(input, forceUtf16 = false) {
+  if (!input) return "";
+  const buf = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  if (!buf.length) return "";
+
+  const asUtf16 = (source) => {
+    const even = source.length % 2 === 0 ? source : source.subarray(0, source.length - 1);
+    let start = 0;
+    if (even.length >= 2 && even[0] === 0xff && even[1] === 0xfe) start = 2;
+    if (even.length >= 2 && even[0] === 0xfe && even[1] === 0xff) {
+      const swapped = Buffer.from(even.subarray(2));
+      swapped.swap16();
+      return swapped.toString("utf16le").replace(/\u0000/g, "");
+    }
+    return even.subarray(start).toString("utf16le").replace(/\u0000/g, "");
+  };
+
+  if (forceUtf16) return asUtf16(buf);
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return asUtf16(buf);
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) return asUtf16(buf);
+  if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) {
+    return buf.subarray(3).toString("utf8");
+  }
+  if (looksLikeUtf16(buf)) return asUtf16(buf);
+
+  const utf8 = buf.toString("utf8");
+  if (!utf8.includes("\uFFFD")) return utf8.replace(/\u0000/g, "");
+  return buf.toString("latin1").replace(/\u0000/g, "");
+}
+
+function readDecodedFile(file, trim = true) {
+  try {
+    if (!fs.existsSync(file)) return "";
+    const text = decodeWindowsBuffer(fs.readFileSync(file));
+    return trim ? text.trim() : text;
+  } catch {
+    return "";
+  }
+}
+
+function linesFromCmdChunk(chunk) {
+  if (!chunk) return [];
+  return String(chunk)
+    .replace(/\u0000/g, "")
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const parts = line
+        .split("\r")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.length ? [parts[parts.length - 1]] : [];
+    });
+}
 
 const decodeOutput = (stdout, stderr) => `${toText(stdout)}${toText(stderr)}`;
 
@@ -320,7 +380,7 @@ function execBuffered(command, limitMs) {
         timeout: limitMs,
         windowsHide: true,
         maxBuffer: 1024 * 1024,
-        encoding: "utf8",
+        encoding: "buffer",
         shell: process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : true,
       },
       (err, stdout, stderr) => {
@@ -416,8 +476,8 @@ function runElevatedBuffered(command, limitMs = 120000) {
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "${ps.replace(/"/g, '\\"')}"`,
       { timeout: limitMs, windowsHide: true },
       (err) => {
-        const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8") : "";
-        const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8") : "";
+        const stdout = readDecodedFile(outFile);
+        const stderr = readDecodedFile(errFile);
         cleanupFiles([outFile, errFile, batFile]);
 
         if (!stdout && !stderr && err) {
@@ -469,15 +529,13 @@ function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEO
     };
 
     const streamFile = (file, getLast, setLast) => {
-      if (!fs.existsSync(file)) return;
-      const content = fs.readFileSync(file, "utf8");
+      const content = readDecodedFile(file, false);
       const lastLen = getLast();
       if (content.length <= lastLen) return;
       const chunk = content.slice(lastLen);
       setLast(content.length);
 
-      for (const line of chunk.split(/\r?\n/)) {
-        if (!line) continue;
+      for (const line of linesFromCmdChunk(chunk)) {
         if (sentLines >= MAX_STREAM_LINES) {
           if (!truncated && !event.sender.isDestroyed()) {
             truncated = true;
@@ -519,8 +577,8 @@ function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEO
       (err) => {
         poll();
 
-        const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8").trim() : "";
-        const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8").trim() : "";
+        const stdout = readDecodedFile(outFile);
+        const stderr = readDecodedFile(errFile);
 
         if (err && err.killed) {
           if (!event.sender.isDestroyed()) {
@@ -602,6 +660,9 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
 
       let tail = "";
       let pending = "";
+      let raw = Buffer.alloc(0);
+      let lastDecodedLen = 0;
+      let utf16Mode = false;
       let sentLines = 0;
       let truncated = false;
       let flushTimer = null;
@@ -637,8 +698,7 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
         const parts = pending.split(/\r?\n/);
         pending = parts.pop() ?? "";
 
-        for (const line of parts) {
-          if (!line) continue;
+        for (const line of linesFromCmdChunk(parts.join("\n"))) {
           if (sentLines >= MAX_STREAM_LINES) {
             if (!truncated) {
               truncated = true;
@@ -660,9 +720,24 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
         flushTimer = setTimeout(flush, 40);
       };
 
-      const ingest = (chunk) => {
-        pending += chunk.toString("utf8");
-        scheduleFlush();
+      const ingest = (chunk, final = false) => {
+        if (chunk && chunk.length) {
+          const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          raw = Buffer.concat([raw, incoming]);
+        }
+
+        if (!utf16Mode) {
+          if (raw.length >= 2 && raw[0] === 0xff && raw[1] === 0xfe) utf16Mode = true;
+          else if (looksLikeUtf16(raw)) utf16Mode = true;
+        }
+
+        if (!final && !utf16Mode && raw.length < 24) return;
+
+        const decoded = decodeWindowsBuffer(raw, utf16Mode);
+        if (decoded.length <= lastDecodedLen) return;
+        pending += decoded.slice(lastDecodedLen);
+        lastDecodedLen = decoded.length;
+        if (!final) scheduleFlush();
       };
 
       child.stdout.on("data", ingest);
@@ -670,9 +745,13 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
       child.on("error", (err) => finish(1, err.message));
       child.on("close", (code) => {
         if (flushTimer) clearTimeout(flushTimer);
+        ingest(Buffer.alloc(0), true);
+        flush();
         if (pending.trim() && sentLines < MAX_STREAM_LINES) {
-          tail = pending.trim();
-          event.sender.send("wincare:data", { runId, chunk: `${pending.trim()}\n` });
+          for (const line of linesFromCmdChunk(pending)) {
+            tail = line;
+            event.sender.send("wincare:data", { runId, chunk: `${line}\n` });
+          }
         }
         finish(
           code ?? 0,
@@ -967,76 +1046,328 @@ ipcMain.handle("wincare:disks", async () => {
     .filter(Boolean);
 });
 
+/** Expande %WINDIR%, %LOCALAPPDATA% etc. */
+function expandWindowsPath(p) {
+  return String(p || "").replace(/%([^%]+)%/gi, (_, name) => {
+    const value = process.env[name] || process.env[name.toUpperCase()];
+    return value || `%${name}%`;
+  });
+}
+
+function stripDisabledSuffix(filePath) {
+  return String(filePath || "").replace(/\.disabled$/i, "");
+}
+
+function findNearbyExe(dir, exeName) {
+  const direct = path.join(dir, exeName);
+  if (fs.existsSync(direct)) return direct;
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const nested = path.join(dir, entry.name, exeName);
+      if (fs.existsSync(nested)) return nested;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Caminhos de .exe / .lnk a partir da linha de comando do registro. */
+function extractIconCandidates(command) {
+  const cmd = String(command || "").trim();
+  const candidates = [];
+
+  const processStart = cmd.match(/--processStart\s+"?([^\s"]+\.exe)/i);
+  const quotedExe = cmd.match(/"([^"]+)\\([^"\\]+\.exe)"/i);
+  if (processStart && quotedExe) {
+    const nearby = findNearbyExe(quotedExe[1], processStart[1]);
+    if (nearby) candidates.push(nearby);
+  }
+
+  for (const match of cmd.matchAll(/"([^"]+\.(?:exe|lnk|msc))"/gi)) {
+    candidates.push(expandWindowsPath(match[1]));
+  }
+
+  const unquoted = cmd.match(/^([A-Za-z]:\\[^\s"]+\.(?:exe|lnk))/i);
+  if (unquoted) candidates.push(expandWindowsPath(unquoted[1]));
+
+  const envPath = cmd.match(/^(%[^%]+%\\[^\s"]+\.exe)/i);
+  if (envPath) candidates.push(expandWindowsPath(envPath[1]));
+
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+function resolveLnkTargets(lnkPaths) {
+  return new Promise((resolve) => {
+    const unique = [...new Set(lnkPaths.filter((p) => p && fs.existsSync(p)))];
+    if (!unique.length) {
+      resolve(new Map());
+      return;
+    }
+    const tmp = path.join(os.tmpdir(), `wincare-lnk-${Date.now()}.json`);
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(unique), "utf8");
+    } catch {
+      resolve(new Map());
+      return;
+    }
+    const ps = [
+      "$ErrorActionPreference = 'SilentlyContinue'",
+      `$paths = Get-Content -LiteralPath '${tmp.replace(/'/g, "''")}' -Raw | ConvertFrom-Json`,
+      "$sh = New-Object -ComObject WScript.Shell",
+      "$out = @()",
+      "foreach ($p in @($paths)) {",
+      "  $t = $sh.CreateShortcut([string]$p).TargetPath",
+      "  if ($t) { $out += [ordered]@{ src = [string]$p; target = [string]$t } }",
+      "}",
+      ",@($out) | ConvertTo-Json -Compress -Depth 3",
+    ].join("; ");
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+      { windowsHide: true, timeout: 20000 },
+      (err, stdout) => {
+        try {
+          fs.unlinkSync(tmp);
+        } catch {
+          /* ignore */
+        }
+        const map = new Map();
+        if (!err && stdout) {
+          try {
+            const parsed = JSON.parse(String(stdout).trim() || "null");
+            const rows = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+            for (const row of rows) {
+              if (row?.src && row?.target) map.set(String(row.src), String(row.target));
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        resolve(map);
+      },
+    );
+  });
+}
+
+async function attachStartupIcons(items) {
+  const lnkPaths = [];
+  for (const item of items) {
+    if (item.location === "startup-folder") {
+      const file = stripDisabledSuffix(item.command);
+      if (/\.lnk$/i.test(file)) lnkPaths.push(file);
+    }
+    for (const candidate of extractIconCandidates(item.command)) {
+      if (/\.lnk$/i.test(candidate)) lnkPaths.push(candidate);
+    }
+  }
+  const lnkMap = await resolveLnkTargets(lnkPaths);
+
+  const fileByItem = items.map((item) => {
+    if (item.location === "startup-folder") {
+      const file = stripDisabledSuffix(item.command);
+      if (lnkMap.has(file) && fs.existsSync(lnkMap.get(file))) return lnkMap.get(file);
+      if (file && fs.existsSync(file) && /\.exe$/i.test(file)) return file;
+    }
+    for (const candidate of extractIconCandidates(item.command)) {
+      const resolved = lnkMap.get(candidate) || candidate;
+      if (resolved && fs.existsSync(resolved)) return resolved;
+    }
+    return null;
+  });
+
+  const iconCache = new Map();
+  const uniqueFiles = [...new Set(fileByItem.filter(Boolean))];
+  await Promise.all(
+    uniqueFiles.map(async (filePath) => {
+      try {
+        const image = await app.getFileIcon(filePath, { size: "normal" });
+        iconCache.set(filePath, image && !image.isEmpty() ? image.toDataURL() : "");
+      } catch {
+        iconCache.set(filePath, "");
+      }
+    }),
+  );
+
+  return items.map((item, index) => {
+    const filePath = fileByItem[index];
+    const iconDataUrl = filePath ? iconCache.get(filePath) : "";
+    return iconDataUrl ? { ...item, iconDataUrl } : item;
+  });
+}
+
+function parseRegSzLines(stdout) {
+  const rows = [];
+  for (const line of String(stdout || "").split(/\r?\n/)) {
+    const match = line.match(/^\s{4}(.+?)\s+REG_(?:SZ|EXPAND_SZ)\s+(.*)$/i);
+    if (!match) continue;
+    const name = match[1].trim();
+    if (!name) continue;
+    rows.push({ name, command: (match[2] || "").trim() });
+  }
+  return rows;
+}
+
+function regQueryValues(key) {
+  return new Promise((resolve) => {
+    exec(`reg query "${key}"`, { windowsHide: true, timeout: 10000 }, (err, stdout) => {
+      if (err || !stdout) {
+        resolve([]);
+        return;
+      }
+      resolve(parseRegSzLines(stdout));
+    });
+  });
+}
+
+function exeStemFromCommand(command) {
+  const text = String(command || "");
+  const processStart = text.match(/--processStart\s+"?([^\s"]+\.exe)/i);
+  if (processStart) return path.basename(processStart[1], ".exe");
+  const names = [...text.matchAll(/([A-Za-z0-9_\-]+\.exe)/gi)].map((m) => m[1]);
+  const prefer = names.filter((n) => !/^(update|updater|installer|unins000|setup)\.exe$/i.test(n));
+  const pick = prefer.at(-1) || names.at(-1);
+  return pick ? path.basename(pick, ".exe") : "";
+}
+
+function listStartupFolderItems() {
+  const dir = getUserStartupDir();
+  const items = [];
+  try {
+    if (!fs.existsSync(dir)) return items;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      const lower = entry.name.toLowerCase();
+      if (lower === "desktop.ini" || lower === "thumbs.db") continue;
+      const enabled = !lower.endsWith(".disabled");
+      let display = entry.name;
+      if (!enabled) display = display.slice(0, -".disabled".length);
+      display = path.parse(display).name;
+      if (!display) continue;
+      items.push({
+        id: `startup-folder:${entry.name}`,
+        name: display,
+        command: path.join(dir, entry.name),
+        location: "startup-folder",
+        enabled,
+        requiresAdmin: false,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+  return items;
+}
+
+async function collectStartupItems() {
+  const items = [];
+  const seen = new Set();
+  const push = (item) => {
+    const name = String(item?.name || "").trim();
+    const id = String(item?.id || "").trim();
+    if (!name || !id || seen.has(id)) return;
+    seen.add(id);
+    items.push({ ...item, name, id });
+  };
+
+  const runKeys = [
+    ["HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "hkcu-run", false],
+    ["HKCU\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run", "hkcu-run", false],
+    ["HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "hklm-run", true],
+    ["HKLM\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run", "hklm-run", true],
+  ];
+
+  for (const [key, location, requiresAdmin] of runKeys) {
+    const rows = await regQueryValues(key);
+    for (const row of rows) {
+      push({
+        id: `${location}:${row.name}`,
+        name: row.name,
+        command: row.command,
+        location,
+        enabled: true,
+        requiresAdmin,
+      });
+    }
+  }
+
+  for (const item of listStartupFolderItems()) push(item);
+
+  const disabled = await regQueryValues("HKCU\\Software\\WinCare\\DisabledStartup");
+  for (const row of disabled) {
+    const sep = row.command.indexOf("||");
+    const loc = sep >= 0 ? row.command.slice(0, sep) : "hkcu-run";
+    const cmd = sep >= 0 ? row.command.slice(sep + 2) : row.command;
+    const location = loc === "hklm-run" || loc === "startup-folder" ? loc : "hkcu-run";
+    push({
+      id: `${location}:${row.name}`,
+      name: row.name,
+      command: cmd,
+      location,
+      enabled: false,
+      requiresAdmin: location === "hklm-run",
+    });
+  }
+
+  return items;
+}
+
+async function enrichStartupProcesses(items) {
+  try {
+    const rows = await psJson(
+      "Get-Process | Where-Object { $_.ProcessName -and $_.ProcessName -ne 'Idle' -and $_.ProcessName -ne 'System' } | Group-Object ProcessName | ForEach-Object { [ordered]@{ name = $_.Name; memMb = [int][math]::Round((($_.Group | Measure-Object WorkingSet64 -Sum).Sum)/1MB); count = $_.Count } } | ConvertTo-Json -Compress",
+      20000,
+    );
+    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+    const cache = new Map();
+    for (const row of list) {
+      const name = String(row.name || "");
+      if (!name) continue;
+      cache.set(name.toLowerCase(), {
+        memMb: Number(row.memMb) || 0,
+        count: Number(row.count) || 0,
+      });
+    }
+    return items.map((item) => {
+      const stem = exeStemFromCommand(item.command) || item.name;
+      const hit = cache.get(String(stem).toLowerCase()) || cache.get(String(item.name).toLowerCase());
+      return {
+        ...item,
+        processName: stem || undefined,
+        running: !!hit,
+        memMb: hit?.memMb || 0,
+        processCount: hit?.count || 0,
+      };
+    });
+  } catch {
+    return items.map((item) => ({
+      ...item,
+      processName: exeStemFromCommand(item.command) || item.name,
+      running: false,
+      memMb: 0,
+      processCount: 0,
+    }));
+  }
+}
+
 /** Lista programas de inicialização (Run HKCU/HKLM + pasta Startup + desabilitados pelo WinCare). */
 ipcMain.handle("wincare:listStartup", async () => {
   if (process.platform !== "win32") return [];
   try {
-    const rows = await psFileJson(
-      `
-$ErrorActionPreference = 'SilentlyContinue'
-$items = @()
-
-function Add-RunKey($path, $location, $requiresAdmin) {
-  if (-not (Test-Path $path)) { return }
-  $props = Get-ItemProperty -Path $path
-  foreach ($p in $props.PSObject.Properties) {
-    if ($p.Name -match '^(PS|\\\\)') { continue }
-    $items += [ordered]@{
-      id = ($location + ':' + $p.Name)
-      name = $p.Name
-      command = [string]$p.Value
-      location = $location
-      enabled = $true
-      requiresAdmin = [bool]$requiresAdmin
+    const collected = await collectStartupItems();
+    const mapped = await enrichStartupProcesses(collected);
+    try {
+      return await attachStartupIcons(mapped);
+    } catch (iconError) {
+      logger.warn(
+        "startup",
+        "Ícones da inicialização indisponíveis",
+        iconError instanceof Error ? iconError.message : iconError,
+      );
+      return mapped;
     }
-  }
-}
-
-Add-RunKey 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' 'hkcu-run' $false
-Add-RunKey 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' 'hklm-run' $true
-
-$startup = [Environment]::GetFolderPath('Startup')
-Get-ChildItem -LiteralPath $startup -Force | ForEach-Object {
-  $enabled = -not $_.Name.ToLower().EndsWith('.disabled')
-  $display = $_.Name
-  if ($display.ToLower().EndsWith('.disabled')) { $display = $display.Substring(0, $display.Length - 9) }
-  $display = [System.IO.Path]::GetFileNameWithoutExtension($display)
-  $items += [ordered]@{
-    id = ('startup-folder:' + $_.Name)
-    name = $display
-    command = $_.FullName
-    location = 'startup-folder'
-    enabled = $enabled
-    requiresAdmin = $false
-  }
-}
-
-$disabled = 'HKCU:\\Software\\WinCare\\DisabledStartup'
-if (Test-Path $disabled) {
-  $props = Get-ItemProperty -Path $disabled
-  foreach ($p in $props.PSObject.Properties) {
-    if ($p.Name -match '^(PS|\\\\)') { continue }
-    $raw = [string]$p.Value
-    $sep = $raw.IndexOf('||')
-    $cmd = if ($sep -ge 0) { $raw.Substring($sep + 2) } else { $raw }
-    $loc = if ($sep -ge 0) { $raw.Substring(0, $sep) } else { 'hkcu-run' }
-    $items += [ordered]@{
-      id = ($loc + ':' + $p.Name)
-      name = $p.Name
-      command = $cmd
-      location = $loc
-      enabled = $false
-      requiresAdmin = ($loc -eq 'hklm-run')
-    }
-  }
-}
-
-,@($items) | ConvertTo-Json -Compress -Depth 4
-`,
-      45000,
-    );
-    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-    return list;
   } catch (error) {
     logger.error("startup", "listStartup falhou", error instanceof Error ? error.message : error);
     return [];
@@ -1216,7 +1547,7 @@ ipcMain.handle("wincare:topProcesses", async () => {
   if (process.platform !== "win32") return [];
   try {
     const rows = await psJson(
-      "Get-Process | Where-Object { $_.Name -ne 'Idle' -and $_.Name -ne 'System' } | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 10 @{N='name';E={$_.ProcessName}}, @{N='pid';E={$_.Id}}, @{N='cpu';E={[math]::Round(([double]($_.CPU)),1)}}, @{N='memMb';E={[math]::Round($_.WorkingSet64/1MB,0)}} | ConvertTo-Json -Compress",
+      "Get-Process | Where-Object { $_.Name -ne 'Idle' -and $_.Name -ne 'System' } | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 20 @{N='name';E={$_.ProcessName}}, @{N='pid';E={$_.Id}}, @{N='cpu';E={[math]::Round(([double]($_.CPU)),1)}}, @{N='memMb';E={[math]::Round($_.WorkingSet64/1MB,0)}} | ConvertTo-Json -Compress",
     );
     const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
     return list.map((p) => ({
@@ -1336,6 +1667,153 @@ switch ($id) {
       ok: false,
       reason: error instanceof Error ? error.message : "Falha ao limpar pasta.",
     };
+  }
+});
+
+const POWER_GUIDS = {
+  battery: "a1841308-3541-4fab-bc81-f71556f20b4a",
+  balanced: "381b4222-f694-41f0-9685-ff5bb260df2e",
+  gaming: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+  work: "381b4222-f694-41f0-9685-ff5bb260df2e",
+};
+
+function runPowerCfg(args, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    execFile(
+      "powercfg.exe",
+      args,
+      { windowsHide: true, timeout: timeoutMs, encoding: "buffer" },
+      (err, stdout) => {
+        if (err && !stdout) {
+          resolve("");
+          return;
+        }
+        resolve(decodeWindowsBuffer(stdout));
+      },
+    );
+  });
+}
+
+function parsePowerPlans(text) {
+  const plans = [];
+  const re = /(\*)?\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s+\(([^)]+)\)/g;
+  let m;
+  while ((m = re.exec(String(text || "")))) {
+    plans.push({
+      guid: m[2].toLowerCase(),
+      name: m[3].trim(),
+      active: !!m[1],
+    });
+  }
+  return plans;
+}
+
+ipcMain.handle("wincare:powerPlan", async (_e, payload = {}) => {
+  if (process.platform !== "win32") {
+    return { ok: false, reason: "not-windows", plans: [], active: null };
+  }
+  const action = payload.action || "list";
+  const profile = payload.profile;
+
+  if (action === "set" && profile && POWER_GUIDS[profile]) {
+    let guid = POWER_GUIDS[profile];
+    let out = await runPowerCfg(["/setactive", guid]);
+    if (/does not exist|não existe|not exist/i.test(out) && profile === "gaming") {
+      await runPowerCfg(["-duplicatescheme", guid]);
+      out = await runPowerCfg(["/setactive", guid]);
+    }
+  }
+
+  const listed = await runPowerCfg(["/list"]);
+  const plans = parsePowerPlans(listed);
+  const active = plans.find((p) => p.active) || null;
+  return { ok: true, plans, active };
+});
+
+function collectStorageIntel() {
+  const home = os.homedir();
+  const roots = ["Downloads", "Documents", "Desktop", "Videos", "Pictures", "Music"]
+    .map((name) => path.join(home, name))
+    .filter((dir) => {
+      try {
+        return fs.existsSync(dir);
+      } catch {
+        return false;
+      }
+    });
+
+  const skipDir = /^(node_modules|\.git|\.svn|AppData|Windows)$/i;
+  const files = [];
+  let visited = 0;
+  const maxVisited = 10000;
+
+  const walk = (dir, depth) => {
+    if (visited >= maxVisited || depth > 7) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      if (visited >= maxVisited) return;
+      visited++;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (skipDir.test(ent.name) || ent.name.startsWith(".")) continue;
+        walk(full, depth + 1);
+      } else if (ent.isFile()) {
+        try {
+          const st = fs.statSync(full);
+          if (st.size >= 8 * 1024 * 1024) {
+            files.push({ path: full, name: ent.name, sizeBytes: st.size });
+          }
+        } catch {
+          /* ignore locked files */
+        }
+      }
+    }
+  };
+
+  for (const root of roots) walk(root, 0);
+  files.sort((a, b) => b.sizeBytes - a.sizeBytes);
+
+  const groups = new Map();
+  for (const file of files) {
+    const key = `${file.sizeBytes}|${file.name.toLowerCase()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(file.path);
+  }
+
+  const duplicates = [];
+  for (const [key, paths] of groups) {
+    if (paths.length < 2) continue;
+    const sizeBytes = Number(key.split("|")[0]);
+    duplicates.push({
+      name: path.basename(paths[0]),
+      sizeBytes,
+      paths: paths.slice(0, 6),
+    });
+    if (duplicates.length >= 12) break;
+  }
+
+  return {
+    at: Date.now(),
+    visited,
+    largeFiles: files.slice(0, 25),
+    duplicates,
+  };
+}
+
+ipcMain.handle("wincare:storageIntel", async () => {
+  if (process.platform !== "win32") {
+    return { at: Date.now(), visited: 0, largeFiles: [], duplicates: [] };
+  }
+  try {
+    return collectStorageIntel();
+  } catch (error) {
+    logger.error("disk", "storageIntel falhou", error instanceof Error ? error.message : error);
+    return { at: Date.now(), visited: 0, largeFiles: [], duplicates: [] };
   }
 });
 

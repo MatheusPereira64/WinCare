@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as InicializacaoRouteImport } from './routes/inicializacao'
+import { Route as InteligenciaRouteImport } from './routes/inteligencia'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
@@ -39,6 +40,11 @@ const DiscoRoute = DiscoRouteImport.update({
 const InicializacaoRoute = InicializacaoRouteImport.update({
   id: '/inicializacao',
   path: '/inicializacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InteligenciaRoute = InteligenciaRouteImport.update({
+  id: '/inteligencia',
+  path: '/inteligencia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LimpezaRoute = LimpezaRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
+  '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
+  '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
+  '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
+    | '/inteligencia'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
+    | '/inteligencia'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
+    | '/inteligencia'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DiscoRoute: typeof DiscoRoute
   InicializacaoRoute: typeof InicializacaoRoute
+  InteligenciaRoute: typeof InteligenciaRoute
   LimpezaRoute: typeof LimpezaRoute
   LogsRoute: typeof LogsRoute
   MonitoramentoRoute: typeof MonitoramentoRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/inicializacao'
       fullPath: '/inicializacao'
       preLoaderRoute: typeof InicializacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inteligencia': {
+      id: '/inteligencia'
+      path: '/inteligencia'
+      fullPath: '/inteligencia'
+      preLoaderRoute: typeof InteligenciaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/limpeza': {
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   DiscoRoute: DiscoRoute,
   InicializacaoRoute: InicializacaoRoute,
+  InteligenciaRoute: InteligenciaRoute,
   LimpezaRoute: LimpezaRoute,
   LogsRoute: LogsRoute,
   MonitoramentoRoute: MonitoramentoRoute,

@@ -5,13 +5,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { formatLog, useToolRunner } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
 import { getCommandPreview, resolveCommand, RISK_LABEL } from "@/lib/wincare/tools";
 import type { Tool, ToolCategory } from "@/lib/wincare/types";
 import { ConfirmModal } from "./ConfirmModal";
-import { LogView } from "./LogView";
+import { CommandFeed } from "./CommandFeed";
 
 const riskStyle: Record<string, string> = {
   safe: "border-success/30 bg-success/10 text-success",
@@ -141,18 +140,14 @@ function ToolCardInner({ tool, confirmCritical, onRequestConfirm }: ToolCardProp
         )}
       </div>
 
-      {(state.running || state.progress > 0) && (
-        <Progress value={state.progress} className="h-1.5" />
-      )}
-
-      {state.lines.length > 0 && <LogView lines={state.lines} />}
-
-      {state.result && !state.running && (
-        <p
-          className={`text-sm font-medium ${state.status === "error" ? "text-destructive" : "text-success"}`}
-        >
-          {state.result}
-        </p>
+      {state.lines.length > 0 && (
+        <CommandFeed
+          lines={state.lines}
+          running={state.running}
+          status={state.status}
+          result={state.result}
+          toolName={tool.name}
+        />
       )}
 
       {!onRequestConfirm && (

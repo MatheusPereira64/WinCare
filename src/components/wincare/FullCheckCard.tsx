@@ -9,8 +9,9 @@ import { getNative, simulateRun } from "@/lib/wincare/bridge";
 import { actions } from "@/lib/wincare/store";
 import { FULL_CHECK_IDS, getTool } from "@/lib/wincare/tools";
 import { formatLog } from "@/lib/wincare/runner";
+import { normalizeCmdText } from "@/lib/wincare/commandFeed";
 import type { LogLine } from "@/lib/wincare/types";
-import { LogView } from "./LogView";
+import { CommandFeed } from "./CommandFeed";
 
 const now = () =>
   new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -23,7 +24,8 @@ export function FullCheckCard() {
   const buffer = useRef<LogLine[]>([]);
 
   const push = (text: string, kind: LogLine["kind"] = "output") => {
-    buffer.current = [...buffer.current, { time: now(), text, kind }];
+    const clean = normalizeCmdText(text) || text;
+    buffer.current = [...buffer.current, { time: now(), text: clean, kind }];
     setLines(buffer.current);
   };
 
@@ -129,7 +131,9 @@ export function FullCheckCard() {
         </div>
       )}
 
-      {lines.length > 0 && <LogView lines={lines} className="h-72" />}
+      {lines.length > 0 && (
+        <CommandFeed lines={lines} running={running} toolName={current || "Verificação completa"} />
+      )}
     </Card>
   );
 }

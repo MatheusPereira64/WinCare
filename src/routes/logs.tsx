@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LogView } from "@/components/wincare/LogView";
+import { CommandFeed } from "@/components/wincare/CommandFeed";
 import { actions, useStore } from "@/lib/wincare/store";
 import { formatLog } from "@/lib/wincare/runner";
 
@@ -134,8 +134,13 @@ function LogsPage() {
                 </Badge>
               </div>
             </div>
-            <LogView lines={run.lines} />
-            {run.result && <p className="text-sm text-muted-foreground">{run.result}</p>}
+            <CommandFeed
+              lines={run.lines}
+              running={run.status === "running"}
+              status={run.status}
+              result={run.result}
+              toolName={run.toolName}
+            />
           </Card>
         ))}
       </div>

@@ -59,6 +59,19 @@ export interface ApplyUpdateResult {
   logFile?: string;
 }
 
+export interface PowerPlanInfo {
+  guid: string;
+  name: string;
+  active: boolean;
+}
+
+export interface StorageIntelResult {
+  at: number;
+  visited: number;
+  largeFiles: { path: string; name: string; sizeBytes: number }[];
+  duplicates: { name: string; sizeBytes: number; paths: string[] }[];
+}
+
 export interface NativeBridge {
   run: (
     command: string,
@@ -78,6 +91,10 @@ export interface NativeBridge {
   topProcesses?: () => Promise<TopProcess[]>;
   diskUsage: () => Promise<DiskUsageFolder[]>;
   clearDiskFolder: (id: string) => Promise<{ ok: boolean; reason?: string; freedBytes?: number }>;
+  storageIntel?: () => Promise<StorageIntelResult>;
+  powerPlan?: (
+    payload?: { action?: "list" | "set"; profile?: "balanced" | "gaming" | "work" | "battery" },
+  ) => Promise<{ ok: boolean; reason?: string; plans: PowerPlanInfo[]; active: PowerPlanInfo | null }>;
   saveTextFile?: (
     content: string,
     defaultName?: string,
@@ -354,6 +371,10 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     command: '"C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe" /background',
     location: "hkcu-run",
     enabled: true,
+    processName: "OneDrive",
+    running: true,
+    memMb: 92,
+    processCount: 2,
   },
   {
     id: "hkcu-run:Discord",
@@ -361,13 +382,32 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     command: '"C:\\Users\\Usuario\\AppData\\Local\\Discord\\Update.exe" --processStart Discord.exe',
     location: "hkcu-run",
     enabled: true,
+    processName: "Discord",
+    running: true,
+    memMb: 268,
+    processCount: 4,
   },
   {
     id: "hkcu-run:Steam",
     name: "Steam",
     command: '"C:\\Program Files (x86)\\Steam\\steam.exe" -silent',
     location: "hkcu-run",
-    enabled: false,
+    enabled: true,
+    processName: "steam",
+    running: true,
+    memMb: 186,
+    processCount: 3,
+  },
+  {
+    id: "hkcu-run:Spotify",
+    name: "Spotify",
+    command: '"C:\\Users\\Usuario\\AppData\\Roaming\\Spotify\\Spotify.exe" --autostart',
+    location: "hkcu-run",
+    enabled: true,
+    processName: "Spotify",
+    running: true,
+    memMb: 154,
+    processCount: 2,
   },
   {
     id: "hklm-run:SecurityHealth",
@@ -376,6 +416,10 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     location: "hklm-run",
     enabled: true,
     requiresAdmin: true,
+    processName: "SecurityHealthSystray",
+    running: true,
+    memMb: 18,
+    processCount: 1,
   },
 ];
 

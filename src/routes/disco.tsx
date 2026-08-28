@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
+import { StorageIntelCard } from "@/components/wincare/StorageIntelCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import { useDisks } from "@/lib/wincare/useSystem";
 
@@ -86,6 +87,8 @@ function DiskPage() {
       </section>
 
       <DiskSpaceAnalyzer />
+
+      <StorageIntelCard />
 
       <ToolSection
         title="Diagnóstico de armazenamento"

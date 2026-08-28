@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld("wincare", {
   topProcesses: () => ipcRenderer.invoke("wincare:topProcesses"),
   diskUsage: () => ipcRenderer.invoke("wincare:diskUsage"),
   clearDiskFolder: (id) => ipcRenderer.invoke("wincare:clearDiskFolder", { id }),
+  storageIntel: () => ipcRenderer.invoke("wincare:storageIntel"),
+  powerPlan: (payload) => ipcRenderer.invoke("wincare:powerPlan", payload || {}),
   saveTextFile: (content, defaultName) =>
     ipcRenderer.invoke("wincare:saveTextFile", { content, defaultName }),
   isElevated: () => ipcRenderer.invoke("wincare:isElevated"),

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getNative, simulateRun } from "./bridge";
+import { normalizeCmdText } from "./commandFeed";
 import { actions } from "./store";
 import { resolveCommand } from "./tools";
 import type { LogLine, RunRecord, Tool } from "./types";
@@ -74,14 +75,17 @@ export function useToolRunner(tool: Tool) {
         if (!pendingChunkLines.length || lines.length >= MAX_LOG_LINES) return;
         const batch = pendingChunkLines.splice(0, MAX_LOG_LINES - lines.length);
         for (const text of batch) {
-          lines.push({ time: now(), text, kind: "output" });
+          const clean = normalizeCmdText(text);
+          if (!clean) continue;
+          lines.push({ time: now(), text: clean, kind: "output" });
         }
         setState((s) => ({ ...s, lines: [...lines] }));
       };
 
       const push = (text: string, kind: LogLine["kind"] = "output") => {
         if (lines.length >= MAX_LOG_LINES) return;
-        lines.push({ time: now(), text, kind });
+        const clean = normalizeCmdText(text) || text;
+        lines.push({ time: now(), text: clean, kind });
         setState((s) => ({ ...s, lines: [...lines] }));
       };
 
