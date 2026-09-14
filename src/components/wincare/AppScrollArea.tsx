@@ -71,4 +71,4 @@ const AppScrollBar = React.forwardRef<
 ));
 AppScrollBar.displayName = "AppScrollBar";
 
-export { AppScrollArea, AppScrollBar };
+export { AppScrollArea };

@@ -1,13 +1,25 @@
-name: Test Project
+name: Quality
 
 on:
   pull_request:
     branches:
       - main
+      - development
+  push:
+    branches:
+      - development
+      - main
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  test:
-    name: Lint & Build
+  quality:
+    name: Lint, types, unused & build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,5 +40,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Build
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unused files and dependencies
+        run: npm run knip
+
+      - name: Build (web / TanStack Start)
         run: npm run build
+
+      - name: Build (Electron renderer)
+        run: npm run wincare:build

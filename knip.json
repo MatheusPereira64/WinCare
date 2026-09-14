@@ -1,0 +1,39 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/router.tsx",
+    "src/start.ts",
+    "src/server.ts",
+    "src/routes/**/*.{ts,tsx}",
+    "electron/renderer/main.tsx",
+    "electron/main.cjs",
+    "electron/preload.cjs",
+    "electron/updater.cjs",
+    "electron/system-metrics.cjs",
+    "electron/logger.cjs",
+    "scripts/*.{cjs,js}",
+    "vite.config.ts",
+    "vite.electron.config.ts",
+    "eslint.config.js"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "electron/**/*.{ts,tsx,cjs}",
+    "scripts/**/*.{cjs,js}",
+    "*.{ts,js}"
+  ],
+  "ignore": ["src/routeTree.gen.ts"],
+  "ignoreDependencies": [
+    "@electron/packager",
+    "@lovable.dev/vite-tanstack-config",
+    "@tanstack/router-plugin",
+    "nitro",
+    "tailwindcss",
+    "tw-animate-css"
+  ],
+  "ignoreBinaries": ["powershell", "zip"],
+  "ignoreIssues": {
+    "src/components/ui/**": ["exports", "types"],
+    "src/lib/wincare/**": ["types"]
+  }
+}

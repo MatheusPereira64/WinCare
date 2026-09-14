@@ -112,7 +112,7 @@ export function hydrateStore() {
   listeners.forEach((l) => l());
 }
 
-export function applyTheme(theme: "dark" | "light") {
+function applyTheme(theme: "dark" | "light") {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("light", theme === "light");
 }

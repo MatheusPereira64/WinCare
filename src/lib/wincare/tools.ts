@@ -288,7 +288,7 @@ export const TOOLS: Tool[] = [
   },
 
   // ---------------- Redes ----------------
-  // Destinos fixos (sem input controlado). Para host customizado use NetworkProbeCard.
+  // Destinos fixos (sem campo de host livre — no Electron, input nativo travava a UI).
   {
     id: "ping-google",
     name: "Ping — Google DNS",

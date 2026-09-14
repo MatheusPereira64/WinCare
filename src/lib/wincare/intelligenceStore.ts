@@ -1,4 +1,4 @@
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import {
   seedHealthHistory,
@@ -123,25 +123,10 @@ export function getIntelState() {
 }
 
 export function useIntel<T>(selector: (s: IntelState) => T): T {
-  const selectorRef = useRef(selector);
-  selectorRef.current = selector;
-  const cacheRef = useRef<T>();
-  const hasCache = useRef(false);
-
-  const take = (store: IntelState) => {
-    const next = selectorRef.current(store);
-    if (hasCache.current && Object.is(cacheRef.current, next)) {
-      return cacheRef.current as T;
-    }
-    hasCache.current = true;
-    cacheRef.current = next;
-    return next;
-  };
-
   return useSyncExternalStore(
     subscribe,
-    () => take(getSnapshot()),
-    () => take(getSnapshot()),
+    () => selector(getSnapshot()),
+    () => selector(getSnapshot()),
   );
 }
 
@@ -219,10 +204,3 @@ export const intelActions = {
     });
   },
 };
-
-export function useIntelActions() {
-  return {
-    recordSample: useCallback(intelActions.recordSample, []),
-    addSnapshot: useCallback(intelActions.addSnapshot, []),
-  };
-}

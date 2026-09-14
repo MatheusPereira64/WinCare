@@ -141,7 +141,7 @@ function impactFromRam(memMb: number, running?: boolean): StartupImpact {
   return "unknown";
 }
 
-export function enrichStartupItem(item: StartupItem): StartupItem {
+function enrichStartupItem(item: StartupItem): StartupItem {
   const mem = Math.max(0, Math.round(item.memMb ?? 0));
   const rule = RULES.find((r) => r.match.test(haystack(item)));
   let impact: StartupImpact = rule?.impact ?? impactFromRam(mem, item.running);
@@ -248,12 +248,6 @@ export const IMPACT_LABEL: Record<StartupImpact, string> = {
   medium: "Médio",
   low: "Baixo",
   unknown: "—",
-};
-
-export const ADVICE_LABEL: Record<StartupAdvice, string> = {
-  keep: "Manter",
-  consider: "Avaliar",
-  disable: "Desativar",
 };
 
 export const LOAD_LABEL: Record<StartupDiagnosis["load"], string> = {

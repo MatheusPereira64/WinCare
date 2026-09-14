@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,9 @@ interface Props {
   subtitle: string;
   categories: ToolCategory[];
   developmentBadge?: string;
-  /** Conteúdo opcional acima do grid de ferramentas. */
-  leading?: ReactNode;
 }
 
-export function ToolSection({ title, subtitle, categories, developmentBadge, leading }: Props) {
+export function ToolSection({ title, subtitle, categories, developmentBadge }: Props) {
   const [query, setQuery] = useState("");
   const [pendingExecute, setPendingExecute] = useState<(() => void) | null>(null);
   const [pendingTool, setPendingTool] = useState<Tool | null>(null);
@@ -93,8 +91,6 @@ export function ToolSection({ title, subtitle, categories, developmentBadge, lea
           />
         </div>
       </header>
-
-      {leading}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tools.map((tool) => (

@@ -144,7 +144,7 @@ export const PROFILE_META: Record<
   },
 };
 
-export const GAME_PROCESS_RE =
+const GAME_PROCESS_RE =
   /\b(cs2|csgo|valorant|league of legends|leagueclient|fortniteclient|rocketleague|gta5|gtav|rdr2|minecraft|javaw|overwatch|apexlegends|cod\.exe|modernwarfare|warzone|eldenring|cyberpunk|dota2|pubg|rainbowsix|destiny2|wow|wowclassic|starfield|palworld|helldivers|thefinals|robloxplayer|genshin|zenlesszonezero)\b/i;
 
 const OVERLAY_RE = /\b(discord|overwolf|nvidia share|rtss|msi afterburner|steamwebhelper)\b/i;
