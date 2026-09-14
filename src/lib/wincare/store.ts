@@ -8,7 +8,10 @@ interface State {
   autoCheck: boolean;
   autoCheckUpdates: boolean;
   confirmCritical: boolean;
+  lastAutoCheckAt: number;
 }
+
+export const AUTO_CHECK_GAP_MS = 2 * 60 * 60 * 1000;
 
 const STORAGE_KEY = "wincare-state";
 const MAX_STORAGE_BYTES = 512_000;
@@ -22,6 +25,7 @@ const initial: State = {
   autoCheck: true,
   autoCheckUpdates: true,
   confirmCritical: true,
+  lastAutoCheckAt: 0,
 };
 
 let state: State = initial;
@@ -42,6 +46,9 @@ function sanitizePartial(data: Partial<State>): Partial<State> {
       }));
   }
   if (!Array.isArray(next.favorites)) next.favorites = initial.favorites;
+  if (typeof next.lastAutoCheckAt !== "number" || !Number.isFinite(next.lastAutoCheckAt)) {
+    next.lastAutoCheckAt = 0;
+  }
   return next;
 }
 
@@ -63,6 +70,7 @@ function persist() {
           autoCheck: state.autoCheck,
           autoCheckUpdates: state.autoCheckUpdates,
           confirmCritical: state.confirmCritical,
+          lastAutoCheckAt: state.lastAutoCheckAt,
         }),
       );
     } catch {
@@ -162,7 +170,15 @@ export const actions = {
   setConfirmCritical(confirmCritical: boolean) {
     setState({ confirmCritical });
   },
+  markAutoCheck(at = Date.now()) {
+    setState({ lastAutoCheckAt: at });
+  },
 };
+
+export function shouldRunAutoCheck(now = Date.now()) {
+  if (!state.autoCheck) return false;
+  return now - (state.lastAutoCheckAt || 0) >= AUTO_CHECK_GAP_MS;
+}
 
 export function useFavorite(id: string) {
   const isFavorite = useStore((s) => s.favorites.includes(id));

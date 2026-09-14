@@ -102,9 +102,10 @@ function SettingsPage() {
           <div className="flex items-start gap-3">
             <Zap className="mt-0.5 size-5 text-primary" />
             <div>
-              <Label htmlFor="auto">Verificação automática ao iniciar</Label>
+              <Label htmlFor="auto">Verificação automática</Label>
               <p className="text-sm text-muted-foreground">
-                Faz um diagnóstico rápido sempre que o WinCare é aberto.
+                Diagnóstico rápido ao abrir o WinCare e de 2 em 2 horas — não cada vez que você
+                entra no Dashboard.
               </p>
             </div>
           </div>

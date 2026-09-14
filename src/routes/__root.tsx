@@ -19,7 +19,7 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sid
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
-import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
+import { actions, AUTO_CHECK_GAP_MS, hydrateStore, shouldRunAutoCheck, useStore } from "@/lib/wincare/store";
 import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
 import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
@@ -234,6 +234,31 @@ function TopBar() {
   );
 }
 
+function PeriodicHealthCheck() {
+  const enabled = useStore((s) => s.autoCheck);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const run = () => {
+      if (!shouldRunAutoCheck()) return;
+      actions.markAutoCheck();
+      toast.info("Verificação automática concluída", {
+        description: "Nenhum problema crítico detectado.",
+      });
+    };
+
+    const first = window.setTimeout(run, 2000);
+    const id = window.setInterval(run, AUTO_CHECK_GAP_MS);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(id);
+    };
+  }, [enabled]);
+
+  return null;
+}
+
 function StartupUpdateCheck() {
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
   const { version, info, applying, progress, promptOpen, apply, openReleasePage, dismissPrompt } =
@@ -322,6 +347,7 @@ function RootComponent() {
           </div>
         </div>
         <Toaster />
+        <PeriodicHealthCheck />
         <StartupUpdateCheck />
         <IntelligenceCollector />
         <RouteUiGuard />

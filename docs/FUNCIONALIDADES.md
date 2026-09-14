@@ -171,7 +171,7 @@ Preferências neste computador (localStorage).
 
 - Tema claro / escuro
 - Confirmar comandos críticos
-- Verificação automática ao iniciar o app
+- Verificação automática ao abrir o app e a cada 2 horas (não ao entrar no Dashboard)
 - **Atualizações:** consultar tags/releases no GitHub, popup ao abrir se houver versão nova, download automático no ZIP instalado, abrir página de releases
 - Atalhos de teclado
 - Executar o WinCare como administrador

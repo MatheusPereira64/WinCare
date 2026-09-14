@@ -11,7 +11,6 @@ import {
   Star,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -54,7 +53,6 @@ function Dashboard() {
   const disks = useDisks();
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
-  const autoCheck = useStore((s) => s.autoCheck);
   const samples = useIntel((s) => s.samples);
   const startupNewIds = useIntel((s) => s.startupNewIds);
   const startupKnown = useIntel((s) => s.startupKnown);
@@ -64,14 +62,6 @@ function Dashboard() {
   }, [startupNewIds, startupKnown]);
   const [startup, setStartup] = useState<StartupItem[]>([]);
   const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
-
-  useEffect(() => {
-    if (autoCheck) {
-      toast.info("Verificação automática concluída", {
-        description: "Nenhum problema crítico detectado na inicialização.",
-      });
-    }
-  }, [autoCheck]);
 
   useEffect(() => {
     let cancelled = false;
