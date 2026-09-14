@@ -12,7 +12,6 @@ const BOOT_FAILSAFE_MS = 8000;
  */
 export function useContentLoading() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const routerPending = useRouterState({ select: (s) => s.status === "pending" });
   const awaitingSystem = useAwaitingFirstSystemSample();
   const [splash, setSplash] = useState(true);
   const [navBusy, setNavBusy] = useState(false);
@@ -41,7 +40,7 @@ export function useContentLoading() {
   }, [pathname]);
 
   const booting = splash || (awaitingSystem && !bootStuck);
-  const visible = booting || navBusy || routerPending;
+  const visible = booting || navBusy;
   const label = booting ? "Lendo informações do sistema…" : "Carregando…";
 
   return { visible, label };

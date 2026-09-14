@@ -1,6 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
-import { PageLoading } from "@/components/wincare/PageLoading";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
@@ -11,7 +10,6 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    defaultPendingComponent: () => <PageLoading label="Carregando…" />,
   });
 
   return router;

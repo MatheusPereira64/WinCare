@@ -174,12 +174,43 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 42%, transparent) transparent;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+  }
+
+  /* Chromium / Electron: barra fina, trilho invisível, thumb no tema. */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--muted-foreground) 38%, transparent);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--primary) 62%, transparent);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in oklab, var(--primary) 78%, transparent);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 

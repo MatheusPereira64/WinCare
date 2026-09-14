@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useState } from "react";
+import { useId } from "react";
 
 import { cn } from "@/lib/utils";
 import appLogo from "@/assets/wincare-icon.png";
@@ -100,8 +100,8 @@ export function PageLoading({
 }
 
 /**
- * Overlay preso à viewport da área de conteúdo (fixed), não ao scroll da página.
- * Sem portal no body — no Electron isso prende o HUD.
+ * Cobre só o &lt;main&gt; (que não rola). O scroll fica no filho — assim o loader
+ * permanece no centro da área visível. Sem portal e sem position:fixed.
  */
 export function PageLoadingOverlay({
   visible,
@@ -110,52 +110,12 @@ export function PageLoadingOverlay({
   visible: boolean;
   label?: string;
 }) {
-  const [box, setBox] = useState<{ top: number; left: number; width: number; height: number } | null>(
-    null,
-  );
-
-  useLayoutEffect(() => {
-    if (!visible) return;
-
-    const host = document.querySelector<HTMLElement>("[data-wincare-content]");
-    if (!host) return;
-
-    const update = () => {
-      const rect = host.getBoundingClientRect();
-      setBox({
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      });
-    };
-
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(host);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [visible]);
-
-  if (!visible || !box) return null;
+  if (!visible) return null;
 
   return (
     <div
-      className="z-30 flex items-center justify-center bg-background/70 backdrop-blur-md"
-      style={{
-        position: "fixed",
-        top: box.top,
-        left: box.left,
-        width: box.width,
-        height: box.height,
-        pointerEvents: "auto",
-      }}
+      className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-md"
+      style={{ pointerEvents: "none" }}
     >
       <PageLoading compact label={label} />
     </div>
