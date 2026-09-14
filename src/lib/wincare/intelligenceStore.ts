@@ -97,12 +97,17 @@ export function hydrateIntelligence() {
     state = {
       ...initial,
       ...parsed,
-      samples: Array.isArray(parsed.samples) ? parsed.samples.slice(-MAX_SAMPLES) : seedHealthHistory(),
+      samples: Array.isArray(parsed.samples)
+        ? parsed.samples.slice(-MAX_SAMPLES)
+        : seedHealthHistory(),
       snapshots: Array.isArray(parsed.snapshots) ? parsed.snapshots.slice(0, MAX_SNAPSHOTS) : [],
       startupKnown: Array.isArray(parsed.startupKnown) ? parsed.startupKnown : [],
       startupNewIds: Array.isArray(parsed.startupNewIds) ? parsed.startupNewIds : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions.slice(0, MAX_SESSIONS) : [],
-      lastFolderBytes: parsed.lastFolderBytes && typeof parsed.lastFolderBytes === "object" ? parsed.lastFolderBytes : {},
+      lastFolderBytes:
+        parsed.lastFolderBytes && typeof parsed.lastFolderBytes === "object"
+          ? parsed.lastFolderBytes
+          : {},
     };
     if (state.samples.length === 0) state.samples = seedHealthHistory();
   } catch {

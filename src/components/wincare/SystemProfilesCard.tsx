@@ -5,11 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getNative, isNative } from "@/lib/wincare/bridge";
-import {
-  PROFILE_META,
-  sessionNote,
-  type ProfileId,
-} from "@/lib/wincare/intelligence";
+import { PROFILE_META, sessionNote, type ProfileId } from "@/lib/wincare/intelligence";
 import { intelActions, useIntel } from "@/lib/wincare/intelligenceStore";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 
@@ -112,8 +108,9 @@ export function SystemProfilesCard() {
       {pending && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2.5">
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            Ativar <span className="font-medium text-foreground">{PROFILE_META[pending].title}</span>?
-            O Windows muda o plano para {PROFILE_META[pending].planHint}.
+            Ativar{" "}
+            <span className="font-medium text-foreground">{PROFILE_META[pending].title}</span>? O
+            Windows muda o plano para {PROFILE_META[pending].planHint}.
             {!isNative() ? " No navegador só fica registrado localmente." : ""}
           </p>
           <Button type="button" size="sm" variant="outline" onClick={() => setPending(null)}>

@@ -68,7 +68,7 @@ export function IntelligenceCollector() {
       inFlight = true;
       const snapshot = infoRef.current;
       const native = getNative();
-      let processes: TopProcess[] = [];
+      let processes: TopProcess[];
       try {
         processes = native?.topProcesses
           ? await native.topProcesses()
@@ -86,9 +86,18 @@ export function IntelligenceCollector() {
       if (game) {
         idleTicks.current = 0;
         if (active && active.game === game) {
-          intelActions.tickSession(snapshot.cpuUsage, snapshot.memoryUsage, snapshot.gpuUsage ?? null);
+          intelActions.tickSession(
+            snapshot.cpuUsage,
+            snapshot.memoryUsage,
+            snapshot.gpuUsage ?? null,
+          );
         } else {
-          intelActions.startSession(game, snapshot.cpuUsage, snapshot.memoryUsage, snapshot.gpuUsage ?? null);
+          intelActions.startSession(
+            game,
+            snapshot.cpuUsage,
+            snapshot.memoryUsage,
+            snapshot.gpuUsage ?? null,
+          );
         }
       } else if (active) {
         idleTicks.current += 1;

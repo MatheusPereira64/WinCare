@@ -19,7 +19,13 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sid
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
-import { actions, AUTO_CHECK_GAP_MS, hydrateStore, shouldRunAutoCheck, useStore } from "@/lib/wincare/store";
+import {
+  actions,
+  AUTO_CHECK_GAP_MS,
+  hydrateStore,
+  shouldRunAutoCheck,
+  useStore,
+} from "@/lib/wincare/store";
 import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
 import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";

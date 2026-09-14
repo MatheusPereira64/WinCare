@@ -74,7 +74,9 @@ export function SymptomDiagnosis({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${findingTone[f.tone]}`}>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${findingTone[f.tone]}`}
+                  >
                     {findingLabel[f.tone]}
                   </span>
                   <p className="text-sm font-medium">{f.title}</p>

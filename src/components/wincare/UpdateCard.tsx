@@ -67,8 +67,8 @@ export function UpdateCard() {
         <div>
           <Label htmlFor="auto-updates">Verificar ao iniciar</Label>
           <p className="text-sm text-muted-foreground">
-            Ao abrir o app, consulta as tags de release no GitHub e mostra um popup se houver
-            versão mais nova.
+            Ao abrir o app, consulta as tags de release no GitHub e mostra um popup se houver versão
+            mais nova.
           </p>
         </div>
         <Switch
@@ -109,7 +109,12 @@ export function UpdateCard() {
           </Button>
         )}
 
-        <Button type="button" variant="ghost" disabled={applying} onClick={() => void openReleasePage()}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={applying}
+          onClick={() => void openReleasePage()}
+        >
           Abrir no GitHub
         </Button>
       </div>
@@ -121,8 +126,8 @@ export function UpdateCard() {
       )}
       {native && info && info.packaged === false && (
         <p className="text-xs text-muted-foreground">
-          Modo desenvolvimento: a verificação funciona, mas a substituição automática só roda no
-          ZIP empacotado.
+          Modo desenvolvimento: a verificação funciona, mas a substituição automática só roda no ZIP
+          empacotado.
         </p>
       )}
     </Card>

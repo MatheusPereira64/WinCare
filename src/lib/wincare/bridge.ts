@@ -92,9 +92,15 @@ export interface NativeBridge {
   diskUsage: () => Promise<DiskUsageFolder[]>;
   clearDiskFolder: (id: string) => Promise<{ ok: boolean; reason?: string; freedBytes?: number }>;
   storageIntel?: () => Promise<StorageIntelResult>;
-  powerPlan?: (
-    payload?: { action?: "list" | "set"; profile?: "balanced" | "gaming" | "work" | "battery" },
-  ) => Promise<{ ok: boolean; reason?: string; plans: PowerPlanInfo[]; active: PowerPlanInfo | null }>;
+  powerPlan?: (payload?: {
+    action?: "list" | "set";
+    profile?: "balanced" | "gaming" | "work" | "battery";
+  }) => Promise<{
+    ok: boolean;
+    reason?: string;
+    plans: PowerPlanInfo[];
+    active: PowerPlanInfo | null;
+  }>;
   saveTextFile?: (
     content: string,
     defaultName?: string,

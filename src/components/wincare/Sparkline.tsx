@@ -1,10 +1,4 @@
-export function Sparkline({
-  values,
-  className = "",
-}: {
-  values: number[];
-  className?: string;
-}) {
+export function Sparkline({ values, className = "" }: { values: number[]; className?: string }) {
   if (values.length < 2) {
     return <div className={`h-12 ${className}`} />;
   }

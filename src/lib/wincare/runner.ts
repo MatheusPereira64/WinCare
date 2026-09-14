@@ -101,8 +101,8 @@ export function useToolRunner(tool: Tool) {
         chunkFrame = requestAnimationFrame(flushChunkLines);
       };
 
-      let code = 0;
-      let result = "";
+      let code: number;
+      let result: string;
       try {
         const native = getNative();
         let elevated = false;

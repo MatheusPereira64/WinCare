@@ -47,5 +47,12 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ["src/routes/**/*.{ts,tsx}"],
+    rules: {
+      // TanStack Router exige `export const Route` junto do componente da página.
+      "react-refresh/only-export-components": "off",
+    },
+  },
   eslintPluginPrettier,
 );

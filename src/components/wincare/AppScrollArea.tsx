@@ -51,8 +51,7 @@ const AppScrollBar = React.forwardRef<
       "flex touch-none select-none transition-[width,height,opacity,colors] duration-200",
       "data-[state=hidden]:pointer-events-none data-[state=hidden]:opacity-0",
       "data-[state=visible]:opacity-100",
-      orientation === "vertical" &&
-        "h-full w-1.5 border-l border-l-transparent p-px hover:w-2",
+      orientation === "vertical" && "h-full w-1.5 border-l border-l-transparent p-px hover:w-2",
       orientation === "horizontal" &&
         "h-1.5 w-full flex-col border-t border-t-transparent p-px hover:h-2",
       className,

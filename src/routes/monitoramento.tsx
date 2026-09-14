@@ -17,8 +17,7 @@ export const Route = createFileRoute("/monitoramento")({
       { title: "Monitoramento de CPU e memória | WinCare" },
       {
         name: "description",
-        content:
-          "Dashboards em tempo real de CPU, memória, disco e processos no Windows.",
+        content: "Dashboards em tempo real de CPU, memória, disco e processos no Windows.",
       },
       { property: "og:title", content: "Monitoramento de CPU e memória | WinCare" },
       {
@@ -169,7 +168,11 @@ function MonitorPage() {
         },
         xaxis: {
           categories,
-          labels: { style: { colors: "#64748b", fontSize: "10px" }, rotate: 0, hideOverlappingLabels: true },
+          labels: {
+            style: { colors: "#64748b", fontSize: "10px" },
+            rotate: 0,
+            hideOverlappingLabels: true,
+          },
           axisBorder: { show: false },
           axisTicks: { show: false },
         },
@@ -193,7 +196,11 @@ function MonitorPage() {
         },
         xaxis: {
           categories,
-          labels: { style: { colors: "#64748b", fontSize: "10px" }, rotate: 0, hideOverlappingLabels: true },
+          labels: {
+            style: { colors: "#64748b", fontSize: "10px" },
+            rotate: 0,
+            hideOverlappingLabels: true,
+          },
           axisBorder: { show: false },
           axisTicks: { show: false },
         },
@@ -234,10 +241,7 @@ function MonitorPage() {
     ];
   }, [disks]);
 
-  const maxProcessMem = useMemo(
-    () => Math.max(1, ...processes.map((p) => p.memMb)),
-    [processes],
-  );
+  const maxProcessMem = useMemo(() => Math.max(1, ...processes.map((p) => p.memMb)), [processes]);
 
   return (
     <div className="space-y-6">
@@ -386,7 +390,10 @@ function MonitorPage() {
                     className="grid grid-cols-[minmax(5.5rem,8rem)_1fr_auto] items-center gap-3 rounded-lg px-1 py-1 hover:bg-muted/30"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold tracking-tight text-foreground" title={p.name}>
+                      <p
+                        className="truncate text-sm font-semibold tracking-tight text-foreground"
+                        title={p.name}
+                      >
                         {p.name}
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground">#{p.pid}</p>

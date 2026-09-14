@@ -95,7 +95,11 @@ if (process.argv.includes("--admin")) {
     console.error("WinCare-Admin.cmd não encontrado. Rode npm run wincare:dev uma vez antes.");
     process.exit(1);
   }
-  const child = spawnSync("cmd.exe", ["/c", adminCmd], { cwd: root, stdio: "inherit", env: process.env });
+  const child = spawnSync("cmd.exe", ["/c", adminCmd], {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
   process.exit(child.status ?? 0);
 }
 

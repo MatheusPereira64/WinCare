@@ -186,9 +186,11 @@ function resolveAppIcon() {
 }
 
 function createWindow() {
-  const icon = resolveAppIcon() || (fs.existsSync(path.join(__dirname, "icon.ico"))
-    ? path.join(__dirname, "icon.ico")
-    : undefined);
+  const icon =
+    resolveAppIcon() ||
+    (fs.existsSync(path.join(__dirname, "icon.ico"))
+      ? path.join(__dirname, "icon.ico")
+      : undefined);
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -311,7 +313,10 @@ function decodeWindowsBuffer(input, forceUtf16 = false) {
       swapped.swap16();
       return swapped.toString("utf16le").replace(/\u0000/g, "");
     }
-    return even.subarray(start).toString("utf16le").replace(/\u0000/g, "");
+    return even
+      .subarray(start)
+      .toString("utf16le")
+      .replace(/\u0000/g, "");
   };
 
   if (forceUtf16) return asUtf16(buf);
@@ -841,8 +846,7 @@ ipcMain.handle("wincare:restartAsAdmin", async () => {
     // .electron-dev copia o Electron com default_app.asar — app.isPackaged fica true
     // mesmo em desenvolvimento. Só o app.asar de release é pacote real.
     const isReleaseBuild = fs.existsSync(realAsar);
-    const exe =
-      !isReleaseBuild && fs.existsSync(brandedExe) ? brandedExe : process.execPath;
+    const exe = !isReleaseBuild && fs.existsSync(brandedExe) ? brandedExe : process.execPath;
     const args = isReleaseBuild ? [] : [projectRoot];
     const cwd = isReleaseBuild ? path.dirname(process.execPath) : projectRoot;
 
@@ -931,7 +935,10 @@ const psJson = (script, timeoutMs = 20000) =>
 /** Scripts longos: evita escaping quebrado via arquivo .ps1 temporário. */
 const psFileJson = (scriptBody, timeoutMs = 60000) =>
   new Promise((resolve, reject) => {
-    const ps1 = path.join(os.tmpdir(), `wincare-ps-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`);
+    const ps1 = path.join(
+      os.tmpdir(),
+      `wincare-ps-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`,
+    );
     fs.writeFileSync(ps1, scriptBody, "utf8");
     exec(
       `powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}"`,
@@ -1012,7 +1019,11 @@ ipcMain.handle("wincare:systemInfo", async () => {
   try {
     return await enrichSystemInfo(base, { cpuFromWmi });
   } catch (error) {
-    logger.warn("metrics", "Falha ao enriquecer métricas", error instanceof Error ? error.message : error);
+    logger.warn(
+      "metrics",
+      "Falha ao enriquecer métricas",
+      error instanceof Error ? error.message : error,
+    );
     return base;
   }
 });
@@ -1332,7 +1343,8 @@ async function enrichStartupProcesses(items) {
     }
     return items.map((item) => {
       const stem = exeStemFromCommand(item.command) || item.name;
-      const hit = cache.get(String(stem).toLowerCase()) || cache.get(String(item.name).toLowerCase());
+      const hit =
+        cache.get(String(stem).toLowerCase()) || cache.get(String(item.name).toLowerCase());
       return {
         ...item,
         processName: stem || undefined,
@@ -1461,9 +1473,7 @@ ipcMain.handle("wincare:setStartupEnabled", async (_e, { id, enabled }) => {
       const target = resolveStartupFolderPath(raw);
       if (!target) return { ok: false, reason: "Caminho de inicializacao invalido." };
 
-      const asDisabled = target.toLowerCase().endsWith(".disabled")
-        ? target
-        : `${target}.disabled`;
+      const asDisabled = target.toLowerCase().endsWith(".disabled") ? target : `${target}.disabled`;
       const asEnabled = target.toLowerCase().endsWith(".disabled")
         ? target.slice(0, -".disabled".length)
         : target;
@@ -1696,7 +1706,8 @@ function runPowerCfg(args, timeoutMs = 12000) {
 
 function parsePowerPlans(text) {
   const plans = [];
-  const re = /(\*)?\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s+\(([^)]+)\)/g;
+  const re =
+    /(\*)?\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\s+\(([^)]+)\)/g;
   let m;
   while ((m = re.exec(String(text || "")))) {
     plans.push({

@@ -22,7 +22,10 @@ export function useAppUpdater(options?: { autoCheck?: boolean; promptOnAvailable
 
   useEffect(() => {
     if (!native?.getAppVersion) return;
-    void native.getAppVersion().then(setVersion).catch(() => setVersion(""));
+    void native
+      .getAppVersion()
+      .then(setVersion)
+      .catch(() => setVersion(""));
   }, [native]);
 
   useEffect(() => {

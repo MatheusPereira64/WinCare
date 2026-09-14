@@ -132,7 +132,10 @@ function Dashboard() {
                 />
                 {loading ? "Carregando…" : healthy ? "Sistema saudável" : "Requer atenção"}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-border/60 px-3 text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border/60 px-3 text-muted-foreground"
+              >
                 <Monitor className="size-3" /> {info.hostname}
               </Badge>
             </div>
@@ -168,59 +171,61 @@ function Dashboard() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
-            icon={<Cpu className="size-4" />}
-            label="Uso de CPU"
-            value={`${info.cpuUsage}%`}
-            hint={
-              typeof info.cpuTemperature === "number"
-                ? `${info.cpuTemperature} °C`
-                : "Temperatura indisponível"
-            }
-            progress={info.cpuUsage}
-          />
-          <StatCard
-            icon={<MemoryStick className="size-4" />}
-            label="Memória"
-            value={`${info.memoryUsage}%`}
-            hint={
-              typeof info.memoryUsedGb === "number"
-                ? `${info.memoryUsedGb} / ${info.memoryTotalGb} GB`
-                : `${info.memoryTotalGb} GB instalados`
-            }
-            progress={info.memoryUsage}
-          />
-          <StatCard
-            icon={<CircuitBoard className="size-4" />}
-            label="GPU"
-            value={typeof info.gpuUsage === "number" ? `${info.gpuUsage}%` : "—"}
-            hint={[
+        <StatCard
+          icon={<Cpu className="size-4" />}
+          label="Uso de CPU"
+          value={`${info.cpuUsage}%`}
+          hint={
+            typeof info.cpuTemperature === "number"
+              ? `${info.cpuTemperature} °C`
+              : "Temperatura indisponível"
+          }
+          progress={info.cpuUsage}
+        />
+        <StatCard
+          icon={<MemoryStick className="size-4" />}
+          label="Memória"
+          value={`${info.memoryUsage}%`}
+          hint={
+            typeof info.memoryUsedGb === "number"
+              ? `${info.memoryUsedGb} / ${info.memoryTotalGb} GB`
+              : `${info.memoryTotalGb} GB instalados`
+          }
+          progress={info.memoryUsage}
+        />
+        <StatCard
+          icon={<CircuitBoard className="size-4" />}
+          label="GPU"
+          value={typeof info.gpuUsage === "number" ? `${info.gpuUsage}%` : "—"}
+          hint={
+            [
               info.gpuName,
               typeof info.gpuTemperature === "number" ? `${info.gpuTemperature} °C` : null,
             ]
               .filter(Boolean)
-              .join(" · ") || "Sensor indisponível"}
-            progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
-          />
-          <StatCard
-            icon={<HardDrive className="size-4" />}
-            label="Espaço em disco (C:)"
-            value={`${info.diskUsage}% usado`}
-            hint={`${info.diskTotalGb} GB no total`}
-            progress={info.diskUsage}
-          />
-          <StatCard
-            icon={<Clock className="size-4" />}
-            label="Tempo ligado"
-            value={info.uptime}
-            hint={`Última atualização do Windows: ${info.lastUpdate}`}
-          />
-          <StatCard
-            icon={<ShieldCheck className="size-4" />}
-            label="Windows Defender"
-            value={info.defenderStatus}
-            hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
-          />
+              .join(" · ") || "Sensor indisponível"
+          }
+          progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
+        />
+        <StatCard
+          icon={<HardDrive className="size-4" />}
+          label="Espaço em disco (C:)"
+          value={`${info.diskUsage}% usado`}
+          hint={`${info.diskTotalGb} GB no total`}
+          progress={info.diskUsage}
+        />
+        <StatCard
+          icon={<Clock className="size-4" />}
+          label="Tempo ligado"
+          value={info.uptime}
+          hint={`Última atualização do Windows: ${info.lastUpdate}`}
+        />
+        <StatCard
+          icon={<ShieldCheck className="size-4" />}
+          label="Windows Defender"
+          value={info.defenderStatus}
+          hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
+        />
       </div>
 
       <DiagnosticReportCard system={info} disks={disks} />
@@ -248,8 +253,7 @@ function Dashboard() {
 /** Medidor compacto usado dentro do painel hero. */
 function HeroMeter({ label, value }: { label: string; value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
-  const tone =
-    clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
+  const tone = clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
 
   return (
     <div className="space-y-1.5">

@@ -33,10 +33,7 @@ export function PageLoading({
         )}
       >
         <div className="relative size-32">
-          <span
-            className="absolute inset-3 rounded-full bg-primary/25 blur-2xl"
-            aria-hidden
-          />
+          <span className="absolute inset-3 rounded-full bg-primary/25 blur-2xl" aria-hidden />
           <svg
             className="animate-wincare-loader-spin absolute inset-0 size-full"
             viewBox="0 0 100 100"
@@ -81,7 +78,9 @@ export function PageLoading({
         </div>
 
         <div className="space-y-2.5">
-          <p className="max-w-[16rem] text-sm font-medium tracking-tight text-foreground">{label}</p>
+          <p className="max-w-[16rem] text-sm font-medium tracking-tight text-foreground">
+            {label}
+          </p>
           <div className="flex items-center justify-center gap-1.5" aria-hidden>
             <span className="animate-wincare-loader-dot size-1.5 rounded-full bg-primary" />
             <span

@@ -88,9 +88,9 @@ export function UpdateAvailableModal({
         ) : (
           <div className="mt-3 space-y-3 text-sm text-muted-foreground">
             <p>
-              Seu aplicativo está na versão <span className="font-medium text-foreground">{current}</span>.
-              Deseja baixar a versão <span className="font-medium text-foreground">{latest}</span> mais
-              atual?
+              Seu aplicativo está na versão{" "}
+              <span className="font-medium text-foreground">{current}</span>. Deseja baixar a versão{" "}
+              <span className="font-medium text-foreground">{latest}</span> mais atual?
             </p>
             {!canAutoUpdate && (
               <p>

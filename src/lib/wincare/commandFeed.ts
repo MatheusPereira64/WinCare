@@ -19,7 +19,8 @@ const TONE_LABEL: Record<CommandInsight["tone"], string> = {
 /** Junta "c o n c l u í d a" (UTF-16 lido errado) e limpa CR de progresso. */
 export function normalizeCmdText(raw: string) {
   let text = String(raw || "")
-    .replace(/\u0000/g, "")
+    .split("\0")
+    .join("")
     .replace(/\uFFFD/g, "");
   if (text.includes("\r")) {
     const parts = text

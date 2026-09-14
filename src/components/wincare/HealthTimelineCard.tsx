@@ -105,13 +105,20 @@ export function SnapshotCompareCard({
             Capture o estado do PC, faça uma limpeza ou mude o boot e compare os números.
           </p>
         </div>
-        <Button type="button" className="rounded-full" onClick={capture} disabled={info.hostname === "…"}>
+        <Button
+          type="button"
+          className="rounded-full"
+          onClick={capture}
+          disabled={info.hostname === "…"}
+        >
           <Camera /> Capturar agora
         </Button>
       </div>
 
       {snapshots.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nenhum snapshot ainda. Capture o estado atual.</p>
+        <p className="text-sm text-muted-foreground">
+          Nenhum snapshot ainda. Capture o estado atual.
+        </p>
       )}
 
       {snapshots.length > 0 && (
@@ -124,7 +131,12 @@ export function SnapshotCompareCard({
                   Saúde {snap.health}% · RAM {snap.ram}% · {snap.startupEnabled} no boot
                 </p>
               </div>
-              <Button type="button" size="icon" variant="ghost" onClick={() => intelActions.removeSnapshot(snap.id)}>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => intelActions.removeSnapshot(snap.id)}
+              >
                 <Trash2 className="size-4" />
               </Button>
             </li>
@@ -158,7 +170,11 @@ export function SnapshotCompareCard({
                   {row.delta != null && row.delta !== 0 && (
                     <span
                       className={
-                        row.tone === "up" ? "text-success" : row.tone === "down" ? "text-destructive" : ""
+                        row.tone === "up"
+                          ? "text-success"
+                          : row.tone === "down"
+                            ? "text-destructive"
+                            : ""
                       }
                     >
                       ({row.delta > 0 ? "+" : ""}

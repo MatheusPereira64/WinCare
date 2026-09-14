@@ -441,9 +441,7 @@ export function resolveCommand(tool: Tool, target?: string): string {
   const factor = tool.input.toCommandFactor ?? 1;
   const n = Number(raw.replace(",", "."));
   const value =
-    Number.isFinite(n) && factor !== 1
-      ? String(Math.max(0, Math.round(n * factor)))
-      : raw;
+    Number.isFinite(n) && factor !== 1 ? String(Math.max(0, Math.round(n * factor))) : raw;
 
   return tool.command.replace(/[^ ]+$/, value);
 }

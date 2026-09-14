@@ -59,7 +59,9 @@ function compareVersions(a, b) {
 }
 
 function stripVersion(tag) {
-  return String(tag || "").replace(/^v/i, "").trim();
+  return String(tag || "")
+    .replace(/^v/i, "")
+    .trim();
 }
 
 function githubHeaders() {
@@ -156,7 +158,9 @@ function pickBestRelease(list) {
   if (!published.length) return null;
   const stable = published.filter((r) => !r.prerelease);
   const pool = stable.length ? stable : published;
-  return pool.sort((a, b) => compareVersions(stripVersion(b.tag_name), stripVersion(a.tag_name)))[0];
+  return pool.sort((a, b) =>
+    compareVersions(stripVersion(b.tag_name), stripVersion(a.tag_name)),
+  )[0];
 }
 
 function unavailableResult(currentVersion, reason, message) {
@@ -255,49 +259,50 @@ function downloadFile(fileUrl, destPath, onProgress) {
         return;
       }
       const client = currentUrl.startsWith("http://") ? http : https;
-      const req = client.get(
-        currentUrl,
-        { headers: { "User-Agent": USER_AGENT } },
-        (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            res.resume();
-            follow(res.headers.location, redirects + 1);
-            return;
-          }
-          if (!res.statusCode || res.statusCode >= 400) {
-            reject(new Error(`Falha no download (HTTP ${res.statusCode || "?"}).`));
-            res.resume();
-            return;
-          }
+      const req = client.get(currentUrl, { headers: { "User-Agent": USER_AGENT } }, (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          res.resume();
+          follow(res.headers.location, redirects + 1);
+          return;
+        }
+        if (!res.statusCode || res.statusCode >= 400) {
+          reject(new Error(`Falha no download (HTTP ${res.statusCode || "?"}).`));
+          res.resume();
+          return;
+        }
 
-          const total = Number(res.headers["content-length"]) || 0;
-          let received = 0;
-          const file = fs.createWriteStream(destPath);
-          res.on("data", (chunk) => {
-            received += chunk.length;
-            if (onProgress && total > 0) {
-              onProgress({
-                phase: "download",
-                percent: Math.min(99, Math.round((received / total) * 100)),
-                received,
-                total,
-              });
-            }
-          });
-          res.pipe(file);
-          file.on("finish", () => {
-            file.close(() => resolve({ received, total }));
-          });
-          file.on("error", (err) => {
-            try {
-              fs.unlinkSync(destPath);
-            } catch {
-              /* ignore */
-            }
-            reject(err);
-          });
-        },
-      );
+        const total = Number(res.headers["content-length"]) || 0;
+        let received = 0;
+        const file = fs.createWriteStream(destPath);
+        res.on("data", (chunk) => {
+          received += chunk.length;
+          if (onProgress && total > 0) {
+            onProgress({
+              phase: "download",
+              percent: Math.min(99, Math.round((received / total) * 100)),
+              received,
+              total,
+            });
+          }
+        });
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close(() => resolve({ received, total }));
+        });
+        file.on("error", (err) => {
+          try {
+            fs.unlinkSync(destPath);
+          } catch {
+            /* ignore */
+          }
+          reject(err);
+        });
+      });
       req.on("error", reject);
     };
     follow(fileUrl, 0);
@@ -389,7 +394,12 @@ async function downloadAndApplyUpdate(onProgress) {
   onProgress?.({ phase: "check", percent: 0 });
   const info = await checkForUpdate();
   if (!info.updateAvailable) {
-    return { ok: false, reason: "up-to-date", message: "Você já está na versão mais recente.", info };
+    return {
+      ok: false,
+      reason: "up-to-date",
+      message: "Você já está na versão mais recente.",
+      info,
+    };
   }
   if (!info.downloadUrl) {
     return {

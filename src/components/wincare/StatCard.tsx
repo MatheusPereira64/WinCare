@@ -59,7 +59,11 @@ export function StatCard({ icon, label, value, hint, progress, tone }: Props) {
           />
         </div>
       )}
-      {hint && <p className="truncate text-xs text-muted-foreground" title={hint}>{hint}</p>}
+      {hint && (
+        <p className="truncate text-xs text-muted-foreground" title={hint}>
+          {hint}
+        </p>
+      )}
     </Card>
   );
 }

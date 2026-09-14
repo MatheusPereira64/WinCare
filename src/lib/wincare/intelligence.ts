@@ -118,31 +118,29 @@ export const SYMPTOMS: SymptomDef[] = [
   { id: "net", title: "A internet está ruim", hint: "DNS, ping e pilha de rede" },
 ];
 
-export const PROFILE_META: Record<
-  ProfileId,
-  { title: string; detail: string; planHint: string }
-> = {
-  balanced: {
-    title: "Equilibrado",
-    detail: "Uso misto: desempenho e consumo no meio-termo do Windows.",
-    planHint: "Plano Equilibrado",
-  },
-  gaming: {
-    title: "Jogos",
-    detail: "Prioriza desempenho: plano de alto desempenho e monitoramento da sessão.",
-    planHint: "Alto desempenho",
-  },
-  work: {
-    title: "Trabalho",
-    detail: "Estável para escritório: plano equilibrado e menos distrações de launchers.",
-    planHint: "Plano Equilibrado",
-  },
-  battery: {
-    title: "Bateria",
-    detail: "Economia de energia para notebook: reduz desempenho em troca de autonomia.",
-    planHint: "Economia de energia",
-  },
-};
+export const PROFILE_META: Record<ProfileId, { title: string; detail: string; planHint: string }> =
+  {
+    balanced: {
+      title: "Equilibrado",
+      detail: "Uso misto: desempenho e consumo no meio-termo do Windows.",
+      planHint: "Plano Equilibrado",
+    },
+    gaming: {
+      title: "Jogos",
+      detail: "Prioriza desempenho: plano de alto desempenho e monitoramento da sessão.",
+      planHint: "Alto desempenho",
+    },
+    work: {
+      title: "Trabalho",
+      detail: "Estável para escritório: plano equilibrado e menos distrações de launchers.",
+      planHint: "Plano Equilibrado",
+    },
+    battery: {
+      title: "Bateria",
+      detail: "Economia de energia para notebook: reduz desempenho em troca de autonomia.",
+      planHint: "Economia de energia",
+    },
+  };
 
 const GAME_PROCESS_RE =
   /\b(cs2|csgo|valorant|league of legends|leagueclient|fortniteclient|rocketleague|gta5|gtav|rdr2|minecraft|javaw|overwatch|apexlegends|cod\.exe|modernwarfare|warzone|eldenring|cyberpunk|dota2|pubg|rainbowsix|destiny2|wow|wowclassic|starfield|palworld|helldivers|thefinals|robloxplayer|genshin|zenlesszonezero)\b/i;
@@ -192,7 +190,9 @@ export function detectGameProcess(processes: TopProcess[], gpuUsage: number | nu
     const heavy = processes.find(
       (p) =>
         p.cpu > 12 &&
-        !/^(dwm|csrss|system|idle|explorer|wincare|chrome|msedge|code|discord|steam)$/i.test(p.name),
+        !/^(dwm|csrss|system|idle|explorer|wincare|chrome|msedge|code|discord|steam)$/i.test(
+          p.name,
+        ),
     );
     if (heavy) return heavy.name;
   }
@@ -331,13 +331,13 @@ export function buildRecommendations(input: {
     const recent = trend.slice(-6);
     const older = trend.slice(0, Math.min(6, trend.length - 6));
     if (older.length >= 3) {
-      const avg = (rows: HealthSample[]) =>
-        rows.reduce((s, r) => s + r.health, 0) / rows.length;
+      const avg = (rows: HealthSample[]) => rows.reduce((s, r) => s + r.health, 0) / rows.length;
       if (avg(recent) <= avg(older) - 8) {
         recs.push({
           id: "health-drop",
           title: "Saúde em queda nesta sessão",
-          detail: "O índice de saúde caiu em relação às amostras anteriores. Veja a linha do tempo.",
+          detail:
+            "O índice de saúde caiu em relação às amostras anteriores. Veja a linha do tempo.",
           severity: "medium",
           href: "/inteligencia",
           action: "Ver histórico",
@@ -475,7 +475,8 @@ export function diagnoseSymptom(
       id: "gpu-temp",
       tone: (gpuT ?? 0) >= 85 ? "bad" : (gpuT ?? 0) >= 78 ? "warn" : gpuT == null ? "warn" : "ok",
       title: gpuT == null ? "Temperatura da GPU indisponível" : `GPU ${gpuT} °C`,
-      detail: "Em jogos, 70–80 °C é comum; acima de 85 °C vale revisar pasta térmica e fluxo de ar.",
+      detail:
+        "Em jogos, 70–80 °C é comum; acima de 85 °C vale revisar pasta térmica e fluxo de ar.",
       href: "/monitoramento",
     });
     findings.push({
@@ -493,7 +494,8 @@ export function diagnoseSymptom(
       id: "c-drive",
       tone: info.diskUsage >= 90 ? "bad" : info.diskUsage >= 80 ? "warn" : "ok",
       title: `C: ${info.diskUsage}% usado (${info.diskTotalGb} GB)`,
-      detail: "O Windows precisa de alguns GB livres para hibernação, updates e arquivo de paginação.",
+      detail:
+        "O Windows precisa de alguns GB livres para hibernação, updates e arquivo de paginação.",
       href: "/disco",
     });
     const big = [...folders].sort((a, b) => b.sizeBytes - a.sizeBytes)[0];
@@ -569,7 +571,12 @@ export function diagnoseSymptom(
 }
 
 export function diffSnapshots(a: SystemSnapshot, b: SystemSnapshot) {
-  const row = (label: string, before: number | string, after: number | string, better?: "up" | "down") => {
+  const row = (
+    label: string,
+    before: number | string,
+    after: number | string,
+    better?: "up" | "down",
+  ) => {
     const n1 = typeof before === "number" ? before : null;
     const n2 = typeof after === "number" ? after : null;
     let delta: number | null = null;
@@ -609,7 +616,10 @@ export function detectStartupChanges(
   return { added, removed };
 }
 
-export function mergeStartupWatch(current: StartupItem[], known: StartupWatchItem[]): StartupWatchItem[] {
+export function mergeStartupWatch(
+  current: StartupItem[],
+  known: StartupWatchItem[],
+): StartupWatchItem[] {
   const now = Date.now();
   const map = new Map(known.map((k) => [k.id, k]));
   for (const item of current) {

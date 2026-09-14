@@ -76,7 +76,12 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
             </p>
           </div>
         </div>
-        <Button type="button" className="rounded-full" disabled={busy} onClick={() => void runScan()}>
+        <Button
+          type="button"
+          className="rounded-full"
+          disabled={busy}
+          onClick={() => void runScan()}
+        >
           {busy ? <Loader2 className="animate-spin" /> : <Files />}
           {busy ? "Varrendo…" : scan ? "Atualizar varredura" : "Varrer arquivos"}
         </Button>
@@ -84,7 +89,9 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
 
       {growth.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Crescimento desde a última análise</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Crescimento desde a última análise
+          </p>
           <ul className="mt-2 space-y-1 text-sm">
             {growth.map((g) => (
               <li key={g.id} className="flex justify-between gap-2">
@@ -116,16 +123,23 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
                 </li>
               ))}
               {scan.largeFiles.length === 0 && (
-                <li className="py-2 text-sm text-muted-foreground">Nenhum arquivo acima de 8 MB.</li>
+                <li className="py-2 text-sm text-muted-foreground">
+                  Nenhum arquivo acima de 8 MB.
+                </li>
               )}
             </ul>
           </div>
           <div>
             <p className="text-sm font-medium">Possíveis duplicados</p>
-            <p className="text-[11px] text-muted-foreground">Mesmo nome e tamanho — revise antes de apagar.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Mesmo nome e tamanho — revise antes de apagar.
+            </p>
             <ul className="mt-2 space-y-2">
               {scan.duplicates.map((g) => (
-                <li key={`${g.name}-${g.sizeBytes}`} className="rounded-lg border border-border/40 px-3 py-2">
+                <li
+                  key={`${g.name}-${g.sizeBytes}`}
+                  className="rounded-lg border border-border/40 px-3 py-2"
+                >
                   <p className="text-sm font-medium">
                     {g.name} · {formatBytes(g.sizeBytes)}
                   </p>
@@ -137,7 +151,9 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
                 </li>
               ))}
               {scan.duplicates.length === 0 && (
-                <li className="text-sm text-muted-foreground">Nenhum duplicado óbvio nesta varredura.</li>
+                <li className="text-sm text-muted-foreground">
+                  Nenhum duplicado óbvio nesta varredura.
+                </li>
               )}
             </ul>
           </div>

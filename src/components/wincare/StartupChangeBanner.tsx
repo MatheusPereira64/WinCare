@@ -24,7 +24,12 @@ export function StartupChangeBanner() {
             </p>
           </div>
         </div>
-        <Button type="button" size="sm" variant="secondary" onClick={() => intelActions.dismissStartupNews()}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => intelActions.dismissStartupNews()}
+        >
           Entendi
         </Button>
       </div>

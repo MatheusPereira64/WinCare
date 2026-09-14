@@ -99,14 +99,19 @@ export function useSystemInfo(pollMs = 3000) {
           typeof base.gpuUsage === "number" ? jitter(base.gpuUsage, 12) : jitter(20, 10);
         const cpuTemperature =
           typeof base.cpuTemperature === "number"
-            ? Math.max(35, Math.min(95, Math.round(base.cpuTemperature + (Math.random() - 0.5) * 3)))
+            ? Math.max(
+                35,
+                Math.min(95, Math.round(base.cpuTemperature + (Math.random() - 0.5) * 3)),
+              )
             : 48;
         const gpuTemperature =
           typeof base.gpuTemperature === "number"
-            ? Math.max(35, Math.min(95, Math.round(base.gpuTemperature + (Math.random() - 0.5) * 4)))
+            ? Math.max(
+                35,
+                Math.min(95, Math.round(base.gpuTemperature + (Math.random() - 0.5) * 4)),
+              )
             : 52;
-        const memoryUsedGb =
-          Math.round(((memoryUsage / 100) * (base.memoryTotalGb || 32)) * 10) / 10;
+        const memoryUsedGb = Math.round((memoryUsage / 100) * (base.memoryTotalGb || 32) * 10) / 10;
         return {
           ...base,
           simulated: true,

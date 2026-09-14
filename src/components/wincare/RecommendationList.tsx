@@ -9,7 +9,13 @@ const tone: Record<Recommendation["severity"], string> = {
   low: "border-success/40 bg-success/10 text-success",
 };
 
-export function RecommendationList({ items, compact }: { items: Recommendation[]; compact?: boolean }) {
+export function RecommendationList({
+  items,
+  compact,
+}: {
+  items: Recommendation[];
+  compact?: boolean;
+}) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">Nenhuma recomendação no momento.</p>;
   }
@@ -23,7 +29,9 @@ export function RecommendationList({ items, compact }: { items: Recommendation[]
         >
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone[rec.severity]}`}>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone[rec.severity]}`}
+              >
                 {rec.severity === "high" ? "Alta" : rec.severity === "medium" ? "Média" : "Baixa"}
               </span>
               <p className="text-sm font-medium">{rec.title}</p>
