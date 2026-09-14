@@ -155,16 +155,15 @@ function IntelligencePage() {
       {tab === "saude" && (
         <div className="space-y-4">
           <HealthTimelineCard samples={samples} />
-          <Card className="surface-panel gap-4 border-border/60 p-5">
-            <div className="flex items-start gap-3">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Lightbulb className="size-5" />
+          <Card className="surface-panel gap-2 border-border/60 p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <Lightbulb className="size-4" />
               </span>
               <div>
-                <h2 className="text-lg font-semibold">Recomendações</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Geradas a partir de CPU, RAM, disco, boot e tendência de saúde — não de regras
-                  fixas.
+                <h2 className="text-base font-semibold tracking-tight">Recomendações</h2>
+                <p className="text-xs text-muted-foreground">
+                  Com base em CPU, RAM, disco, boot e tendência de saúde.
                 </p>
               </div>
             </div>

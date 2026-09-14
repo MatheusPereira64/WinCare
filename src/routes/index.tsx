@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   CircuitBoard,
   Clock,
   Cpu,
   HardDrive,
+  Lightbulb,
   MemoryStick,
   Monitor,
   RefreshCw,
@@ -17,7 +18,10 @@ import { Card } from "@/components/ui/card";
 import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
-import { RecommendationList } from "@/components/wincare/RecommendationList";
+import {
+  RecommendationList,
+  RecommendationsHeaderLink,
+} from "@/components/wincare/RecommendationList";
 import { Sparkline } from "@/components/wincare/Sparkline";
 import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
@@ -159,12 +163,15 @@ function Dashboard() {
       </Card>
 
       {recs.length > 0 && (
-        <Card className="surface-panel gap-3 border-border/60 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Recomendações</h2>
-            <Link to="/inteligencia" className="text-xs font-medium text-primary hover:underline">
-              Ver inteligência
-            </Link>
+        <Card className="surface-panel gap-2 border-border/60 p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <Lightbulb className="size-4" />
+              </span>
+              <h2 className="text-base font-semibold tracking-tight">Recomendações</h2>
+            </div>
+            <RecommendationsHeaderLink />
           </div>
           <RecommendationList items={recs} compact />
         </Card>
