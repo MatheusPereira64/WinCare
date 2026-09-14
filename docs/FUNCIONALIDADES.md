@@ -188,6 +188,7 @@ Preferências neste computador (localStorage).
 - Badge **Nativo** ou **Demonstração**
 - Badge de privilégio (Admin / Usuário padrão) e botão **Executar como admin**
 - Alternar tema
+- Indicador de carregamento na abertura e na troca de telas (e nas listas de inicialização/disco)
 - Menu nativo (só no desktop): limpar histórico, abrir logs, verificar atualizações, releases, DevTools (F12), sair
 
 ### Atualizações (desktop)

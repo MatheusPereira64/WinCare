@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmModal } from "@/components/wincare/ConfirmModal";
+import { PageLoading } from "@/components/wincare/PageLoading";
 import { StartupAppIcon } from "@/components/wincare/StartupAppIcon";
 import { StartupChangeBanner } from "@/components/wincare/StartupChangeBanner";
 import { StartupDiagnosisCard } from "@/components/wincare/StartupDiagnosisCard";
@@ -224,9 +225,7 @@ export function StartupManager() {
       )}
 
       {loading && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Lendo registro, pasta Inicializar e uso de memória…
-        </p>
+        <PageLoading compact label="Lendo registro, pasta Inicializar e uso de memória…" />
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum item de inicialização encontrado.</p>
       ) : (

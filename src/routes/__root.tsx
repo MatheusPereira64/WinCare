@@ -27,6 +27,8 @@ import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
 import { UpdateAvailableModal } from "@/components/wincare/UpdateAvailableModal";
 import { IntelligenceCollector } from "@/components/wincare/IntelligenceCollector";
+import { PageLoadingOverlay } from "@/components/wincare/PageLoading";
+import { useContentLoading } from "@/lib/wincare/useContentLoading";
 
 function NotFoundComponent() {
   return (
@@ -260,6 +262,11 @@ function StartupUpdateCheck() {
   );
 }
 
+function AppLoadingLayer() {
+  const { visible, label } = useContentLoading();
+  return <PageLoadingOverlay visible={visible} label={label} />;
+}
+
 /** Fecha o Sheet mobile e remove locks Radix em toda navegação. */
 function RouteUiGuard() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -302,9 +309,15 @@ function RootComponent() {
           <AppSidebar />
           <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
-            <main className="app-ambient relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
-              {/* Required: nested routes render here. */}
-              <Outlet />
+            <main
+              data-wincare-content
+              className="app-ambient relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
+                {/* Required: nested routes render here. */}
+                <Outlet />
+              </div>
+              <AppLoadingLayer />
             </main>
           </div>
         </div>

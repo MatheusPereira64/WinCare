@@ -246,3 +246,46 @@
     transform: translateY(0);
   }
 }
+
+@keyframes wincare-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wincare-loader-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+  50% {
+    transform: scale(1.045);
+    filter: saturate(1.15);
+  }
+}
+
+@keyframes wincare-loader-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.22;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@utility animate-wincare-loader-spin {
+  animation: wincare-loader-spin 1.15s linear infinite;
+}
+
+@utility animate-wincare-loader-breathe {
+  animation: wincare-loader-breathe 2.6s ease-in-out infinite;
+}
+
+@utility animate-wincare-loader-dot {
+  animation: wincare-loader-dot 1.05s ease-in-out infinite;
+}

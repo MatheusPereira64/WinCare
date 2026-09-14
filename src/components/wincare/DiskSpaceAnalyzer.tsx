@@ -10,6 +10,7 @@ import { getNative, isNative, SIMULATED_DISK_USAGE } from "@/lib/wincare/bridge"
 import { formatBytes } from "@/lib/wincare/report";
 import type { DiskUsageFolder } from "@/lib/wincare/types";
 import { ConfirmModal } from "./ConfirmModal";
+import { PageLoading } from "./PageLoading";
 
 export function DiskSpaceAnalyzer() {
   const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
@@ -119,9 +120,7 @@ export function DiskSpaceAnalyzer() {
       </div>
 
       {loading && folders.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Calculando tamanhos (pode levar alguns segundos)…
-        </p>
+        <PageLoading compact label="Calculando tamanhos (pode levar alguns segundos)…" />
       ) : (
         <>
           <p className="text-xs text-muted-foreground">

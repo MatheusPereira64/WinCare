@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
 
+import { PageLoading } from "@/components/wincare/PageLoading";
 import { routeTree } from "@/routeTree.gen";
 import { hydrateStore } from "@/lib/wincare/store";
 import "@/styles.css";
@@ -16,6 +17,7 @@ const router = createRouter({
   history: createHashHistory(),
   defaultPreloadStaleTime: 0,
   scrollRestoration: false,
+  defaultPendingComponent: () => <PageLoading label="Carregando…" />,
 });
 
 declare module "@tanstack/react-router" {

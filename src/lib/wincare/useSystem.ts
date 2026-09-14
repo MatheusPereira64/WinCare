@@ -1,6 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { getNative, isNative, SIMULATED_DISKS, SIMULATED_SYSTEM } from "./bridge";
 import type { DiskDrive, SystemInfo } from "./types";
+
+const bootListeners = new Set<() => void>();
+let firstSystemAttemptDone = false;
+
+function notifyBootListeners() {
+  bootListeners.forEach((listener) => listener());
+}
+
+function markFirstSystemAttemptDone() {
+  if (firstSystemAttemptDone) return;
+  firstSystemAttemptDone = true;
+  notifyBootListeners();
+}
 
 /** Última amostra nativa — evita flash do mock ao trocar de aba. */
 let nativeInfoCache: SystemInfo | null = null;
@@ -62,9 +75,11 @@ export function useSystemInfo(pollMs = 3000) {
           const data = await native.systemInfo();
           if (!alive) return;
           nativeInfoCache = data;
+          markFirstSystemAttemptDone();
           setInfo(data);
         } catch {
           // Mantém o último valor real ou o placeholder — nunca volta ao mock.
+          markFirstSystemAttemptDone();
           if (alive && !nativeInfoCache) {
             setInfo(NATIVE_PLACEHOLDER);
           }
@@ -147,4 +162,16 @@ export function useDisks() {
 /** Útil para UI: true enquanto o desktop ainda não recebeu a 1ª amostra real. */
 export function isSystemInfoLoading(info: SystemInfo) {
   return !info.simulated && info.hostname === "…" && !nativeInfoCache;
+}
+
+/** True no Electron até a primeira chamada de systemInfo terminar (sucesso ou erro). */
+export function useAwaitingFirstSystemSample() {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      bootListeners.add(onStoreChange);
+      return () => bootListeners.delete(onStoreChange);
+    },
+    () => isNative() && !firstSystemAttemptDone && !nativeInfoCache,
+    () => false,
+  );
 }
