@@ -7,6 +7,7 @@ const os = require("os");
 const logger = require("./logger.cjs");
 const updater = require("./updater.cjs");
 const { enrichSystemInfo } = require("./system-metrics.cjs");
+const { optimizeMemory } = require("./memory-optimizer.cjs");
 
 /** Espaço de uma unidade via Node (mais confiável que WMI no Electron). */
 function readDriveSpace(rootPath) {
@@ -961,6 +962,20 @@ const psFileJson = (scriptBody, timeoutMs = 60000) =>
       },
     );
   });
+
+ipcMain.handle("wincare:optimizeMemory", async () => {
+  try {
+    return await optimizeMemory();
+  } catch (error) {
+    logger.error("memory", "optimizeMemory", error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      reason: "failed",
+      message: error instanceof Error ? error.message : "Falha ao otimizar a memória.",
+      freedMb: 0,
+    };
+  }
+});
 
 ipcMain.handle("wincare:systemInfo", async () => {
   const uptimeSec = os.uptime();

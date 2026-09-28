@@ -10,6 +10,7 @@
     "electron/preload.cjs",
     "electron/updater.cjs",
     "electron/system-metrics.cjs",
+    "electron/memory-optimizer.cjs",
     "electron/logger.cjs",
     "scripts/*.{cjs,js}",
     "vite.config.ts",

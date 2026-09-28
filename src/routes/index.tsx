@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
+import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import {
   RecommendationList,
   RecommendationsHeaderLink,
@@ -176,6 +177,8 @@ function Dashboard() {
           <RecommendationList items={recs} compact />
         </Card>
       )}
+
+      <MemoryOptimizerCard compact />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard

@@ -223,10 +223,10 @@ export function buildRecommendations(input: {
     recs.push({
       id: "ram-high",
       title: "Memória quase no limite",
-      detail: `${info.memoryUsage}% da RAM em uso. Feche programas pesados ou desative itens do boot.`,
+      detail: `${info.memoryUsage}% da RAM em uso. Otimize a memória ou feche programas pesados.`,
       severity: "high",
-      href: "/inicializacao",
-      action: "Ver inicialização",
+      href: "/monitoramento",
+      action: "Otimizar memória",
     });
   }
 

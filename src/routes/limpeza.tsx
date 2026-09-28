@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import type { ToolCategory } from "@/lib/wincare/types";
 
@@ -6,11 +7,14 @@ const CLEANUP_CATEGORIES: ToolCategory[] = ["cleanup"];
 
 function LimpezaPage() {
   return (
-    <ToolSection
-      title="Limpeza"
-      subtitle="Libere espaço removendo arquivos temporários e caches do sistema."
-      categories={CLEANUP_CATEGORIES}
-    />
+    <div className="space-y-6">
+      <MemoryOptimizerCard />
+      <ToolSection
+        title="Limpeza"
+        subtitle="Libere espaço removendo arquivos temporários e caches do sistema."
+        categories={CLEANUP_CATEGORIES}
+      />
+    </div>
   );
 }
 

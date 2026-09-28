@@ -7,6 +7,7 @@ import type { ApexOptions } from "apexcharts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AppScrollArea } from "@/components/wincare/AppScrollArea";
+import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import { getNative, isNative } from "@/lib/wincare/bridge";
 import type { TopProcess } from "@/lib/wincare/types";
 import { useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
@@ -258,6 +259,8 @@ function MonitorPage() {
         </div>
         <LiveBadge />
       </header>
+
+      <MemoryOptimizerCard />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile

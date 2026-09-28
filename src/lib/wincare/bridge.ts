@@ -65,6 +65,18 @@ export interface PowerPlanInfo {
   active: boolean;
 }
 
+export interface MemoryOptimizeResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  freedMb?: number;
+  trimmed?: number;
+  skipped?: number;
+  standbyPurged?: boolean;
+  before?: { totalMb: number; usedMb: number; freeMb: number; usagePct: number };
+  after?: { totalMb: number; usedMb: number; freeMb: number; usagePct: number };
+}
+
 export interface StorageIntelResult {
   at: number;
   visited: number;
@@ -92,6 +104,7 @@ export interface NativeBridge {
   diskUsage: () => Promise<DiskUsageFolder[]>;
   clearDiskFolder: (id: string) => Promise<{ ok: boolean; reason?: string; freedBytes?: number }>;
   storageIntel?: () => Promise<StorageIntelResult>;
+  optimizeMemory?: () => Promise<MemoryOptimizeResult>;
   powerPlan?: (payload?: {
     action?: "list" | "set";
     profile?: "balanced" | "gaming" | "work" | "battery";

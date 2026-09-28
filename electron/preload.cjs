@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld("wincare", {
     ipcRenderer.on("wincare:updateAvailable", listener);
     return () => ipcRenderer.removeListener("wincare:updateAvailable", listener);
   },
+  optimizeMemory: () => ipcRenderer.invoke("wincare:optimizeMemory"),
   systemInfo: () => ipcRenderer.invoke("wincare:systemInfo"),
   disks: () => ipcRenderer.invoke("wincare:disks"),
   listStartup: () => ipcRenderer.invoke("wincare:listStartup"),
