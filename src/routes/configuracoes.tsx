@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Keyboard, Moon, ShieldAlert, ShieldCheck, Sun, Trash2, Zap } from "lucide-react";
+import {
+  History,
+  Keyboard,
+  Moon,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Sun,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/wincare/PageHeader";
 import { UpdateCard } from "@/components/wincare/UpdateCard";
 import { actions, useStore } from "@/lib/wincare/store";
 import { isNative, getNative } from "@/lib/wincare/bridge";
@@ -35,6 +46,7 @@ function SettingsPage() {
   const theme = useStore((s) => s.theme);
   const autoCheck = useStore((s) => s.autoCheck);
   const confirmCritical = useStore((s) => s.confirmCritical);
+  const autoRestorePoint = useStore((s) => s.autoRestorePoint);
   const { native, elevated, restartAsAdmin } = useAdmin();
 
   const handleRestartAsAdmin = async () => {
@@ -52,20 +64,19 @@ function SettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Preferências salvas localmente neste computador.
-        </p>
-      </header>
+      <PageHeader
+        icon={Settings}
+        title="Configurações"
+        subtitle="Preferências salvas localmente neste computador."
+      />
 
       <Card className="surface-panel gap-5 border-border/60 p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             {theme === "dark" ? (
-              <Moon className="mt-0.5 size-5 text-primary" />
+              <Moon className="mt-0.5 size-5 shrink-0 text-primary" />
             ) : (
-              <Sun className="mt-0.5 size-5 text-primary" />
+              <Sun className="mt-0.5 size-5 shrink-0 text-primary" />
             )}
             <div>
               <Label htmlFor="theme">Tema claro</Label>
@@ -83,7 +94,7 @@ function SettingsPage() {
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 size-5 text-warning" />
+            <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" />
             <div>
               <Label htmlFor="confirm">Confirmar comandos críticos</Label>
               <p className="text-sm text-muted-foreground">
@@ -100,11 +111,30 @@ function SettingsPage() {
 
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <Zap className="mt-0.5 size-5 text-primary" />
+            <History className="mt-0.5 size-5 shrink-0 text-success" />
             <div>
-              <Label htmlFor="auto">Verificação automática ao iniciar</Label>
+              <Label htmlFor="restore-point">Ponto de restauração antes de ações avançadas</Label>
               <p className="text-sm text-muted-foreground">
-                Faz um diagnóstico rápido sempre que o WinCare é aberto.
+                Cria um ponto antes de DISM RestoreHealth, chkdsk /f e resets de rede. Se falhar, a
+                ação não é executada sem você confirmar.
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="restore-point"
+            checked={autoRestorePoint}
+            onCheckedChange={actions.setAutoRestorePoint}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Zap className="mt-0.5 size-5 shrink-0 text-primary" />
+            <div>
+              <Label htmlFor="auto">Avisar sobre problemas ao abrir</Label>
+              <p className="text-sm text-muted-foreground">
+                Ao abrir o WinCare, mostra um aviso se algo medido precisar de atenção. Rotinas em
+                horário fixo ficam na página Agendamento.
               </p>
             </div>
           </div>
@@ -194,8 +224,8 @@ function SettingsPage() {
           <Trash2 className="size-4" /> Limpar histórico local
         </Button>
         <p className="text-xs text-muted-foreground">
-          No menu superior do app: <strong>WinCare → Limpar histórico local</strong>. Esse comando
-          não funciona no PowerShell — só dentro do WinCare.
+          Também no menu do app (tecla <strong>Alt</strong>):{" "}
+          <strong>WinCare → Limpar histórico local</strong>.
         </p>
       </Card>
 

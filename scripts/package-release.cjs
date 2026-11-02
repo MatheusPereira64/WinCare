@@ -8,6 +8,7 @@
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { signPackage } = require("./sign-windows.cjs");
 
 const root = path.resolve(__dirname, "..");
 const outDir = path.join(root, "electron-release");
@@ -72,12 +73,16 @@ function main() {
     "--ignore=^/.github",
     "--ignore=^/docs",
     "--ignore=^/scripts",
+    "--ignore=^/electron/tests",
   ]);
 
   if (!fs.existsSync(path.join(appDir, "WinCare.exe"))) {
     console.error("Falha: WinCare.exe não encontrado em", appDir);
     process.exit(1);
   }
+
+  console.log("=== WinCare: assinatura de código ===");
+  signPackage(appDir);
 
   console.log("=== WinCare: gerando ZIP ===");
   zipFolder(appDir, zipPath);

@@ -1,4 +1,17 @@
-const { app, BrowserWindow, ipcMain, shell, protocol, net, Menu, dialog } = require("electron");
+/* Mais threads de E/S: varrer caches com centenas de milhares de arquivos é lento com 4. */
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || "16";
+
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeTheme,
+  shell,
+  protocol,
+  net,
+  Menu,
+  dialog,
+} = require("electron");
 const { spawn, exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
@@ -7,6 +20,9 @@ const os = require("os");
 const logger = require("./logger.cjs");
 const updater = require("./updater.cjs");
 const { enrichSystemInfo } = require("./system-metrics.cjs");
+const { isWindowsAdmin, psFileJson } = require("./powershell.cjs");
+const { registerNativeActions } = require("./native-actions.cjs");
+const scheduler = require("./scheduler.cjs");
 
 /** Espaço de uma unidade via Node (mais confiável que WMI no Electron). */
 function readDriveSpace(rootPath) {
@@ -56,10 +72,17 @@ if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-if (!hasSingleInstanceLock) {
+/** Rotina do Agendador de Tarefas: roda sem janela e em paralelo a uma instância aberta. */
+const scheduledJob = scheduler.parseJobArg(process.argv);
+if (scheduledJob) {
+  app.setPath("userData", path.join(app.getPath("userData"), "scheduled-runner"));
+  app.disableHardwareAcceleration();
+}
+
+const hasSingleInstanceLock = !scheduledJob && app.requestSingleInstanceLock();
+if (!scheduledJob && !hasSingleInstanceLock) {
   app.quit();
-} else {
+} else if (!scheduledJob) {
   app.on("second-instance", () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -195,7 +218,8 @@ function createWindow() {
     minWidth: 1024,
     backgroundColor: "#0d1117",
     title: APP_NAME,
-    autoHideMenuBar: false,
+    minHeight: 640,
+    autoHideMenuBar: true,
     ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -237,7 +261,13 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-if (hasSingleInstanceLock) {
+if (scheduledJob) {
+  app.whenReady().then(async () => {
+    logger.initLogger(app);
+    const exitCode = await scheduler.runScheduledJob(scheduledJob);
+    app.exit(exitCode);
+  });
+} else if (hasSingleInstanceLock) {
   app.whenReady().then(() => {
     logger.initLogger(app);
     logger.log("app", "WinCare iniciado", {
@@ -373,23 +403,6 @@ function runBufferedCommand(_event, { command, limitMs }) {
   return execBuffered(command, limitMs);
 }
 
-const isWindowsAdmin = () =>
-  new Promise((resolve) => {
-    if (process.platform !== "win32") {
-      resolve(false);
-      return;
-    }
-    const timer = setTimeout(() => resolve(false), 8000);
-    exec(
-      'powershell -NoProfile -Command "([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"',
-      { timeout: 7000, windowsHide: true },
-      (err, stdout) => {
-        clearTimeout(timer);
-        resolve(!err && stdout.trim().toLowerCase() === "true");
-      },
-    );
-  });
-
 const cleanupFiles = (files) => {
   for (const file of files) {
     try {
@@ -400,6 +413,18 @@ const cleanupFiles = (files) => {
   }
 };
 
+/**
+ * O comando fica intacto em um .cmd próprio e é chamado com a saída redirecionada:
+ * envolver em parênteses no mesmo arquivo quebrava comandos com `(`, `)` ou aspas.
+ */
+function writeElevatedBatch(batFile, command, outFile, errFile) {
+  const innerFile = batFile.replace(/\.cmd$/, ".inner.cmd");
+  fs.writeFileSync(innerFile, `@echo off\r\n${command}\r\n`, "utf8");
+  const bat = `@echo off\r\ncall "${innerFile}" 1>"${outFile}" 2>"${errFile}"\r\nexit /b %ERRORLEVEL%\r\n`;
+  fs.writeFileSync(batFile, bat, "utf8");
+  return innerFile;
+}
+
 /** Executa comando elevado e retorna saída completa (sem streaming IPC). */
 function runElevatedBuffered(command, limitMs = 120000) {
   return new Promise((resolve) => {
@@ -407,9 +432,7 @@ function runElevatedBuffered(command, limitMs = 120000) {
     const outFile = path.join(os.tmpdir(), `wincare-${id}.out.log`);
     const errFile = path.join(os.tmpdir(), `wincare-${id}.err.log`);
     const batFile = path.join(os.tmpdir(), `wincare-${id}.cmd`);
-    const escaped = command.replace(/"/g, '""');
-    const bat = `@echo off\r\n(${escaped}) 1>"${outFile}" 2>"${errFile}"\r\nexit /b %ERRORLEVEL%\r\n`;
-    fs.writeFileSync(batFile, bat, "utf8");
+    const innerFile = writeElevatedBatch(batFile, command, outFile, errFile);
 
     const ps = `Start-Process -FilePath '${batFile.replace(/'/g, "''")}' -Verb RunAs -Wait -WindowStyle Hidden`;
     exec(
@@ -418,7 +441,7 @@ function runElevatedBuffered(command, limitMs = 120000) {
       (err) => {
         const stdout = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8") : "";
         const stderr = fs.existsSync(errFile) ? fs.readFileSync(errFile, "utf8") : "";
-        cleanupFiles([outFile, errFile, batFile]);
+        cleanupFiles([outFile, errFile, batFile, innerFile]);
 
         if (!stdout && !stderr && err) {
           resolve({
@@ -448,9 +471,7 @@ function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEO
   const outFile = path.join(os.tmpdir(), `wincare-${id}.out.log`);
   const errFile = path.join(os.tmpdir(), `wincare-${id}.err.log`);
   const batFile = path.join(os.tmpdir(), `wincare-${id}.cmd`);
-  const escaped = command.replace(/"/g, '""');
-  const bat = `@echo off\r\n(${escaped}) 1>"${outFile}" 2>"${errFile}"\r\nexit /b %ERRORLEVEL%\r\n`;
-  fs.writeFileSync(batFile, bat, "utf8");
+  const innerFile = writeElevatedBatch(batFile, command, outFile, errFile);
 
   return new Promise((resolve) => {
     let lastOutLen = 0;
@@ -464,7 +485,7 @@ function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEO
       if (settled) return;
       settled = true;
       if (pollTimer) clearInterval(pollTimer);
-      cleanupFiles([outFile, errFile, batFile]);
+      cleanupFiles([outFile, errFile, batFile, innerFile]);
       resolve(payload);
     };
 
@@ -747,6 +768,13 @@ ipcMain.handle("wincare:open", async (_e, target) => {
 
 ipcMain.handle("wincare:clearStorage", () => clearRendererStorage());
 
+/* Mantém a barra de título da janela no mesmo tema da interface. */
+ipcMain.handle("wincare:setNativeTheme", (_e, theme) => {
+  nativeTheme.themeSource = theme === "light" ? "light" : "dark";
+});
+
+registerNativeActions();
+
 ipcMain.handle("wincare:isElevated", () => isWindowsAdmin());
 
 ipcMain.handle("wincare:restartAsAdmin", async () => {
@@ -756,16 +784,7 @@ ipcMain.handle("wincare:restartAsAdmin", async () => {
   if (already) return { ok: true, reason: "already-elevated" };
 
   try {
-    const projectRoot = path.resolve(path.join(__dirname, ".."));
-    const brandedExe = path.join(projectRoot, ".electron-dev", "WinCare.exe");
-    const realAsar = path.join(path.dirname(process.execPath), "resources", "app.asar");
-    // .electron-dev copia o Electron com default_app.asar — app.isPackaged fica true
-    // mesmo em desenvolvimento. Só o app.asar de release é pacote real.
-    const isReleaseBuild = fs.existsSync(realAsar);
-    const exe =
-      !isReleaseBuild && fs.existsSync(brandedExe) ? brandedExe : process.execPath;
-    const args = isReleaseBuild ? [] : [projectRoot];
-    const cwd = isReleaseBuild ? path.dirname(process.execPath) : projectRoot;
+    const { isReleaseBuild, exe, args, cwd } = scheduler.resolveSelfLaunch();
 
     logger.log("admin", "Preparando elevação", {
       isPackaged: app.isPackaged,
@@ -846,33 +865,6 @@ const psJson = (script, timeoutMs = 20000) =>
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "${script.replace(/"/g, '\\"')}"`,
       { maxBuffer: 1024 * 1024 * 8, timeout: timeoutMs, windowsHide: true },
       (err, stdout) => (err ? reject(err) : resolve(JSON.parse(stdout || "null"))),
-    );
-  });
-
-/** Scripts longos: evita escaping quebrado via arquivo .ps1 temporário. */
-const psFileJson = (scriptBody, timeoutMs = 60000) =>
-  new Promise((resolve, reject) => {
-    const ps1 = path.join(os.tmpdir(), `wincare-ps-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`);
-    fs.writeFileSync(ps1, scriptBody, "utf8");
-    exec(
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}"`,
-      { maxBuffer: 1024 * 1024 * 16, timeout: timeoutMs, windowsHide: true },
-      (err, stdout) => {
-        try {
-          fs.unlinkSync(ps1);
-        } catch {
-          /* ignore */
-        }
-        if (err && !stdout) {
-          reject(err);
-          return;
-        }
-        try {
-          resolve(JSON.parse(String(stdout || "null").trim() || "null"));
-        } catch (parseErr) {
-          reject(parseErr);
-        }
-      },
     );
   });
 

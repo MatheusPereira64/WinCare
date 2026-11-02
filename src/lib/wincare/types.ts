@@ -19,6 +19,10 @@ export interface Tool {
   timeoutMs?: number;
   /** true when the tool just opens a native Windows app */
   launcher?: boolean;
+  /** Oferece criar um ponto de restauração do Windows antes de executar. */
+  restorePoint?: boolean;
+  /** Executa uma ação do processo principal em vez de `command`. */
+  nativeAction?: "restore-point";
   /** accepts a free-text target (host, domain, minutes...) */
   input?: {
     label: string;
@@ -48,6 +52,8 @@ export interface RunRecord {
   status: "running" | "success" | "error";
   lines: LogLine[];
   result?: string;
+  /** A ação não foi executada porque o ponto de restauração falhou. */
+  restorePointFailed?: boolean;
 }
 
 export interface SystemInfo {
@@ -114,4 +120,130 @@ export interface DiskUsageFolder {
   sizeBytes: number;
   clearable: boolean;
   hint?: string;
+}
+
+export interface RestorePointResult {
+  ok: boolean;
+  status: "created" | "recent" | "failed" | "cancelled";
+  message?: string;
+  createdAt?: string;
+}
+
+export type CleanerCategory = "cache" | "cookies" | "history";
+
+export interface CleanerSample {
+  path: string;
+  sizeBytes: number;
+}
+
+export interface CleanerItem {
+  id: string;
+  appId: string;
+  appName: string;
+  appKind: "browser" | "app";
+  profile: string;
+  category: CleanerCategory;
+  sizeBytes: number;
+  fileCount: number;
+  samples: CleanerSample[];
+  /** O navegador/app está aberto agora. */
+  running: boolean;
+}
+
+export interface CleanerResult {
+  ok: boolean;
+  reason?: string;
+  freedBytes?: number;
+  removed?: number;
+  skipped?: number;
+  /** Apps cujos cookies/histórico não foram tocados por estarem abertos. */
+  blocked?: string[];
+}
+
+export interface InstalledProgram {
+  id: string;
+  name: string;
+  publisher: string;
+  version: string;
+  /** yyyy-mm-dd */
+  installDate: string | null;
+  sizeBytes: number;
+  installLocation: string;
+  scope: "machine" | "user";
+  /** Componente do qual outros programas costumam depender. */
+  critical: boolean;
+  icon: string | null;
+}
+
+export interface UninstallResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  exitCode?: number;
+  stillInstalled?: boolean;
+}
+
+export interface LeftoverItem {
+  id: string;
+  kind: "folder" | "registry";
+  path: string;
+  reason: string;
+  sizeBytes: number;
+  fileCount: number;
+  requiresAdmin: boolean;
+}
+
+export interface LeftoverScan {
+  ok: boolean;
+  reason?: string;
+  items: LeftoverItem[];
+}
+
+export interface LeftoverRemoval {
+  ok: boolean;
+  removed: number;
+  freedBytes: number;
+  failed: { path: string; reason: string }[];
+  backupDir: string | null;
+}
+
+export type ScheduleJob = "cleanup" | "full-check";
+
+export interface ScheduleConfig {
+  frequency: "daily" | "weekly" | "monthly";
+  /** 0 = domingo */
+  weekDay: number;
+  monthDay: number;
+  /** HH:mm */
+  time: string;
+}
+
+export interface ScheduleEntry {
+  job: ScheduleJob;
+  enabled: boolean;
+  config: ScheduleConfig;
+  requiresAdmin: boolean;
+  nextRun: string | null;
+  lastRun: string | null;
+  /** A tarefa aponta para um executável que mudou de lugar. */
+  stale: boolean;
+}
+
+export interface ScheduleHistoryEntry {
+  id: string;
+  job: ScheduleJob;
+  label: string;
+  startedAt: string;
+  finishedAt: string;
+  ok: boolean;
+  summary: string;
+  freedBytes?: number;
+  steps: { name: string; ok: boolean; detail?: string }[];
+}
+
+export interface ScheduleOverview {
+  ok: boolean;
+  reason?: string;
+  items: ScheduleEntry[];
+  history: ScheduleHistoryEntry[];
 }

@@ -1,45 +1,93 @@
-import { useRef, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Copy, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { getNative, simulateRun } from "@/lib/wincare/bridge";
-import { actions } from "@/lib/wincare/store";
+import { createRestorePoint, getNative, simulateRun } from "@/lib/wincare/bridge";
+import { actions, useStore } from "@/lib/wincare/store";
 import { FULL_CHECK_IDS, getTool } from "@/lib/wincare/tools";
-import { formatLog } from "@/lib/wincare/runner";
-import type { LogLine } from "@/lib/wincare/types";
+import { formatLog, setExternalRunActive } from "@/lib/wincare/runner";
+import type { LogLine, Tool } from "@/lib/wincare/types";
+import { ConfirmModal } from "./ConfirmModal";
 import { LogView } from "./LogView";
 
 const now = () =>
   new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+const FULL_CHECK_TOOL: Tool = {
+  id: "full-check",
+  name: "Verificação completa",
+  description: "SFC, DISM e verificação de disco em sequência.",
+  command: "",
+  category: "repair",
+  risk: "warning",
+};
+
+interface CheckState {
+  running: boolean;
+  progress: number;
+  lines: LogLine[];
+  current: string | null;
+}
+
+/* Fora do componente: a verificação leva até 1 hora e continua ao trocar de página. */
+let checkState: CheckState = { running: false, progress: 0, lines: [], current: null };
+const checkListeners = new Set<() => void>();
+
+const subscribeCheck = (listener: () => void) => {
+  checkListeners.add(listener);
+  return () => checkListeners.delete(listener);
+};
+
+function updateCheck(next: Partial<CheckState>) {
+  checkState = { ...checkState, ...next };
+  checkListeners.forEach((l) => l());
+}
+
 export function FullCheckCard() {
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [lines, setLines] = useState<LogLine[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
-  const buffer = useRef<LogLine[]>([]);
+  const { running, progress, lines, current } = useSyncExternalStore(
+    subscribeCheck,
+    () => checkState,
+    () => checkState,
+  );
+  const [confirming, setConfirming] = useState(false);
+  const autoRestorePoint = useStore((s) => s.autoRestorePoint);
+  const [withRestorePoint, setWithRestorePoint] = useState(autoRestorePoint);
 
   const push = (text: string, kind: LogLine["kind"] = "output") => {
-    buffer.current = [...buffer.current, { time: now(), text, kind }];
-    setLines(buffer.current);
+    updateCheck({ lines: [...checkState.lines, { time: now(), text, kind }] });
   };
 
   const start = async () => {
-    setRunning(true);
-    buffer.current = [];
-    setLines([]);
-    setProgress(0);
+    updateCheck({ running: true, progress: 0, lines: [], current: null });
+    setExternalRunActive(FULL_CHECK_TOOL, true);
     push("Iniciando verificação completa do sistema...", "info");
+
+    if (withRestorePoint) {
+      updateCheck({ current: "Ponto de restauração" });
+      push("Criando ponto de restauração...", "info");
+      const point = await createRestorePoint("verificação completa");
+      if (!point.ok) {
+        push(`Verificação não iniciada: ${point.message ?? "falha no ponto."}`, "error");
+        toast.error("Ponto de restauração não criado", {
+          description: "Por segurança, nada foi executado. Desmarque a opção para seguir sem ele.",
+        });
+        updateCheck({ current: null, running: false });
+        setExternalRunActive(FULL_CHECK_TOOL, false);
+        return;
+      }
+      push(point.message ?? "Ponto de restauração pronto.", "success");
+    }
 
     const tools = FULL_CHECK_IDS.map(getTool).filter(Boolean);
     const native = getNative();
 
     for (let i = 0; i < tools.length; i++) {
       const tool = tools[i]!;
-      setCurrent(tool.name);
+      updateCheck({ current: tool.name });
       push(`Executando: ${tool.command}`, "info");
       try {
         let elevated = false;
@@ -58,7 +106,7 @@ export function FullCheckCard() {
                   .split(/\r?\n/)
                   .filter(Boolean)
                   .forEach((l) => push(l)),
-              { elevated },
+              { elevated, timeoutMs: tool.timeoutMs },
             )
           : await simulateRun(tool, (l) => push(l));
         push(`Resultado: ${out.result}`, out.code === 0 ? "success" : "error");
@@ -70,18 +118,18 @@ export function FullCheckCard() {
           startedAt: Date.now(),
           finishedAt: Date.now(),
           status: out.code === 0 ? "success" : "error",
-          lines: buffer.current.slice(-6),
+          lines: checkState.lines.slice(-6),
           result: out.result,
         });
       } catch (err) {
         push(err instanceof Error ? err.message : "Falha na etapa.", "error");
       }
-      setProgress(((i + 1) / tools.length) * 100);
+      updateCheck({ progress: ((i + 1) / tools.length) * 100 });
     }
 
-    setCurrent(null);
     push("Verificação completa finalizada.", "success");
-    setRunning(false);
+    updateCheck({ current: null, running: false });
+    setExternalRunActive(FULL_CHECK_TOOL, false);
     toast.success("Verificação completa finalizada");
   };
 
@@ -101,7 +149,7 @@ export function FullCheckCard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => void start()} disabled={running} className="rounded-full">
+          <Button onClick={() => setConfirming(true)} disabled={running} className="rounded-full">
             {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
             {running ? "Verificando..." : "Iniciar verificação"}
           </Button>
@@ -130,6 +178,38 @@ export function FullCheckCard() {
       )}
 
       {lines.length > 0 && <LogView lines={lines} className="h-72" />}
+
+      <ConfirmModal
+        open={confirming}
+        title="Iniciar verificação completa?"
+        confirmLabel="Iniciar"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          void start();
+        }}
+      >
+        <p>
+          Roda SFC, DISM (incluindo o reparo da imagem) e verificação de disco, em sequência. Pode
+          levar de 30 minutos a mais de 1 hora; dá para continuar usando o PC.
+        </p>
+        <p>O Windows pode pedir permissão de administrador em cada etapa.</p>
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+          <Checkbox
+            checked={withRestorePoint}
+            onCheckedChange={(v) => setWithRestorePoint(v === true)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <ShieldCheck className="size-4 text-success" /> Criar ponto de restauração antes
+            </span>
+            <span className="mt-0.5 block text-xs">
+              Permite desfazer pelo Restaurar Sistema caso algo dê errado.
+            </span>
+          </span>
+        </label>
+      </ConfirmModal>
     </Card>
   );
 }

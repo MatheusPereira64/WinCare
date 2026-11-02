@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getNative, isNative, SIMULATED_DISK_USAGE } from "@/lib/wincare/bridge";
 import { formatBytes } from "@/lib/wincare/report";
 import type { DiskUsageFolder } from "@/lib/wincare/types";
@@ -119,9 +120,11 @@ export function DiskSpaceAnalyzer() {
       </div>
 
       {loading && folders.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Calculando tamanhos (pode levar alguns segundos)…
-        </p>
+        <div className="space-y-3" aria-label="Calculando tamanhos das pastas">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
@@ -185,6 +188,7 @@ export function DiskSpaceAnalyzer() {
         open={!!pending}
         title="Limpar pasta"
         confirmLabel="Limpar agora"
+        destructive
         onCancel={() => setPending(null)}
         onConfirm={() => {
           if (pending) void clearFolder(pending);

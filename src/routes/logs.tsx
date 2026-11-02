@@ -1,11 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Copy, Download, FileText, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Copy,
+  Download,
+  FileText,
+  ScrollText,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ChoiceChips } from "@/components/wincare/ChoiceChips";
+import { EmptyState } from "@/components/wincare/EmptyState";
 import { LogView } from "@/components/wincare/LogView";
+import { PageHeader } from "@/components/wincare/PageHeader";
+import { cn } from "@/lib/utils";
 import { actions, useStore } from "@/lib/wincare/store";
 import { formatLog } from "@/lib/wincare/runner";
 
@@ -28,8 +40,25 @@ export const Route = createFileRoute("/logs")({
   component: LogsPage,
 });
 
+type LogFilter = "all" | "success" | "error";
+
+function formatDuration(run: { startedAt: number; finishedAt?: number }) {
+  if (!run.finishedAt) return null;
+  const seconds = Math.max(0, Math.round((run.finishedAt - run.startedAt) / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+}
+
 function LogsPage() {
   const runs = useStore((s) => s.runs);
+  const [filter, setFilter] = useState<LogFilter>("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const errorCount = useMemo(() => runs.filter((r) => r.status === "error").length, [runs]);
+  const visible = useMemo(
+    () => (filter === "all" ? runs : runs.filter((r) => r.status === filter)),
+    [runs, filter],
+  );
 
   const fullText = runs
     .map(
@@ -61,84 +90,119 @@ function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Logs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Histórico de execuções — {runs.length} registro(s).
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={exportTxt} disabled={!runs.length}>
-            <Download /> Exportar TXT
-          </Button>
-          <Button variant="secondary" onClick={exportPdf} disabled={!runs.length}>
-            <FileText /> Exportar PDF
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={!runs.length}
-            onClick={async () => {
-              await navigator.clipboard.writeText(fullText);
-              toast.success("Log completo copiado");
-            }}
-          >
-            <Copy /> Copiar log
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={!runs.length}
-            onClick={() => {
-              actions.clearRuns();
-              toast.success("Histórico limpo");
-            }}
-          >
-            <Trash2 /> Limpar
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        icon={ScrollText}
+        title="Logs"
+        subtitle="O que foi executado neste computador, quando e com qual resultado."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={exportTxt} disabled={!runs.length}>
+              <Download /> TXT
+            </Button>
+            <Button variant="secondary" size="sm" onClick={exportPdf} disabled={!runs.length}>
+              <FileText /> PDF
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!runs.length}
+              onClick={async () => {
+                await navigator.clipboard.writeText(fullText);
+                toast.success("Log completo copiado");
+              }}
+            >
+              <Copy /> Copiar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!runs.length}
+              onClick={() => {
+                actions.clearRuns();
+                toast.success("Histórico limpo");
+              }}
+            >
+              <Trash2 /> Limpar
+            </Button>
+          </>
+        }
+      />
 
-      {runs.length === 0 && (
-        <Card className="surface-panel border-border/60 p-8 text-center text-sm text-muted-foreground">
-          Nenhuma execução registrada ainda.
-        </Card>
-      )}
-
-      <div className="space-y-4">
-        {runs.map((run) => (
-          <Card key={run.id} className="surface-panel gap-3 border-border/60 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-semibold">{run.toolName}</p>
-                <p className="font-mono text-xs text-muted-foreground">{run.command}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {new Date(run.startedAt).toLocaleString("pt-BR")}
-                </span>
-                <Badge
-                  variant="outline"
-                  className={`rounded-full ${
-                    run.status === "success"
-                      ? "border-success/30 bg-success/10 text-success"
-                      : run.status === "error"
-                        ? "border-destructive/30 bg-destructive/10 text-destructive"
-                        : "border-primary/30 bg-primary/10 text-primary"
-                  }`}
-                >
-                  {run.status === "success"
-                    ? "Sucesso"
-                    : run.status === "error"
-                      ? "Erro"
-                      : "Em execução"}
-                </Badge>
-              </div>
+      {runs.length === 0 ? (
+        <EmptyState
+          icon={ScrollText}
+          title="Nenhuma execução registrada ainda"
+          description="Quando você executar uma ferramenta, o resultado e a saída completa aparecem aqui."
+        />
+      ) : (
+        <>
+          <ChoiceChips
+            label="Filtrar execuções"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "all", label: `Todas (${runs.length})` },
+              { value: "success", label: `Sucesso (${runs.length - errorCount})` },
+              { value: "error", label: `Com erro (${errorCount})` },
+            ]}
+          />
+          {visible.length === 0 ? (
+            <EmptyState icon={CheckCircle2} title="Nenhuma execução neste filtro" />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+              <ul className="divide-y divide-border/40">
+                {visible.map((run) => {
+                  const open = expanded === run.id;
+                  const duration = formatDuration(run);
+                  return (
+                    <li key={run.id}>
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => setExpanded(open ? null : run.id)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+                      >
+                        {run.status === "error" ? (
+                          <XCircle className="size-4 shrink-0 text-destructive" />
+                        ) : (
+                          <CheckCircle2 className="size-4 shrink-0 text-success" />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{run.toolName}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {run.result ?? run.command}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          {new Date(run.startedAt).toLocaleString("pt-BR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                          {duration && <span className="block">{duration}</span>}
+                        </span>
+                        <ChevronDown
+                          className={cn(
+                            "size-4 shrink-0 text-muted-foreground transition-transform",
+                            open && "rotate-180",
+                          )}
+                        />
+                      </button>
+                      {open && (
+                        <div className="animate-fade-in space-y-2 px-4 pb-4">
+                          <code className="block font-mono text-xs break-all text-muted-foreground">
+                            {run.command}
+                          </code>
+                          <LogView lines={run.lines} />
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <LogView lines={run.lines} />
-            {run.result && <p className="text-sm text-muted-foreground">{run.result}</p>}
-          </Card>
-        ))}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

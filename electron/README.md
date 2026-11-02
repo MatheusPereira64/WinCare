@@ -41,6 +41,12 @@ npm run wincare:package
   stdout/stderr, e coleta CPU, memória, disco, Defender, HotFix e SMART via PowerShell/CIM.
   Serve a interface por um protocolo `app://` (módulos ES não carregam via `file://`).
 - `electron/preload.cjs` — expõe `window.wincare` com `contextIsolation: true` e sem `nodeIntegration`.
+- `electron/cleaner.cjs` — varre e limpa navegadores/apps. A UI só envia IDs da última varredura, nunca caminhos.
+- `electron/uninstaller.cjs` — lista programas, abre o desinstalador e procura resíduos, com bloqueio de pastas e chaves protegidas.
+- `electron/restore-point.cjs` — cria pontos de restauração.
+- `electron/scheduler.cjs` — tarefas no Agendador do Windows e rotinas sem janela (`--wincare-job=cleanup|full-check`).
+- `electron/powershell.cjs` — execução de scripts em UTF-8, com ou sem UAC.
+- `electron/tests/safety.test.cjs` — testes das proteções contra exclusão indevida (`npm test`).
 - `src/lib/wincare/bridge.ts` — usa o bridge nativo quando existe; caso contrário, simula.
 
 ## Scripts disponíveis
@@ -53,3 +59,5 @@ npm run wincare:package
 | `npm run wincare:dev:debug` | Igual ao dev, com DevTools aberto |
 | `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` em `electron-release/` |
 | `npm run wincare:clear-data` | Limpa histórico local do app |
+| `npm run wincare:screenshots` | Regera as prévias do README em `docs/screenshots/` (dados simulados) |
+| `npm test` | Roda os testes das proteções contra exclusão indevida |

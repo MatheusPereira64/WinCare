@@ -39,8 +39,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Assina quando os secrets existirem; sem eles o pacote sai sem assinatura.
       - name: Package WinCare (ZIP)
         run: npm run wincare:package
+        env:
+          WINCARE_SIGN_PFX_BASE64: ${{ secrets.WINCARE_SIGN_PFX_BASE64 }}
+          WINCARE_SIGN_PASSWORD: ${{ secrets.WINCARE_SIGN_PASSWORD }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

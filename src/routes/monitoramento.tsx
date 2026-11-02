@@ -7,6 +7,7 @@ import type { ApexOptions } from "apexcharts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AppScrollArea } from "@/components/wincare/AppScrollArea";
+import { PageHeader } from "@/components/wincare/PageHeader";
 import { getNative, isNative } from "@/lib/wincare/bridge";
 import type { TopProcess } from "@/lib/wincare/types";
 import { useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
@@ -241,19 +242,12 @@ function MonitorPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="size-6 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight">Monitoramento</h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Painéis em tempo real — CPU, memória, discos e processos.
-            {!nativeMode && " Modo demonstração."}
-          </p>
-        </div>
-        <LiveBadge />
-      </header>
+      <PageHeader
+        icon={Activity}
+        title="Monitoramento"
+        subtitle="Painéis em tempo real: CPU, memória, discos e processos."
+        actions={<LiveBadge />}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile

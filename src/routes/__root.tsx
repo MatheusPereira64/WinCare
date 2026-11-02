@@ -9,7 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-import { Moon, Shield, ShieldCheck, Sun } from "lucide-react";
+import { Loader2, Moon, Shield, ShieldCheck, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
@@ -24,6 +24,8 @@ import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
+import { useActiveRuns } from "@/lib/wincare/runner";
+import type { ToolCategory } from "@/lib/wincare/types";
 
 function NotFoundComponent() {
   return (
@@ -136,6 +138,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/reparo": "Reparo",
   "/limpeza": "Limpeza",
+  "/programas": "Programas",
+  "/agendamento": "Agendamento",
   "/disco": "Disco",
   "/inicializacao": "Inicialização",
   "/sistema": "Sistema",
@@ -144,6 +148,33 @@ const PAGE_TITLES: Record<string, string> = {
   "/logs": "Logs",
   "/configuracoes": "Configurações",
 };
+
+const CATEGORY_PAGE: Record<ToolCategory, string> = {
+  repair: "/reparo",
+  cleanup: "/limpeza",
+  disk: "/disco",
+  network: "/redes",
+  system: "/sistema",
+};
+
+/** Mantém visível o que continua rodando depois de trocar de página. */
+function RunningIndicator() {
+  const runs = useActiveRuns();
+  if (runs.length === 0) return null;
+  const first = runs[0].tool;
+  return (
+    <Link
+      to={first.id === "full-check" ? "/" : CATEGORY_PAGE[first.category]}
+      title={runs.map((r) => r.tool.name).join(", ")}
+      className="animate-fade-in flex max-w-64 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+    >
+      <Loader2 className="size-3.5 shrink-0 animate-spin" />
+      <span className="truncate">
+        {runs.length === 1 ? first.name : `${runs.length} tarefas em execução`}
+      </span>
+    </Link>
+  );
+}
 
 function TopBar() {
   const theme = useStore((s) => s.theme);
@@ -181,13 +212,16 @@ function TopBar() {
         )}
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <Badge
-          variant="outline"
-          className="hidden rounded-full border-primary/30 bg-primary/10 px-3 text-primary md:inline-flex"
-        >
-          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-          {isNative() ? "Nativo" : "Demonstração"}
-        </Badge>
+        <RunningIndicator />
+        {!isNative() && (
+          <Badge
+            variant="outline"
+            className="hidden rounded-full border-primary/30 bg-primary/10 px-3 text-primary md:inline-flex"
+          >
+            <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+            Demonstração
+          </Badge>
+        )}
         {native && elevated === true && (
           <Badge
             variant="outline"
@@ -251,6 +285,7 @@ function RouteUiGuard() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
   useEffect(() => {
@@ -276,8 +311,10 @@ function RootComponent() {
           <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
             <main className="app-ambient relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
-              {/* Required: nested routes render here. */}
-              <Outlet />
+              <div key={pathname} className="animate-fade-in mx-auto w-full max-w-[1500px]">
+                {/* Required: nested routes render here. */}
+                <Outlet />
+              </div>
             </main>
           </div>
         </div>

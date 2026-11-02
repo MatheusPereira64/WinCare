@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Brush } from "lucide-react";
+import { BrowserCleaner } from "@/components/wincare/BrowserCleaner";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import type { ToolCategory } from "@/lib/wincare/types";
 
@@ -8,8 +10,10 @@ function LimpezaPage() {
   return (
     <ToolSection
       title="Limpeza"
-      subtitle="Libere espaço removendo arquivos temporários e caches do sistema."
+      icon={Brush}
+      subtitle="Libere espaço revisando o que será apagado em navegadores, apps e no sistema."
       categories={CLEANUP_CATEGORIES}
+      leading={<BrowserCleaner />}
     />
   );
 }
@@ -21,7 +25,7 @@ export const Route = createFileRoute("/limpeza")({
       {
         name: "description",
         content:
-          "Limpe pastas Temp, Prefetch e o cache do Windows, e abra a Limpeza de Disco nativa direto do WinCare.",
+          "Limpe navegadores e apps com prévia dos arquivos, pastas Temp, Prefetch e o cache do Windows.",
       },
       { property: "og:title", content: "Limpeza de arquivos temporários | WinCare" },
       {

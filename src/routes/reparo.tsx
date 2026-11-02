@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Wrench } from "lucide-react";
 import { ToolSection } from "@/components/wincare/ToolSection";
 
 export const Route = createFileRoute("/reparo")({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/reparo")({
   component: () => (
     <ToolSection
       title="Reparo"
+      icon={Wrench}
       subtitle="Correção de arquivos do sistema, imagem do Windows e disco."
       categories={["repair"]}
     />

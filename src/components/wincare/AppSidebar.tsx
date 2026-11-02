@@ -1,11 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   Brush,
+  CalendarClock,
   Gauge,
   HardDrive,
   LayoutDashboard,
   Network,
+  PackageX,
   Rocket,
   ScrollText,
   Settings,
@@ -24,7 +27,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { isNative } from "@/lib/wincare/bridge";
+import { getNative, isNative } from "@/lib/wincare/bridge";
 import appLogo from "@/assets/wincare-icon.png";
 
 interface NavItem {
@@ -46,8 +49,10 @@ const groups: { label: string; items: NavItem[] }[] = [
     items: [
       { title: "Reparo", url: "/reparo", icon: Wrench },
       { title: "Limpeza", url: "/limpeza", icon: Brush },
+      { title: "Programas", url: "/programas", icon: PackageX },
       { title: "Disco", url: "/disco", icon: HardDrive },
       { title: "Inicialização", url: "/inicializacao", icon: Rocket },
+      { title: "Agendamento", url: "/agendamento", icon: CalendarClock },
     ],
   },
   {
@@ -70,6 +75,11 @@ export function AppSidebar() {
   const { state, setOpenMobile, isMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getNative()?.getAppVersion?.().then(setVersion);
+  }, []);
 
   return (
     <Sidebar collapsible="icon">
@@ -141,10 +151,10 @@ export function AppSidebar() {
         <SidebarFooter className="px-3 pb-3">
           <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/40 px-3 py-2">
             <p className="text-[11px] font-medium text-sidebar-foreground/80">
-              {isNative() ? "Modo nativo" : "Modo demonstração"}
+              {isNative() ? `WinCare ${version ? `v${version}` : ""}` : "Modo demonstração"}
             </p>
             <p className="text-[10px] text-muted-foreground">
-              {isNative() ? "Comandos reais do Windows" : "Saídas simuladas no navegador"}
+              {isNative() ? "Executa comandos reais do Windows" : "Saídas simuladas no navegador"}
             </p>
           </div>
         </SidebarFooter>

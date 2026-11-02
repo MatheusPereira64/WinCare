@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const LAUNCHERS =
-  /^(start ms-settings:|devmgmt|diskmgmt|services|regedit|eventvwr|taskmgr|control|cleanmgr)/i;
+  /^(start ms-settings:|devmgmt|diskmgmt|services|regedit|eventvwr|taskmgr|control|cleanmgr|rstrui|SystemPropertiesProtection)/i;
 
 /** Um único listener IPC para comandos longos com streaming. */
 const streamHandlers = new Map();
@@ -81,4 +81,17 @@ contextBridge.exposeInMainWorld("wincare", {
   isElevated: () => ipcRenderer.invoke("wincare:isElevated"),
   restartAsAdmin: () => ipcRenderer.invoke("wincare:restartAsAdmin"),
   clearStorage: () => ipcRenderer.invoke("wincare:clearStorage"),
+  setNativeTheme: (theme) => ipcRenderer.invoke("wincare:setNativeTheme", theme),
+  cleanerScan: () => ipcRenderer.invoke("wincare:cleanerScan"),
+  cleanerClean: (ids) => ipcRenderer.invoke("wincare:cleanerClean", { ids }),
+  listPrograms: () => ipcRenderer.invoke("wincare:listPrograms"),
+  uninstallProgram: (id) => ipcRenderer.invoke("wincare:uninstallProgram", { id }),
+  scanLeftovers: (id) => ipcRenderer.invoke("wincare:scanLeftovers", { id }),
+  removeLeftovers: (ids) => ipcRenderer.invoke("wincare:removeLeftovers", { ids }),
+  createRestorePoint: (description) =>
+    ipcRenderer.invoke("wincare:createRestorePoint", { description }),
+  listSchedules: () => ipcRenderer.invoke("wincare:listSchedules"),
+  setSchedule: (job, config) => ipcRenderer.invoke("wincare:setSchedule", { job, config }),
+  removeSchedule: (job) => ipcRenderer.invoke("wincare:removeSchedule", { job }),
+  runScheduleNow: (job) => ipcRenderer.invoke("wincare:runScheduleNow", { job }),
 });

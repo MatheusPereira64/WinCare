@@ -5,6 +5,34 @@ Central de manutenção do Windows com interface moderna. O WinCare reúne diagn
 [![Baixar última versão](https://img.shields.io/github/v/release/MatheusPereira64/WinCare?label=Baixar&color=2ea44f)](https://github.com/MatheusPereira64/WinCare/releases/latest)
 [![Licença](https://img.shields.io/github/license/MatheusPereira64/WinCare)](https://github.com/MatheusPereira64/WinCare)
 
+![Dashboard do WinCare](docs/screenshots/dashboard.png)
+
+## Prévias das telas
+
+> Imagens geradas no modo demonstração, com dados simulados.
+
+| Limpeza com prévia dos arquivos | Programas |
+| --- | --- |
+| ![Limpeza de navegadores e apps com a lista de arquivos antes de apagar](docs/screenshots/limpeza.png) | ![Lista de programas instalados com filtros e ordenação](docs/screenshots/programas.png) |
+
+| Remoção de resíduos | Ponto de restauração |
+| --- | --- |
+| ![Lista de pastas e chaves de registro deixadas por um programa desinstalado](docs/screenshots/desinstalar-residuos.png) | ![Confirmação de ação avançada com opção de criar ponto de restauração](docs/screenshots/confirmacao-ponto-restauracao.png) |
+
+| Agendamento | Reparo |
+| --- | --- |
+| ![Agendamento de limpeza e verificação completa pelo Agendador de Tarefas](docs/screenshots/agendamento.png) | ![Ferramentas de reparo agrupadas por objetivo](docs/screenshots/reparo.png) |
+
+| Monitoramento | Disco |
+| --- | --- |
+| ![Gráficos de CPU, memória e discos em tempo real](docs/screenshots/monitoramento.png) | ![Saúde dos discos e análise de espaço](docs/screenshots/disco.png) |
+
+| Sistema | Tema claro |
+| --- | --- |
+| ![Atalhos de energia e consoles do Windows](docs/screenshots/sistema.png) | ![Dashboard no tema claro](docs/screenshots/dashboard-claro.png) |
+
+Para regerar as imagens: `npm run wincare:screenshots`.
+
 ---
 
 ## Baixar o aplicativo (usuários)
@@ -85,6 +113,8 @@ npm run wincare:dev
 | `npm run wincare:build` | Compila só a interface em `dist/` |
 | `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` para distribuição |
 | `npm run wincare:clear-data` | Limpa histórico salvo localmente |
+| `npm run wincare:screenshots` | Regera as prévias do README (dados simulados) |
+| `npm test` | Testa as proteções contra exclusão indevida |
 | `npm run dev` | Preview web (modo demonstração) |
 | `npm run build` | Build web para produção |
 | `npm run lint` | Verifica o código com ESLint |
@@ -95,7 +125,7 @@ npm run wincare:dev
 
 ### Dashboard
 
-Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atualização e **saúde geral (0–100%)**. Ferramentas favoritas e **Verificação completa** (SFC + DISM + disco em sequência).
+Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atualização e **saúde geral (0–100%)**. **Recomendações** calculadas a partir do que foi medido, ações rápidas, ferramentas favoritas e **Verificação completa** (SFC + DISM + disco em sequência).
 
 ### Reparo
 
@@ -103,10 +133,26 @@ Visão geral do PC: CPU, memória, disco, uptime, Windows Defender, última atua
 - DISM CheckHealth, ScanHealth e RestoreHealth
 - Verificação de disco (`chkdsk`) e correção com confirmação
 - Limpeza do cache do Windows Update
+- **Ponto de restauração** manual e automático antes de DISM RestoreHealth, `chkdsk /f` e resets de rede. Se falhar, a ação não roda sem a sua confirmação
 
 ### Limpeza
 
-Arquivos temporários, Prefetch, cache de ícones e atalho para a Limpeza de Disco nativa (`cleanmgr`).
+**Navegadores e aplicativos com prévia:** Chrome, Edge, Firefox, Brave, Opera, Opera GX e Vivaldi (por perfil), além de Discord, Slack, Spotify, Teams, VS Code e Steam. Você vê o tamanho e os arquivos antes de apagar. Só o cache vem marcado; cookies e histórico são escolhidos por você e ficam bloqueados com o app aberto. Senhas, favoritos e extensões nunca são tocados.
+
+Também limpa arquivos temporários, Prefetch e cache de ícones, com atalho para a Limpeza de Disco nativa (`cleanmgr`).
+
+### Programas
+
+Lista os programas instalados com filtros e ordenação, abre o **desinstalador do próprio programa** e depois procura **resíduos** (pastas e chaves de registro com o nome do programa). Nada é removido sem revisão:
+
+- A busca só roda quando o programa saiu da lista de instalados
+- Pastas do sistema, do usuário e usadas por outros programas ficam de fora
+- Pastas do usuário vão para a Lixeira; chaves de registro ganham um backup `.reg` antes de sair
+- Pastas em `Program Files` e `ProgramData` são removidas permanentemente, com aviso na lista
+
+### Agendamento
+
+Limpeza e verificação completa em horário fixo pelo **Agendador de Tarefas do Windows**, com o WinCare fechado. A limpeza agendada só remove temporários com mais de 24 horas e caches de apps fechados; a verificação cria um ponto de restauração antes e não roda sem ele. O resultado aparece em uma notificação e na tela de Agendamento.
 
 ### Disco
 
@@ -126,7 +172,7 @@ Histórico das execuções com opção de copiar logs.
 
 ### Configurações
 
-Tema claro/escuro, confirmação de comandos críticos, verificação ao iniciar, **Executar como administrador** e limpeza de dados locais.
+Tema claro/escuro, confirmação de comandos críticos, ponto de restauração automático, avisos ao abrir, **Executar como administrador** e limpeza de dados locais.
 
 ---
 
@@ -134,7 +180,7 @@ Tema claro/escuro, confirmação de comandos críticos, verificação ao iniciar
 
 - Nome e descrição em português
 - Nível de risco: **Seguro**, **Atenção** ou **Avançado**
-- Barra de progresso e log em tempo real
+- Barra de progresso e log em tempo real, que continuam ao trocar de página
 - Resultado final e botão **Copiar log**
 - Confirmação antes de ações críticas (configurável)
 
@@ -158,11 +204,24 @@ Após baixar o ZIP da Release (ou `npm run wincare:package`), use o `WinCare.exe
 
 ---
 
+## Assinatura de código
+
+O pacote já está preparado para assinatura, mas **as releases continuam sem assinatura até existir um certificado**, e por isso o SmartScreen ainda avisa. Com um certificado de assinatura de código (OV/EV, ou um serviço como Azure Artifact Signing ou SignPath):
+
+1. Converta o `.pfx` para base64 e crie os secrets `WINCARE_SIGN_PFX_BASE64` e `WINCARE_SIGN_PASSWORD` no GitHub
+2. Crie a próxima tag: o workflow de Release assina `WinCare.exe` e as DLLs antes de gerar o ZIP
+
+Localmente, `npm run wincare:package` usa as mesmas variáveis (ou `WINCARE_SIGN_PFX` com o caminho do arquivo) e exige o `signtool` do Windows SDK. Sem certificado, o passo é pulado com um aviso; com `WINCARE_SIGN_REQUIRED=1`, o build falha em vez de pular.
+
+---
+
 ## Dados e logs locais
 
 - Histórico e preferências ficam em `localStorage` do app
 - Logs do processo principal: `%APPDATA%\WinCare\logs\wincare.log`
-- Menu **WinCare → Abrir arquivo de log** (no app desktop)
+- Backups do registro feitos ao remover resíduos: `%APPDATA%\WinCare\registry-backups\`
+- Rotinas agendadas: `%APPDATA%\WinCare\schedules.json` e `schedule-history.json`
+- Menu **WinCare → Abrir arquivo de log** (tecla **Alt** no app desktop)
 - Limpar histórico: **Configurações → Dados locais** ou `npm run wincare:clear-data`
 
 ---
@@ -178,6 +237,8 @@ Após baixar o ZIP da Release (ou `npm run wincare:package`), use o `WinCare.exe
 | Comandos não rodam de verdade | Use `wincare:dev`, não `npm run dev` (navegador) |
 | Duas janelas / app não abre | Só uma instância é permitida; foque a janela existente |
 | SmartScreen ao abrir o .exe da Release | **Mais informações** → **Executar assim mesmo** |
+| Ponto de restauração falha | Ative a proteção em **Reparo → Proteção do Sistema**. O Windows também limita a um ponto a cada 24 horas |
+| Rotina agendada não roda após mover a pasta | Abra **Agendamento** e clique em **Salvar** para apontar para o novo local |
 
 ---
 

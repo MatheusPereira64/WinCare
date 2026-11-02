@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
+import { PageHeader } from "@/components/wincare/PageHeader";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import { useDisks } from "@/lib/wincare/useSystem";
 
@@ -32,12 +33,11 @@ function DiskPage() {
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <header>
-          <h1 className="text-2xl font-semibold tracking-tight">Disco</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Integridade das unidades instaladas, espaço disponível e pastas que mais ocupam.
-          </p>
-        </header>
+        <PageHeader
+          icon={HardDrive}
+          title="Disco"
+          subtitle="Integridade das unidades instaladas, espaço disponível e pastas que mais ocupam."
+        />
 
         <div className="grid gap-4 lg:grid-cols-2">
           {disks.map((disk) => {
@@ -88,6 +88,7 @@ function DiskPage() {
       <DiskSpaceAnalyzer />
 
       <ToolSection
+        embedded
         title="Diagnóstico de armazenamento"
         subtitle="Consultas SMART e de espaço executadas diretamente no Windows."
         categories={["disk"]}

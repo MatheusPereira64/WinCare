@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Gauge } from "lucide-react";
 import { ToolSection } from "@/components/wincare/ToolSection";
 
 export const Route = createFileRoute("/sistema")({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/sistema")({
   component: () => (
     <ToolSection
       title="Sistema"
+      icon={Gauge}
       subtitle="Energia do PC e acesso rápido às consoles administrativas do Windows."
       categories={["system"]}
     />

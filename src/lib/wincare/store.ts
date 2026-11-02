@@ -8,6 +8,7 @@ interface State {
   autoCheck: boolean;
   autoCheckUpdates: boolean;
   confirmCritical: boolean;
+  autoRestorePoint: boolean;
 }
 
 const STORAGE_KEY = "wincare-state";
@@ -22,6 +23,7 @@ const initial: State = {
   autoCheck: true,
   autoCheckUpdates: true,
   confirmCritical: true,
+  autoRestorePoint: true,
 };
 
 let state: State = initial;
@@ -63,6 +65,7 @@ function persist() {
           autoCheck: state.autoCheck,
           autoCheckUpdates: state.autoCheckUpdates,
           confirmCritical: state.confirmCritical,
+          autoRestorePoint: state.autoRestorePoint,
         }),
       );
     } catch {
@@ -107,6 +110,9 @@ export function hydrateStore() {
 export function applyTheme(theme: "dark" | "light") {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("light", theme === "light");
+  void (
+    window as unknown as { wincare?: { setNativeTheme?: (t: string) => Promise<void> } }
+  ).wincare?.setNativeTheme?.(theme);
 }
 
 const subscribe = (l: () => void) => {
@@ -115,6 +121,8 @@ const subscribe = (l: () => void) => {
 };
 
 const getSnapshot = () => state;
+
+export const getStoreState = () => state;
 const getServerSnapshot = () => initial;
 
 export function useStore<T>(selector: (s: State) => T): T {
@@ -161,6 +169,9 @@ export const actions = {
   },
   setConfirmCritical(confirmCritical: boolean) {
     setState({ confirmCritical });
+  },
+  setAutoRestorePoint(autoRestorePoint: boolean) {
+    setState({ autoRestorePoint });
   },
 };
 

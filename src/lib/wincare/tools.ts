@@ -1,7 +1,41 @@
-import type { Tool } from "./types";
+import type { Tool, ToolCategory } from "./types";
 
 export const TOOLS: Tool[] = [
   // ---------------- Reparo ----------------
+  {
+    id: "restore-point",
+    name: "Criar ponto de restauração",
+    description:
+      "Salva o estado atual do Windows para você poder voltar atrás. O Windows permite um ponto a cada 24 horas.",
+    command: "Checkpoint-Computer",
+    commandPreview: "Checkpoint-Computer -RestorePointType MODIFY_SETTINGS",
+    nativeAction: "restore-point",
+    category: "repair",
+    risk: "safe",
+    requiresAdmin: true,
+    estimate: 60000,
+    timeoutMs: 300000,
+  },
+  {
+    id: "rstrui",
+    name: "Restaurar o sistema",
+    description: "Abre o assistente do Windows para voltar a um ponto de restauração.",
+    command: "rstrui",
+    category: "repair",
+    risk: "warning",
+    launcher: true,
+    estimate: 1200,
+  },
+  {
+    id: "system-protection",
+    name: "Proteção do Sistema",
+    description: "Ativa ou desativa os pontos de restauração por unidade.",
+    command: "SystemPropertiesProtection",
+    category: "repair",
+    risk: "safe",
+    launcher: true,
+    estimate: 1200,
+  },
   {
     id: "sfc",
     name: "Verificar arquivos do sistema",
@@ -48,6 +82,7 @@ export const TOOLS: Tool[] = [
     risk: "warning",
     requiresAdmin: true,
     requiresConfirmation: true,
+    restorePoint: true,
     estimate: 1_200_000,
     timeoutMs: 1_800_000,
   },
@@ -72,6 +107,7 @@ export const TOOLS: Tool[] = [
     risk: "advanced",
     requiresAdmin: true,
     requiresConfirmation: true,
+    restorePoint: true,
     estimate: 120000,
     timeoutMs: 1_800_000,
   },
@@ -93,12 +129,14 @@ export const TOOLS: Tool[] = [
   {
     id: "temp",
     name: "Limpar arquivos temporários",
-    description: "Remove o conteúdo de %temp% e da pasta Temp do Windows.",
+    description: "Remove o conteúdo de %temp% e da pasta Temp do Windows. Arquivos em uso são mantidos.",
     command:
-      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath ($env:TEMP + '\\*') -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath ($env:WINDIR + '\\Temp\\*') -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Limpeza de temporarios concluida.'\"",
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$dirs = @($env:TEMP, (Join-Path $env:WINDIR 'Temp')); function Measure-Temp { ($dirs | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -Force -File -ErrorAction SilentlyContinue } | Measure-Object -Property Length -Sum).Sum }; $before = Measure-Temp; $dirs | ForEach-Object { Get-ChildItem -LiteralPath $_ -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }; $after = Measure-Temp; Write-Output ('Temporarios limpos: ' + [math]::Round(($before - $after) / 1MB, 1) + ' MB liberados.')\"",
+    commandPreview: "powershell … remove o conteúdo de %TEMP% e %WINDIR%\\Temp",
     category: "cleanup",
     risk: "safe",
     estimate: 9000,
+    timeoutMs: 180000,
   },
   {
     id: "prefetch",
@@ -106,7 +144,8 @@ export const TOOLS: Tool[] = [
     description:
       "Apaga os arquivos de pré-carregamento. O Windows recria conforme você usa os programas.",
     command:
-      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath ($env:WINDIR + '\\Prefetch\\*') -Force -ErrorAction SilentlyContinue; Write-Output 'Prefetch limpo.'\"",
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-ChildItem -LiteralPath (Join-Path $env:WINDIR 'Prefetch') -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Prefetch limpo.'\"",
+    commandPreview: "powershell … remove o conteúdo de %WINDIR%\\Prefetch",
     category: "cleanup",
     risk: "warning",
     requiresAdmin: true,
@@ -118,7 +157,8 @@ export const TOOLS: Tool[] = [
     name: "Limpar cache do Windows",
     description: "Recria o cache de ícones e miniaturas, corrigindo imagens quebradas.",
     command:
-      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Remove-Item -LiteralPath ($env:LOCALAPPDATA + '\\Microsoft\\Windows\\Explorer\\*.db') -Force -ErrorAction SilentlyContinue; Start-Process explorer; Write-Output 'Cache de icones recriado.'\"",
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Explorer') -Filter *.db -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Start-Process explorer; Write-Output 'Cache de icones recriado.'\"",
+    commandPreview: "powershell … reinicia o Explorer e recria o cache de ícones",
     category: "cleanup",
     risk: "warning",
     requiresConfirmation: true,
@@ -271,8 +311,10 @@ export const TOOLS: Tool[] = [
   {
     id: "smart",
     name: "Status SMART dos discos",
-    description: "Consulta o autodiagnóstico dos discos instalados via WMIC.",
-    command: "wmic diskdrive get model,status,size",
+    description: "Consulta o autodiagnóstico dos discos instalados.",
+    command:
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_DiskDrive | Select-Object Model, Status, @{N='SizeGB';E={[math]::Round($_.Size / 1GB)}} | Format-Table -AutoSize | Out-String -Width 120\"",
+    commandPreview: "Get-CimInstance Win32_DiskDrive",
     category: "disk",
     risk: "safe",
     estimate: 5000,
@@ -281,7 +323,9 @@ export const TOOLS: Tool[] = [
     id: "disk-space",
     name: "Espaço livre por unidade",
     description: "Lista as unidades com espaço livre e total.",
-    command: "wmic logicaldisk get caption,freespace,size",
+    command:
+      "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID, @{N='LivreGB';E={[math]::Round($_.FreeSpace / 1GB, 1)}}, @{N='TotalGB';E={[math]::Round($_.Size / 1GB, 1)}} | Format-Table -AutoSize | Out-String -Width 120\"",
+    commandPreview: "Get-CimInstance Win32_LogicalDisk",
     category: "disk",
     risk: "safe",
     estimate: 4000,
@@ -378,6 +422,7 @@ export const TOOLS: Tool[] = [
     risk: "warning",
     requiresAdmin: true,
     requiresConfirmation: true,
+    restorePoint: true,
     estimate: 5000,
   },
   {
@@ -389,6 +434,7 @@ export const TOOLS: Tool[] = [
     risk: "advanced",
     requiresAdmin: true,
     requiresConfirmation: true,
+    restorePoint: true,
     estimate: 6000,
   },
   {
@@ -424,6 +470,72 @@ export const TOOLS: Tool[] = [
     timeoutMs: 15000,
   },
 ];
+
+/** Agrupamento visual de cada página; o que não estiver listado cai em "Outras". */
+export const TOOL_GROUPS: Partial<
+  Record<ToolCategory, { label: string; hint?: string; ids: string[]; compact?: boolean }[]>
+> = {
+  repair: [
+    {
+      label: "Rede de segurança",
+      hint: "Crie um ponto antes de mudanças grandes e volte atrás se algo der errado.",
+      compact: true,
+      ids: ["restore-point", "rstrui", "system-protection"],
+    },
+    {
+      label: "Diagnóstico",
+      hint: "Só analisam: não alteram nada no sistema.",
+      ids: ["dism-check", "dism-scan", "chkdsk"],
+    },
+    {
+      label: "Correção",
+      hint: "Corrigem o que foi encontrado. Podem demorar ou pedir reinicialização.",
+      ids: ["sfc", "dism-restore", "chkdsk-fix", "wu-cache"],
+    },
+  ],
+  system: [
+    {
+      label: "Energia",
+      hint: "Agende o desligamento do PC ou cancele um já agendado.",
+      compact: true,
+      ids: ["shutdown-1", "shutdown-5", "shutdown-15", "shutdown-60", "shutdown-abort"],
+    },
+    {
+      label: "Consoles do Windows",
+      compact: true,
+      ids: [
+        "devmgmt",
+        "diskmgmt",
+        "services",
+        "taskmgr",
+        "eventvwr",
+        "regedit",
+        "control",
+        "ms-settings",
+      ],
+    },
+  ],
+  network: [
+    {
+      label: "Testes de conexão",
+      ids: [
+        "speedtest",
+        "ping-google",
+        "ping-cloudflare",
+        "dns-google",
+        "dns-cloudflare",
+        "tracert-google",
+        "ipconfig-all",
+      ],
+    },
+    { label: "Wi‑Fi", ids: ["wifi-interfaces", "wifi-profiles"] },
+    {
+      label: "Reparo de rede",
+      hint: "Use quando a internet parar de funcionar. Alguns exigem reiniciar o PC.",
+      ids: ["flushdns", "renew-ip", "winsock", "tcpip"],
+    },
+  ],
+};
 
 export const FULL_CHECK_IDS = ["sfc", "dism-check", "dism-scan", "dism-restore", "chkdsk"];
 

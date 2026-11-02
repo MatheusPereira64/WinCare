@@ -10,12 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DiscoRouteImport } from './routes/disco'
 import { Route as InicializacaoRouteImport } from './routes/inicializacao'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
+import { Route as ProgramasRouteImport } from './routes/programas'
 import { Route as RedesRouteImport } from './routes/redes'
 import { Route as ReparoRouteImport } from './routes/reparo'
 import { Route as SistemaRouteImport } from './routes/sistema'
@@ -24,6 +26,11 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgendamentoRoute = AgendamentoRouteImport.update({
+  id: '/agendamento',
+  path: '/agendamento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
@@ -56,6 +63,11 @@ const MonitoramentoRoute = MonitoramentoRouteImport.update({
   path: '/monitoramento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgramasRoute = ProgramasRouteImport.update({
+  id: '/programas',
+  path: '/programas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RedesRoute = RedesRouteImport.update({
   id: '/redes',
   path: '/redes',
@@ -79,12 +91,14 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
@@ -92,12 +106,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
@@ -106,12 +122,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
   '/sistema': typeof SistemaRoute
@@ -121,12 +139,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agendamento'
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/programas'
     | '/redes'
     | '/reparo'
     | '/sistema'
@@ -134,12 +154,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agendamento'
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/programas'
     | '/redes'
     | '/reparo'
     | '/sistema'
@@ -147,12 +169,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/agendamento'
     | '/configuracoes'
     | '/disco'
     | '/inicializacao'
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/programas'
     | '/redes'
     | '/reparo'
     | '/sistema'
@@ -161,12 +185,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgendamentoRoute: typeof AgendamentoRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DiscoRoute: typeof DiscoRoute
   InicializacaoRoute: typeof InicializacaoRoute
   LimpezaRoute: typeof LimpezaRoute
   LogsRoute: typeof LogsRoute
   MonitoramentoRoute: typeof MonitoramentoRoute
+  ProgramasRoute: typeof ProgramasRoute
   RedesRoute: typeof RedesRoute
   ReparoRoute: typeof ReparoRoute
   SistemaRoute: typeof SistemaRoute
@@ -180,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agendamento': {
+      id: '/agendamento'
+      path: '/agendamento'
+      fullPath: '/agendamento'
+      preLoaderRoute: typeof AgendamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configuracoes': {
@@ -224,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MonitoramentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programas': {
+      id: '/programas'
+      path: '/programas'
+      fullPath: '/programas'
+      preLoaderRoute: typeof ProgramasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/redes': {
       id: '/redes'
       path: '/redes'
@@ -257,12 +297,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgendamentoRoute: AgendamentoRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   DiscoRoute: DiscoRoute,
   InicializacaoRoute: InicializacaoRoute,
   LimpezaRoute: LimpezaRoute,
   LogsRoute: LogsRoute,
   MonitoramentoRoute: MonitoramentoRoute,
+  ProgramasRoute: ProgramasRoute,
   RedesRoute: RedesRoute,
   ReparoRoute: ReparoRoute,
   SistemaRoute: SistemaRoute,

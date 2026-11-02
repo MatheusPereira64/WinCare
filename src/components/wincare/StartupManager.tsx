@@ -5,9 +5,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { getNative, isNative, SIMULATED_STARTUP } from "@/lib/wincare/bridge";
 import type { StartupItem } from "@/lib/wincare/types";
+import { EmptyState } from "./EmptyState";
+import { PageHeader } from "./PageHeader";
 
 const LOCATION_LABEL: Record<StartupItem["location"], string> = {
   "hkcu-run": "Usuário",
@@ -102,38 +105,47 @@ export function StartupManager() {
 
   return (
     <div className="space-y-6" data-wincare-startup>
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Rocket className="size-6 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight">Inicialização</h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Programas que abrem junto com o Windows — principal causa de PC lento na inicialização.
-            {!nativeMode && " Modo demonstração."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">
-            {active} ativos / {items.length} total
-          </Badge>
+      <PageHeader
+        icon={Rocket}
+        title="Inicialização"
+        subtitle="Programas que abrem junto com o Windows: a principal causa de PC lento ao ligar."
+        badges={
+          !loading && (
+            <Badge
+              variant="outline"
+              className="rounded-full border-border/60 text-muted-foreground"
+            >
+              {active} de {items.length} ativos
+            </Badge>
+          )
+        }
+        actions={
           <Button
             type="button"
             variant="secondary"
             size="sm"
+            className="rounded-full"
             onClick={() => void refresh()}
             disabled={loading}
           >
             {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
             Atualizar
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {loading && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Lendo registro e pasta Inicializar…</p>
+        <div className="grid gap-3" aria-label="Lendo programas de inicialização">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+          ))}
+        </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum item de inicialização encontrado.</p>
+        <EmptyState
+          icon={Rocket}
+          title="Nenhum programa abre com o Windows"
+          description="Não encontramos itens no registro nem na pasta Inicializar."
+        />
       ) : (
         <div className="grid gap-3">
           {items.map((item) => {

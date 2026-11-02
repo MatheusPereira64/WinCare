@@ -2,22 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   CircuitBoard,
   Clock,
-  Cpu,
-  HardDrive,
-  MemoryStick,
+  LayoutDashboard,
   Monitor,
-  RefreshCw,
   ShieldCheck,
   Star,
 } from "lucide-react";
-import { useEffect } from "react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
+import { PageHeader } from "@/components/wincare/PageHeader";
+import { QuickActions, RecommendationsCard } from "@/components/wincare/RecommendationsCard";
 import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
 import { useStore } from "@/lib/wincare/store";
@@ -48,46 +45,42 @@ function Dashboard() {
   const disks = useDisks();
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
-  const autoCheck = useStore((s) => s.autoCheck);
-
-  useEffect(() => {
-    if (autoCheck) {
-      toast.info("Verificação automática concluída", {
-        description: "Nenhum problema crítico detectado na inicialização.",
-      });
-    }
-  }, [autoCheck]);
 
   const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
   const healthy = info.health >= 80;
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {loading
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Dashboard"
+        subtitle={
+          loading
             ? "Lendo informações do sistema…"
-            : `Estado atual de ${info.hostname} — atualizado a cada 3 segundos.`}
-        </p>
-      </header>
+            : "Estado atual do computador, atualizado a cada 3 segundos."
+        }
+      />
 
       <Card className="hero-panel border-border/50 p-6 sm:p-8">
         <div className="flex flex-wrap items-center gap-8">
-          <HealthRing value={info.health} />
+          <HealthRing value={info.health} loading={loading} />
           <div className="min-w-0 flex-1 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge
                 variant="outline"
                 className={
-                  healthy
-                    ? "rounded-full border-success/30 bg-success/10 px-3 text-success"
-                    : "rounded-full border-warning/30 bg-warning/10 px-3 text-warning"
+                  loading
+                    ? "rounded-full border-border/60 px-3 text-muted-foreground"
+                    : healthy
+                      ? "rounded-full border-success/30 bg-success/10 px-3 text-success"
+                      : "rounded-full border-warning/30 bg-warning/10 px-3 text-warning"
                 }
               >
-                <span
-                  className={`size-1.5 rounded-full ${healthy ? "bg-success" : "bg-warning"}`}
-                />
+                {!loading && (
+                  <span
+                    className={`size-1.5 rounded-full ${healthy ? "bg-success" : "bg-warning"}`}
+                  />
+                )}
                 {loading ? "Carregando…" : healthy ? "Sistema saudável" : "Requer atenção"}
               </Badge>
               <Badge variant="outline" className="rounded-full border-border/60 px-3 text-muted-foreground">
@@ -99,37 +92,33 @@ function Dashboard() {
               Windows: {info.lastUpdate}.
             </p>
             <div className="grid max-w-2xl gap-x-8 gap-y-3 sm:grid-cols-3">
-              <HeroMeter label="CPU" value={info.cpuUsage} />
-              <HeroMeter label="Memória" value={info.memoryUsage} />
-              <HeroMeter label="Disco C:" value={info.diskUsage} />
+              <HeroMeter
+                label="CPU"
+                value={info.cpuUsage}
+                hint={
+                  typeof info.cpuTemperature === "number" ? `${info.cpuTemperature} °C` : undefined
+                }
+              />
+              <HeroMeter
+                label="Memória"
+                value={info.memoryUsage}
+                hint={
+                  typeof info.memoryUsedGb === "number"
+                    ? `${info.memoryUsedGb} de ${info.memoryTotalGb} GB`
+                    : `${info.memoryTotalGb} GB instalados`
+                }
+              />
+              <HeroMeter
+                label="Disco C:"
+                value={info.diskUsage}
+                hint={`${info.diskTotalGb} GB no total`}
+              />
             </div>
           </div>
         </div>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
-            icon={<Cpu className="size-4" />}
-            label="Uso de CPU"
-            value={`${info.cpuUsage}%`}
-            hint={
-              typeof info.cpuTemperature === "number"
-                ? `${info.cpuTemperature} °C`
-                : "Temperatura indisponível"
-            }
-            progress={info.cpuUsage}
-          />
-          <StatCard
-            icon={<MemoryStick className="size-4" />}
-            label="Memória"
-            value={`${info.memoryUsage}%`}
-            hint={
-              typeof info.memoryUsedGb === "number"
-                ? `${info.memoryUsedGb} / ${info.memoryTotalGb} GB`
-                : `${info.memoryTotalGb} GB instalados`
-            }
-            progress={info.memoryUsage}
-          />
           <StatCard
             icon={<CircuitBoard className="size-4" />}
             label="GPU"
@@ -141,13 +130,6 @@ function Dashboard() {
               .filter(Boolean)
               .join(" · ") || "Sensor indisponível"}
             progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
-          />
-          <StatCard
-            icon={<HardDrive className="size-4" />}
-            label="Espaço em disco (C:)"
-            value={`${info.diskUsage}% usado`}
-            hint={`${info.diskTotalGb} GB no total`}
-            progress={info.diskUsage}
           />
           <StatCard
             icon={<Clock className="size-4" />}
@@ -163,16 +145,20 @@ function Dashboard() {
           />
       </div>
 
-      <DiagnosticReportCard system={info} disks={disks} />
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <RecommendationsCard system={info} disks={disks} loading={loading} />
+        <QuickActions />
+      </div>
 
       <FullCheckCard />
+
+      <DiagnosticReportCard system={info} disks={disks} />
 
       {favoriteTools.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Star className="size-4 text-warning" />
             <h2 className="text-lg font-semibold">Favoritos</h2>
-            <RefreshCw className="size-3.5 text-muted-foreground" />
           </div>
           <div className="grid gap-4 xl:grid-cols-2">
             {favoriteTools.map((tool) => (
@@ -186,7 +172,7 @@ function Dashboard() {
 }
 
 /** Medidor compacto usado dentro do painel hero. */
-function HeroMeter({ label, value }: { label: string; value: number }) {
+function HeroMeter({ label, value, hint }: { label: string; value: number; hint?: string }) {
   const clamped = Math.min(100, Math.max(0, value));
   const tone =
     clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
@@ -203,6 +189,7 @@ function HeroMeter({ label, value }: { label: string; value: number }) {
           style={{ width: `${clamped}%` }}
         />
       </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

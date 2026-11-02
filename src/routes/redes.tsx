@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Network } from "lucide-react";
 import { ToolSection } from "@/components/wincare/ToolSection";
 
 /**
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/redes")({
   component: () => (
     <ToolSection
       title="Redes"
+      icon={Network}
       subtitle="Teste conectividade, consulte DNS e execute reparos da pilha de rede do Windows."
       categories={["network"]}
     />
