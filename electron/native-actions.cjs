@@ -1,8 +1,19 @@
 const { ipcMain } = require("electron");
 const logger = require("./logger.cjs");
-const cleaner = require("./cleaner.cjs");
-const uninstaller = require("./uninstaller.cjs");
-const scheduler = require("./scheduler.cjs");
+const { cleanCleanerTargets, scanCleanerTargets } = require("./cleaner.cjs");
+const {
+  listInstalledPrograms,
+  removeLeftovers,
+  runUninstaller,
+  scanLeftovers,
+} = require("./uninstaller.cjs");
+const {
+  listSchedules,
+  readHistory,
+  removeSchedule,
+  runScheduleNow,
+  setSchedule,
+} = require("./scheduler.cjs");
 const { createRestorePoint } = require("./restore-point.cjs");
 
 /** Registra um handler que devolve `{ ok: false, reason }` em vez de rejeitar no renderer. */
@@ -21,28 +32,28 @@ function handle(channel, fn) {
 function registerNativeActions() {
   handle("wincare:cleanerScan", async () => ({
     ok: true,
-    items: await cleaner.scanCleanerTargets(),
+    items: await scanCleanerTargets(),
   }));
-  handle("wincare:cleanerClean", ({ ids }) => cleaner.cleanCleanerTargets(ids));
+  handle("wincare:cleanerClean", ({ ids }) => cleanCleanerTargets(ids));
 
   handle("wincare:listPrograms", async () => ({
     ok: true,
-    items: await uninstaller.listInstalledPrograms(),
+    items: await listInstalledPrograms(),
   }));
-  handle("wincare:uninstallProgram", ({ id }) => uninstaller.runUninstaller(id));
-  handle("wincare:scanLeftovers", ({ id }) => uninstaller.scanLeftovers(id));
-  handle("wincare:removeLeftovers", ({ ids }) => uninstaller.removeLeftovers(ids));
+  handle("wincare:uninstallProgram", ({ id }) => runUninstaller(id));
+  handle("wincare:scanLeftovers", ({ id }) => scanLeftovers(id));
+  handle("wincare:removeLeftovers", ({ ids }) => removeLeftovers(ids));
 
   handle("wincare:createRestorePoint", ({ description }) => createRestorePoint(description));
 
   handle("wincare:listSchedules", async () => ({
     ok: true,
-    items: await scheduler.listSchedules(),
-    history: scheduler.readHistory(),
+    items: await listSchedules(),
+    history: readHistory(),
   }));
-  handle("wincare:setSchedule", ({ job, config }) => scheduler.setSchedule(job, config));
-  handle("wincare:removeSchedule", ({ job }) => scheduler.removeSchedule(job));
-  handle("wincare:runScheduleNow", ({ job }) => scheduler.runScheduleNow(job));
+  handle("wincare:setSchedule", ({ job, config }) => setSchedule(job, config));
+  handle("wincare:removeSchedule", ({ job }) => removeSchedule(job));
+  handle("wincare:runScheduleNow", ({ job }) => runScheduleNow(job));
 }
 
 module.exports = { registerNativeActions };

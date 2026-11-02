@@ -85,7 +85,12 @@ async function collectCpuTempC() {
 function resolveNvidiaSmi() {
   const candidates = [
     "nvidia-smi",
-    path.join(process.env.ProgramFiles || "C:\\Program Files", "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+    path.join(
+      process.env.ProgramFiles || "C:\\Program Files",
+      "NVIDIA Corporation",
+      "NVSMI",
+      "nvidia-smi.exe",
+    ),
     path.join(process.env.SystemRoot || "C:\\Windows", "System32", "nvidia-smi.exe"),
   ];
   for (const candidate of candidates) {
@@ -181,15 +186,13 @@ async function enrichSystemInfo(base, opts = {}) {
       ? cpuFromNode
       : typeof opts.cpuFromWmi === "number"
         ? opts.cpuFromWmi
-        : base.cpuUsage ?? 0;
+        : (base.cpuUsage ?? 0);
 
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const memoryUsedGb = Math.round(((totalMem - freeMem) / 1024 ** 3) * 10) / 10;
   const memoryTotalGb =
-    typeof base.memoryTotalGb === "number"
-      ? base.memoryTotalGb
-      : Math.round(totalMem / 1024 ** 3);
+    typeof base.memoryTotalGb === "number" ? base.memoryTotalGb : Math.round(totalMem / 1024 ** 3);
   const memoryUsage = Math.round(((totalMem - freeMem) / totalMem) * 100);
 
   const [cpuTemperature, gpu] = await Promise.all([collectCpuTempC(), collectGpuMetrics()]);

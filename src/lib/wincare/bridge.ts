@@ -72,6 +72,31 @@ export interface ApplyUpdateResult {
   logFile?: string;
 }
 
+export interface PowerPlanInfo {
+  guid: string;
+  name: string;
+  active: boolean;
+}
+
+export interface MemoryOptimizeResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+  freedMb?: number;
+  trimmed?: number;
+  skipped?: number;
+  standbyPurged?: boolean;
+  before?: { totalMb: number; usedMb: number; freeMb: number; usagePct: number };
+  after?: { totalMb: number; usedMb: number; freeMb: number; usagePct: number };
+}
+
+export interface StorageIntelResult {
+  at: number;
+  visited: number;
+  largeFiles: { path: string; name: string; sizeBytes: number }[];
+  duplicates: { name: string; sizeBytes: number; paths: string[] }[];
+}
+
 export interface NativeBridge {
   run: (
     command: string,
@@ -91,6 +116,17 @@ export interface NativeBridge {
   topProcesses?: () => Promise<TopProcess[]>;
   diskUsage: () => Promise<DiskUsageFolder[]>;
   clearDiskFolder: (id: string) => Promise<{ ok: boolean; reason?: string; freedBytes?: number }>;
+  storageIntel?: () => Promise<StorageIntelResult>;
+  optimizeMemory?: () => Promise<MemoryOptimizeResult>;
+  powerPlan?: (payload?: {
+    action?: "list" | "set";
+    profile?: "balanced" | "gaming" | "work" | "battery";
+  }) => Promise<{
+    ok: boolean;
+    reason?: string;
+    plans: PowerPlanInfo[];
+    active: PowerPlanInfo | null;
+  }>;
   saveTextFile?: (
     content: string,
     defaultName?: string,
@@ -384,6 +420,10 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     command: '"C:\\Users\\Usuario\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe" /background',
     location: "hkcu-run",
     enabled: true,
+    processName: "OneDrive",
+    running: true,
+    memMb: 92,
+    processCount: 2,
   },
   {
     id: "hkcu-run:Discord",
@@ -391,13 +431,32 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     command: '"C:\\Users\\Usuario\\AppData\\Local\\Discord\\Update.exe" --processStart Discord.exe',
     location: "hkcu-run",
     enabled: true,
+    processName: "Discord",
+    running: true,
+    memMb: 268,
+    processCount: 4,
   },
   {
     id: "hkcu-run:Steam",
     name: "Steam",
     command: '"C:\\Program Files (x86)\\Steam\\steam.exe" -silent',
     location: "hkcu-run",
-    enabled: false,
+    enabled: true,
+    processName: "steam",
+    running: true,
+    memMb: 186,
+    processCount: 3,
+  },
+  {
+    id: "hkcu-run:Spotify",
+    name: "Spotify",
+    command: '"C:\\Users\\Usuario\\AppData\\Roaming\\Spotify\\Spotify.exe" --autostart',
+    location: "hkcu-run",
+    enabled: true,
+    processName: "Spotify",
+    running: true,
+    memMb: 154,
+    processCount: 2,
   },
   {
     id: "hklm-run:SecurityHealth",
@@ -406,6 +465,10 @@ export const SIMULATED_STARTUP: StartupItem[] = [
     location: "hklm-run",
     enabled: true,
     requiresAdmin: true,
+    processName: "SecurityHealthSystray",
+    running: true,
+    memMb: 18,
+    processCount: 1,
   },
 ];
 
@@ -449,7 +512,7 @@ export const SIMULATED_DISK_USAGE: DiskUsageFolder[] = [
   },
 ];
 
-export const SIMULATED_CLEANER: CleanerItem[] = [
+const SIMULATED_CLEANER: CleanerItem[] = [
   {
     id: "chrome|Pessoal|cache",
     appId: "chrome",
@@ -613,7 +676,7 @@ const demoProgram = (
   ...extra,
 });
 
-export const SIMULATED_PROGRAMS: InstalledProgram[] = [
+const SIMULATED_PROGRAMS: InstalledProgram[] = [
   demoProgram("p1", "7-Zip 24.09 (x64)", "Igor Pavlov", "24.09", 0.005, "2026-02-11"),
   demoProgram("p2", "Adobe Acrobat Reader", "Adobe", "24.5", 1.1, "2026-05-02"),
   demoProgram("p3", "Blender", "Blender Foundation", "4.2", 1.6, "2026-09-18"),
@@ -640,7 +703,7 @@ export const SIMULATED_PROGRAMS: InstalledProgram[] = [
   }),
 ];
 
-export const SIMULATED_LEFTOVERS: LeftoverItem[] = [
+const SIMULATED_LEFTOVERS: LeftoverItem[] = [
   {
     id: "lo-1",
     kind: "folder",
@@ -725,7 +788,11 @@ export async function createRestorePoint(description: string): Promise<RestorePo
   return { ok: true, status: "created", message: "Ponto de restauração criado (demonstração)." };
 }
 
-export async function scanCleaner(): Promise<{ ok: boolean; reason?: string; items: CleanerItem[] }> {
+export async function scanCleaner(): Promise<{
+  ok: boolean;
+  reason?: string;
+  items: CleanerItem[];
+}> {
   const native = getNative();
   if (native?.cleanerScan) return native.cleanerScan();
   await sleep(900);

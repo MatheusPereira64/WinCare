@@ -10,9 +10,10 @@ import { createRestorePoint, getNative, simulateRun } from "@/lib/wincare/bridge
 import { actions, useStore } from "@/lib/wincare/store";
 import { FULL_CHECK_IDS, getTool } from "@/lib/wincare/tools";
 import { formatLog, setExternalRunActive } from "@/lib/wincare/runner";
+import { normalizeCmdText } from "@/lib/wincare/commandFeed";
 import type { LogLine, Tool } from "@/lib/wincare/types";
+import { CommandFeed } from "./CommandFeed";
 import { ConfirmModal } from "./ConfirmModal";
-import { LogView } from "./LogView";
 
 const now = () =>
   new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -58,7 +59,8 @@ export function FullCheckCard() {
   const [withRestorePoint, setWithRestorePoint] = useState(autoRestorePoint);
 
   const push = (text: string, kind: LogLine["kind"] = "output") => {
-    updateCheck({ lines: [...checkState.lines, { time: now(), text, kind }] });
+    const clean = normalizeCmdText(text) || text;
+    updateCheck({ lines: [...checkState.lines, { time: now(), text: clean, kind }] });
   };
 
   const start = async () => {
@@ -177,7 +179,9 @@ export function FullCheckCard() {
         </div>
       )}
 
-      {lines.length > 0 && <LogView lines={lines} className="h-72" />}
+      {lines.length > 0 && (
+        <CommandFeed lines={lines} running={running} toolName={current || "Verificação completa"} />
+      )}
 
       <ConfirmModal
         open={confirming}

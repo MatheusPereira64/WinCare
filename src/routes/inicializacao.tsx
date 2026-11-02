@@ -7,7 +7,8 @@ export const Route = createFileRoute("/inicializacao")({
       { title: "Gerenciador de inicialização | WinCare" },
       {
         name: "description",
-        content: "Veja e desative programas que abrem com o Windows para deixar o PC mais rápido.",
+        content:
+          "Veja o consumo de RAM dos programas que abrem com o Windows e receba recomendações do que desativar para o PC ligar mais rápido.",
       },
       { property: "og:title", content: "Gerenciador de inicialização | WinCare" },
       {

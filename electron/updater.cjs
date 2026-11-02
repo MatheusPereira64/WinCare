@@ -59,7 +59,9 @@ function compareVersions(a, b) {
 }
 
 function stripVersion(tag) {
-  return String(tag || "").replace(/^v/i, "").trim();
+  return String(tag || "")
+    .replace(/^v/i, "")
+    .trim();
 }
 
 function githubHeaders() {
@@ -122,6 +124,14 @@ function pickAsset(release) {
   return assets.find((a) => a && a.name === ASSET_NAME) || null;
 }
 
+/** Escolhe a tag SemVer mais nova (ex.: v1.0.5 > v1.0.4). */
+function pickBestTag(list) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const named = list.filter((t) => t && t.name);
+  if (!named.length) return null;
+  return named.sort((a, b) => compareVersions(stripVersion(b.name), stripVersion(a.name)))[0];
+}
+
 function releaseToInfo(release, currentVersion) {
   const latestVersion = stripVersion(release.tag_name);
   const asset = pickAsset(release);
@@ -148,7 +158,9 @@ function pickBestRelease(list) {
   if (!published.length) return null;
   const stable = published.filter((r) => !r.prerelease);
   const pool = stable.length ? stable : published;
-  return pool.sort((a, b) => compareVersions(stripVersion(b.tag_name), stripVersion(a.tag_name)))[0];
+  return pool.sort((a, b) =>
+    compareVersions(stripVersion(b.tag_name), stripVersion(a.tag_name)),
+  )[0];
 }
 
 function unavailableResult(currentVersion, reason, message) {
@@ -165,7 +177,33 @@ function unavailableResult(currentVersion, reason, message) {
   };
 }
 
+/**
+ * Resolve o release mais novo: primeiro pelas tags do GitHub (SemVer),
+ * depois /releases/latest e, se necessário, a lista de releases.
+ */
 async function fetchLatestRelease() {
+  try {
+    const tags = await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/tags?per_page=20`);
+    const bestTag = pickBestTag(tags);
+    if (bestTag?.name) {
+      try {
+        const release = await githubJson(
+          `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${encodeURIComponent(bestTag.name)}`,
+        );
+        logger.log("updater", "Release resolvido pela tag mais nova", { tag: bestTag.name });
+        return release;
+      } catch (error) {
+        if (!(error instanceof GitHubHttpError) || error.status !== 404) throw error;
+        logger.warn("updater", `Tag ${bestTag.name} sem GitHub Release; tentando /releases/latest`);
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof GitHubHttpError) || ![401, 403, 404].includes(error.status)) {
+      throw error;
+    }
+    logger.warn("updater", "Não foi possível listar tags; caindo para releases/latest");
+  }
+
   try {
     return await githubJson(`/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`);
   } catch (error) {
@@ -221,49 +259,50 @@ function downloadFile(fileUrl, destPath, onProgress) {
         return;
       }
       const client = currentUrl.startsWith("http://") ? http : https;
-      const req = client.get(
-        currentUrl,
-        { headers: { "User-Agent": USER_AGENT } },
-        (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            res.resume();
-            follow(res.headers.location, redirects + 1);
-            return;
-          }
-          if (!res.statusCode || res.statusCode >= 400) {
-            reject(new Error(`Falha no download (HTTP ${res.statusCode || "?"}).`));
-            res.resume();
-            return;
-          }
+      const req = client.get(currentUrl, { headers: { "User-Agent": USER_AGENT } }, (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          res.resume();
+          follow(res.headers.location, redirects + 1);
+          return;
+        }
+        if (!res.statusCode || res.statusCode >= 400) {
+          reject(new Error(`Falha no download (HTTP ${res.statusCode || "?"}).`));
+          res.resume();
+          return;
+        }
 
-          const total = Number(res.headers["content-length"]) || 0;
-          let received = 0;
-          const file = fs.createWriteStream(destPath);
-          res.on("data", (chunk) => {
-            received += chunk.length;
-            if (onProgress && total > 0) {
-              onProgress({
-                phase: "download",
-                percent: Math.min(99, Math.round((received / total) * 100)),
-                received,
-                total,
-              });
-            }
-          });
-          res.pipe(file);
-          file.on("finish", () => {
-            file.close(() => resolve({ received, total }));
-          });
-          file.on("error", (err) => {
-            try {
-              fs.unlinkSync(destPath);
-            } catch {
-              /* ignore */
-            }
-            reject(err);
-          });
-        },
-      );
+        const total = Number(res.headers["content-length"]) || 0;
+        let received = 0;
+        const file = fs.createWriteStream(destPath);
+        res.on("data", (chunk) => {
+          received += chunk.length;
+          if (onProgress && total > 0) {
+            onProgress({
+              phase: "download",
+              percent: Math.min(99, Math.round((received / total) * 100)),
+              received,
+              total,
+            });
+          }
+        });
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close(() => resolve({ received, total }));
+        });
+        file.on("error", (err) => {
+          try {
+            fs.unlinkSync(destPath);
+          } catch {
+            /* ignore */
+          }
+          reject(err);
+        });
+      });
       req.on("error", reject);
     };
     follow(fileUrl, 0);
@@ -355,7 +394,12 @@ async function downloadAndApplyUpdate(onProgress) {
   onProgress?.({ phase: "check", percent: 0 });
   const info = await checkForUpdate();
   if (!info.updateAvailable) {
-    return { ok: false, reason: "up-to-date", message: "Você já está na versão mais recente.", info };
+    return {
+      ok: false,
+      reason: "up-to-date",
+      message: "Você já está na versão mais recente.",
+      info,
+    };
   }
   if (!info.downloadUrl) {
     return {

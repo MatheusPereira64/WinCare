@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Brush } from "lucide-react";
 import { BrowserCleaner } from "@/components/wincare/BrowserCleaner";
+import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import type { ToolCategory } from "@/lib/wincare/types";
 
@@ -13,7 +14,12 @@ function LimpezaPage() {
       icon={Brush}
       subtitle="Libere espaço revisando o que será apagado em navegadores, apps e no sistema."
       categories={CLEANUP_CATEGORIES}
-      leading={<BrowserCleaner />}
+      leading={
+        <>
+          <MemoryOptimizerCard />
+          <BrowserCleaner />
+        </>
+      }
     />
   );
 }

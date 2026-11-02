@@ -14,8 +14,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ChoiceChips } from "@/components/wincare/ChoiceChips";
+import { CommandFeed } from "@/components/wincare/CommandFeed";
 import { EmptyState } from "@/components/wincare/EmptyState";
-import { LogView } from "@/components/wincare/LogView";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { cn } from "@/lib/utils";
 import { actions, useStore } from "@/lib/wincare/store";
@@ -192,7 +192,13 @@ function LogsPage() {
                           <code className="block font-mono text-xs break-all text-muted-foreground">
                             {run.command}
                           </code>
-                          <LogView lines={run.lines} />
+                          <CommandFeed
+                            lines={run.lines}
+                            running={run.status === "running"}
+                            status={run.status}
+                            result={run.result}
+                            toolName={run.toolName}
+                          />
                         </div>
                       )}
                     </li>

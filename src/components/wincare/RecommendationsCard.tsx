@@ -80,7 +80,7 @@ export function RecommendationsCard({
 
   return (
     <Card ref={cardRef} className="surface-panel gap-3 border-border/50 p-5">
-      <h2 className="text-sm font-semibold tracking-tight">Recomendações</h2>
+      <h2 className="text-sm font-semibold tracking-tight">Manutenção</h2>
       {items.length === 0 ? (
         <div className="flex items-center gap-3 py-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/15 text-success">

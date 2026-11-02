@@ -129,7 +129,8 @@ export const TOOLS: Tool[] = [
   {
     id: "temp",
     name: "Limpar arquivos temporários",
-    description: "Remove o conteúdo de %temp% e da pasta Temp do Windows. Arquivos em uso são mantidos.",
+    description:
+      "Remove o conteúdo de %temp% e da pasta Temp do Windows. Arquivos em uso são mantidos.",
     command:
       "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$dirs = @($env:TEMP, (Join-Path $env:WINDIR 'Temp')); function Measure-Temp { ($dirs | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -Force -File -ErrorAction SilentlyContinue } | Measure-Object -Property Length -Sum).Sum }; $before = Measure-Temp; $dirs | ForEach-Object { Get-ChildItem -LiteralPath $_ -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }; $after = Measure-Temp; Write-Output ('Temporarios limpos: ' + [math]::Round(($before - $after) / 1MB, 1) + ' MB liberados.')\"",
     commandPreview: "powershell … remove o conteúdo de %TEMP% e %WINDIR%\\Temp",
@@ -332,7 +333,7 @@ export const TOOLS: Tool[] = [
   },
 
   // ---------------- Redes ----------------
-  // Destinos fixos (sem input controlado). Para host customizado use NetworkProbeCard.
+  // Destinos fixos (sem campo de host livre — no Electron, input nativo travava a UI).
   {
     id: "ping-google",
     name: "Ping — Google DNS",
@@ -553,9 +554,7 @@ export function resolveCommand(tool: Tool, target?: string): string {
   const factor = tool.input.toCommandFactor ?? 1;
   const n = Number(raw.replace(",", "."));
   const value =
-    Number.isFinite(n) && factor !== 1
-      ? String(Math.max(0, Math.round(n * factor)))
-      : raw;
+    Number.isFinite(n) && factor !== 1 ? String(Math.max(0, Math.round(n * factor))) : raw;
 
   return tool.command.replace(/[^ ]+$/, value);
 }

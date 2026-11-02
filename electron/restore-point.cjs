@@ -59,4 +59,4 @@ async function createRestorePoint(description) {
   }
 }
 
-module.exports = { createRestorePoint, restorePointScript, sanitizeDescription };
+module.exports = { createRestorePoint, sanitizeDescription };

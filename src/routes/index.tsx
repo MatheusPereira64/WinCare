@@ -3,10 +3,12 @@ import {
   CircuitBoard,
   Clock,
   LayoutDashboard,
+  Lightbulb,
   Monitor,
   ShieldCheck,
   Star,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -15,10 +17,20 @@ import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { QuickActions, RecommendationsCard } from "@/components/wincare/RecommendationsCard";
+import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
+import {
+  RecommendationList,
+  RecommendationsHeaderLink,
+} from "@/components/wincare/RecommendationList";
+import { Sparkline } from "@/components/wincare/Sparkline";
 import { StatCard } from "@/components/wincare/StatCard";
 import { ToolCard } from "@/components/wincare/ToolCard";
+import { getNative, SIMULATED_DISK_USAGE, SIMULATED_STARTUP } from "@/lib/wincare/bridge";
+import { buildRecommendations } from "@/lib/wincare/intelligence";
+import { useIntel } from "@/lib/wincare/intelligenceStore";
 import { useStore } from "@/lib/wincare/store";
 import { TOOLS } from "@/lib/wincare/tools";
+import type { DiskUsageFolder, StartupItem } from "@/lib/wincare/types";
 import { isSystemInfoLoading, useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/")({
@@ -40,11 +52,62 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+/* Já aparecem no card Manutenção, que olha todas as unidades e a proteção em tempo real. */
+const COVERED_BY_MAINTENANCE = new Set(["defender", "disk-full"]);
+
 function Dashboard() {
   const info = useSystemInfo();
   const disks = useDisks();
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
+  const samples = useIntel((s) => s.samples);
+  const startupNewIds = useIntel((s) => s.startupNewIds);
+  const startupKnown = useIntel((s) => s.startupKnown);
+  const newcomers = useMemo(() => {
+    const ids = new Set(startupNewIds);
+    return startupKnown.filter((k) => ids.has(k.id));
+  }, [startupNewIds, startupKnown]);
+  const [startup, setStartup] = useState<StartupItem[]>([]);
+  const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const native = getNative();
+      try {
+        const [boot, disk] = await Promise.all([
+          native?.listStartup?.() ?? SIMULATED_STARTUP,
+          native?.diskUsage?.() ?? SIMULATED_DISK_USAGE,
+        ]);
+        if (cancelled) return;
+        setStartup(Array.isArray(boot) ? boot : SIMULATED_STARTUP);
+        setFolders(Array.isArray(disk) ? disk : SIMULATED_DISK_USAGE);
+      } catch {
+        if (!cancelled) {
+          setStartup(SIMULATED_STARTUP);
+          setFolders(SIMULATED_DISK_USAGE);
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const recs = useMemo(
+    () =>
+      buildRecommendations({
+        info,
+        startup,
+        folders,
+        newcomers,
+        trend: samples,
+      })
+        .filter((rec) => !COVERED_BY_MAINTENANCE.has(rec.id))
+        .slice(0, 3),
+    [info, startup, folders, newcomers, samples],
+  );
 
   const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
   const healthy = info.health >= 80;
@@ -83,7 +146,10 @@ function Dashboard() {
                 )}
                 {loading ? "Carregando…" : healthy ? "Sistema saudável" : "Requer atenção"}
               </Badge>
-              <Badge variant="outline" className="rounded-full border-border/60 px-3 text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="rounded-full border-border/60 px-3 text-muted-foreground"
+              >
                 <Monitor className="size-3" /> {info.hostname}
               </Badge>
             </div>
@@ -114,35 +180,60 @@ function Dashboard() {
                 hint={`${info.diskTotalGb} GB no total`}
               />
             </div>
+            {samples.length > 3 && (
+              <div className="max-w-md text-primary/80">
+                <p className="text-[11px] text-muted-foreground">Saúde nas últimas horas</p>
+                <Sparkline values={samples.map((s) => s.health)} />
+              </div>
+            )}
           </div>
         </div>
       </Card>
 
+      {recs.length > 0 && (
+        <Card className="surface-panel gap-2 border-border/60 p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <Lightbulb className="size-4" />
+              </span>
+              <h2 className="text-base font-semibold tracking-tight">Recomendações</h2>
+            </div>
+            <RecommendationsHeaderLink />
+          </div>
+          <RecommendationList items={recs} compact />
+        </Card>
+      )}
+
+      <MemoryOptimizerCard compact />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
-            icon={<CircuitBoard className="size-4" />}
-            label="GPU"
-            value={typeof info.gpuUsage === "number" ? `${info.gpuUsage}%` : "—"}
-            hint={[
+        <StatCard
+          icon={<CircuitBoard className="size-4" />}
+          label="GPU"
+          value={typeof info.gpuUsage === "number" ? `${info.gpuUsage}%` : "—"}
+          hint={
+            [
               info.gpuName,
               typeof info.gpuTemperature === "number" ? `${info.gpuTemperature} °C` : null,
             ]
               .filter(Boolean)
-              .join(" · ") || "Sensor indisponível"}
-            progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
-          />
-          <StatCard
-            icon={<Clock className="size-4" />}
-            label="Tempo ligado"
-            value={info.uptime}
-            hint={`Última atualização do Windows: ${info.lastUpdate}`}
-          />
-          <StatCard
-            icon={<ShieldCheck className="size-4" />}
-            label="Windows Defender"
-            value={info.defenderStatus}
-            hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
-          />
+              .join(" · ") || "Sensor indisponível"
+          }
+          progress={typeof info.gpuUsage === "number" ? info.gpuUsage : 0}
+        />
+        <StatCard
+          icon={<Clock className="size-4" />}
+          label="Tempo ligado"
+          value={info.uptime}
+          hint={`Última atualização do Windows: ${info.lastUpdate}`}
+        />
+        <StatCard
+          icon={<ShieldCheck className="size-4" />}
+          label="Windows Defender"
+          value={info.defenderStatus}
+          hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
+        />
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-2">
@@ -174,8 +265,7 @@ function Dashboard() {
 /** Medidor compacto usado dentro do painel hero. */
 function HeroMeter({ label, value, hint }: { label: string; value: number; hint?: string }) {
   const clamped = Math.min(100, Math.max(0, value));
-  const tone =
-    clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
+  const tone = clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
 
   return (
     <div className="space-y-1.5">

@@ -20,12 +20,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
+import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
 import { isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
 import { useActiveRuns } from "@/lib/wincare/runner";
 import type { ToolCategory } from "@/lib/wincare/types";
+import { UpdateAvailableModal } from "@/components/wincare/UpdateAvailableModal";
+import { IntelligenceCollector } from "@/components/wincare/IntelligenceCollector";
+import { PageLoadingOverlay } from "@/components/wincare/PageLoading";
+import { useContentLoading } from "@/lib/wincare/useContentLoading";
 
 function NotFoundComponent() {
   return (
@@ -147,6 +152,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/monitoramento": "Monitoramento",
   "/logs": "Logs",
   "/configuracoes": "Configurações",
+  "/inteligencia": "Inteligência",
 };
 
 const CATEGORY_PAGE: Record<ToolCategory, string> = {
@@ -264,8 +270,35 @@ function TopBar() {
 
 function StartupUpdateCheck() {
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
-  useAppUpdater({ autoCheck: autoCheckUpdates });
-  return null;
+  const { version, info, applying, progress, promptOpen, apply, openReleasePage, dismissPrompt } =
+    useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
+
+  const handleConfirm = () => {
+    if (!info?.canAutoUpdate) {
+      dismissPrompt();
+      void openReleasePage();
+      return;
+    }
+    void apply();
+  };
+
+  return (
+    <UpdateAvailableModal
+      open={promptOpen}
+      currentVersion={info?.currentVersion || version}
+      latestVersion={info?.latestVersion || ""}
+      canAutoUpdate={!!info?.canAutoUpdate}
+      applying={applying}
+      progress={progress}
+      onConfirm={handleConfirm}
+      onCancel={dismissPrompt}
+    />
+  );
+}
+
+function AppLoadingLayer() {
+  const { visible, label } = useContentLoading();
+  return <PageLoadingOverlay visible={visible} label={label} />;
 }
 
 /** Fecha o Sheet mobile e remove locks Radix em toda navegação. */
@@ -290,6 +323,7 @@ function RootComponent() {
   // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
   useEffect(() => {
     hydrateStore();
+    hydrateIntelligence();
   }, []);
 
   useEffect(() => {
@@ -310,16 +344,23 @@ function RootComponent() {
           <AppSidebar />
           <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
             <TopBar />
-            <main className="app-ambient relative z-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
-              <div key={pathname} className="animate-fade-in mx-auto w-full max-w-[1500px]">
-                {/* Required: nested routes render here. */}
-                <Outlet />
+            <main
+              data-wincare-content
+              className="app-ambient relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
+                <div key={pathname} className="animate-fade-in mx-auto w-full max-w-[1500px]">
+                  {/* Required: nested routes render here. */}
+                  <Outlet />
+                </div>
               </div>
+              <AppLoadingLayer />
             </main>
           </div>
         </div>
         <Toaster />
         <StartupUpdateCheck />
+        <IntelligenceCollector />
         <RouteUiGuard />
       </SidebarProvider>
     </QueryClientProvider>

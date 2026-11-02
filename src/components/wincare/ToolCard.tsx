@@ -1,8 +1,6 @@
 import { memo, useState } from "react";
 import {
   Brush,
-  CheckCircle2,
-  ChevronDown,
   Code2,
   Copy,
   ExternalLink,
@@ -15,7 +13,6 @@ import {
   Star,
   Wrench,
   X,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,14 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatLog, useToolRunner, type RunOptions } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
 import { getCommandPreview, resolveCommand, RISK_LABEL } from "@/lib/wincare/tools";
 import type { RunRecord, Tool, ToolCategory } from "@/lib/wincare/types";
 import { ConfirmModal } from "./ConfirmModal";
-import { LogView } from "./LogView";
+import { CommandFeed } from "./CommandFeed";
 
 const riskStyle: Record<string, string> = {
   safe: "border-success/30 bg-success/10 text-success",
@@ -158,9 +154,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
     useToolAction(tool);
   const { isFavorite, toggle } = useFavorite(tool.id);
   const [showCommand, setShowCommand] = useState(false);
-  const [showLogChoice, setShowLogChoice] = useState<boolean | null>(null);
 
-  const logVisible = showLogChoice ?? (state.running || state.status === "error");
   const finished = !state.running && state.status !== "idle";
 
   const copy = async () => {
@@ -257,19 +251,6 @@ function ToolCardInner({ tool }: { tool: Tool }) {
         >
           <Code2 /> Comando
         </Button>
-        {state.lines.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            aria-expanded={logVisible}
-            onClick={() => setShowLogChoice(!logVisible)}
-            className="rounded-full text-muted-foreground"
-          >
-            <ChevronDown className={cn("transition-transform", logVisible && "rotate-180")} />
-            Saída
-          </Button>
-        )}
         {finished && (
           <Button
             type="button"
@@ -279,6 +260,17 @@ function ToolCardInner({ tool }: { tool: Tool }) {
             className="rounded-full text-muted-foreground"
           >
             <Copy /> Copiar
+          </Button>
+        )}
+        {finished && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={reset}
+            className="rounded-full text-muted-foreground"
+          >
+            <X /> Limpar
           </Button>
         )}
       </div>
@@ -292,45 +284,23 @@ function ToolCardInner({ tool }: { tool: Tool }) {
         </code>
       )}
 
+      {state.lines.length > 0 && (
+        <CommandFeed
+          lines={state.lines}
+          running={state.running}
+          status={state.status}
+          result={state.result}
+          toolName={tool.name}
+        />
+      )}
+
       {state.running && (
-        <div className="animate-fade-in space-y-1.5">
-          <Progress value={state.progress} className="h-1.5" />
+        <div className="animate-fade-in">
           <p className="text-xs text-muted-foreground">
             Pode trocar de página: a execução continua em segundo plano.
           </p>
         </div>
       )}
-
-      {finished && state.result && (
-        <div
-          className={cn(
-            "animate-fade-in flex items-start gap-2 rounded-xl border px-3 py-2 text-sm",
-            state.status === "error"
-              ? "border-destructive/30 bg-destructive/10 text-destructive"
-              : "border-success/30 bg-success/10 text-success",
-          )}
-        >
-          {state.status === "error" ? (
-            <XCircle className="mt-0.5 size-4 shrink-0" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-          )}
-          <span className="min-w-0 flex-1 break-words">{state.result}</span>
-          <button
-            type="button"
-            aria-label="Dispensar resultado"
-            onClick={() => {
-              setShowLogChoice(null);
-              reset();
-            }}
-            className="shrink-0 rounded opacity-70 hover:opacity-100"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
-      {logVisible && state.lines.length > 0 && <LogView lines={state.lines} />}
 
       <ToolConfirmModal
         key={String(confirming)}
