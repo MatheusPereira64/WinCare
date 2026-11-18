@@ -34,7 +34,8 @@
     "wincare:dev:debug": "vite build --config vite.electron.config.ts && set WINCARE_DEVTOOLS=1&& set ELECTRON_ENABLE_LOGGING=1&& node scripts/run-electron-dev.cjs",
     "wincare:clear-data": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clear-wincare-data.ps1",
     "wincare:package": "node scripts/package-release.cjs",
-    "wincare:screenshots": "vite build --config vite.electron.config.ts && electron scripts/capture-screenshots.cjs"
+    "wincare:screenshots": "vite build --config vite.electron.config.ts && electron scripts/capture-screenshots.cjs",
+    "wincare:screenshots:responsivo": "vite build --config vite.electron.config.ts && electron scripts/capture-screenshots.cjs --responsivo"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

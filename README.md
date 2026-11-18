@@ -27,11 +27,19 @@ Central de manutenção do Windows com interface moderna. O WinCare reúne diagn
 | --- | --- |
 | ![Gráficos de CPU, memória e discos em tempo real](docs/screenshots/monitoramento.png) | ![Saúde dos discos e análise de espaço](docs/screenshots/disco.png) |
 
-| Sistema | Tema claro |
+| Sistema e bateria | Histórico |
 | --- | --- |
-| ![Atalhos de energia e consoles do Windows](docs/screenshots/sistema.png) | ![Dashboard no tema claro](docs/screenshots/dashboard-claro.png) |
+| ![Saúde da bateria, capacidade ao longo do tempo, dicas de energia e consoles do Windows](docs/screenshots/sistema.png) | ![Histórico de manutenção com espaço liberado, programas removidos e saúde ao longo do tempo](docs/screenshots/historico.png) |
 
-Para regerar as imagens: `npm run wincare:screenshots`.
+| Bandeja e alertas | Primeira execução |
+| --- | --- |
+| ![Opções de bandeja, abrir com o Windows e alertas em segundo plano](docs/screenshots/bandeja-alertas.png) | ![Introdução da primeira execução com o que o WinCare faz e nunca faz](docs/screenshots/primeira-execucao.png) |
+
+| Configurações | Tema claro |
+| --- | --- |
+| ![Preferências, zoom, segurança e atualizações](docs/screenshots/configuracoes.png) | ![Dashboard no tema claro](docs/screenshots/dashboard-claro.png) |
+
+Para regerar as imagens: `npm run wincare:screenshots`. A matriz responsiva (1024×640, 1366×768 e 1920×1080, incluindo os diálogos) fica em [`docs/screenshots/responsivo/`](docs/screenshots/responsivo/) e é gerada com `npm run wincare:screenshots:responsivo`.
 
 ---
 
@@ -114,6 +122,7 @@ npm run wincare:dev
 | `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` para distribuição |
 | `npm run wincare:clear-data` | Limpa histórico salvo localmente |
 | `npm run wincare:screenshots` | Regera as prévias do README (dados simulados) |
+| `npm run wincare:screenshots:responsivo` | Matriz 1024×640, 1366×768 e 1920×1080 em `docs/screenshots/responsivo/` |
 | `npm test` | Testes rápidos: processo principal + lógica e componentes (Vitest) |
 | `npm run test:e2e` | Fluxos principais no Chromium (Playwright, modo demonstração) |
 | `npm run test:visual` | Compara as telas com a linha de base (Playwright no Docker) |
