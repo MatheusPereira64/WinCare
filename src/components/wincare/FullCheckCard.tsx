@@ -3,8 +3,6 @@ import { Copy, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { createRestorePoint, getNative, simulateRun } from "@/lib/wincare/bridge";
 import { actions, useStore } from "@/lib/wincare/store";
@@ -13,6 +11,8 @@ import { formatLog, setExternalRunActive } from "@/lib/wincare/runner";
 import { normalizeCmdText } from "@/lib/wincare/commandFeed";
 import type { LogLine, Tool } from "@/lib/wincare/types";
 import { CommandFeed } from "./CommandFeed";
+import { Panel, PanelHeader } from "./Panel";
+import { CheckboxCard } from "./CheckboxCard";
 import { ConfirmModal } from "./ConfirmModal";
 
 const now = () =>
@@ -66,11 +66,11 @@ export function FullCheckCard() {
   const start = async () => {
     updateCheck({ running: true, progress: 0, lines: [], current: null });
     setExternalRunActive(FULL_CHECK_TOOL, true);
-    push("Iniciando verificação completa do sistema...", "info");
+    push("Iniciando a verificação completa do sistema…", "info");
 
     if (withRestorePoint) {
       updateCheck({ current: "Ponto de restauração" });
-      push("Criando ponto de restauração...", "info");
+      push("Criando ponto de restauração…", "info");
       const point = await createRestorePoint("verificação completa");
       if (!point.ok) {
         push(`Verificação não iniciada: ${point.message ?? "falha no ponto."}`, "error");
@@ -81,7 +81,7 @@ export function FullCheckCard() {
         setExternalRunActive(FULL_CHECK_TOOL, false);
         return;
       }
-      push(point.message ?? "Ponto de restauração pronto.", "success");
+      push(point.message ?? "Ponto de restauração criado.", "success");
     }
 
     const tools = FULL_CHECK_IDS.map(getTool).filter(Boolean);
@@ -97,7 +97,7 @@ export function FullCheckCard() {
           const isAdmin = await native.isElevated();
           elevated = !isAdmin;
           if (elevated) {
-            push("Solicitando elevação via UAC...", "warn");
+            push("Pedindo permissão de administrador (UAC)…", "warn");
           }
         }
         const out = native
@@ -124,7 +124,7 @@ export function FullCheckCard() {
           result: out.result,
         });
       } catch (err) {
-        push(err instanceof Error ? err.message : "Falha na etapa.", "error");
+        push(err instanceof Error ? err.message : "Etapa não concluída.", "error");
       }
       updateCheck({ progress: ((i + 1) / tools.length) * 100 });
     }
@@ -136,43 +136,41 @@ export function FullCheckCard() {
   };
 
   return (
-    <Card className="hero-panel gap-4 border-primary/25 p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/20 text-primary glow-ring">
-            <ShieldCheck className="size-6" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Verificação Completa</h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Executa em sequência SFC, DISM CheckHealth, ScanHealth, RestoreHealth e verificação de
-              disco, com uma única barra de progresso.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setConfirming(true)} disabled={running} className="rounded-full">
-            {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
-            {running ? "Verificando..." : "Iniciar verificação"}
-          </Button>
-          {lines.length > 0 && (
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onClick={async () => {
-                await navigator.clipboard.writeText(formatLog(lines));
-                toast.success("Log copiado");
-              }}
-            >
-              <Copy /> Copiar
+    <Panel padding="lg">
+      <PanelHeader
+        icon={ShieldCheck}
+        title="Verificação completa"
+        description="Executa em sequência SFC, DISM CheckHealth, ScanHealth, RestoreHealth e a verificação de disco, com uma única barra de progresso."
+        actions={
+          <>
+            <Button onClick={() => setConfirming(true)} disabled={running} className="rounded-full">
+              {running ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+              {running ? "Verificando…" : "Iniciar verificação"}
             </Button>
-          )}
-        </div>
-      </div>
+            {lines.length > 0 && (
+              <Button
+                variant="secondary"
+                className="rounded-full"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(formatLog(lines));
+                  toast.success("Log copiado para a área de transferência");
+                }}
+              >
+                <Copy /> Copiar log
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {(running || progress > 0) && (
         <div className="space-y-2">
-          <Progress value={progress} className="h-2" />
+          <Progress
+            value={progress}
+            className="h-2"
+            aria-label="Progresso da verificação completa"
+            aria-valuetext={`${Math.round(progress)}%${current ? `, etapa: ${current}` : ""}`}
+          />
           <p className="text-xs text-muted-foreground">
             {current ? `Etapa atual: ${current}` : "Concluído"} — {Math.round(progress)}%
           </p>
@@ -198,22 +196,14 @@ export function FullCheckCard() {
           levar de 30 minutos a mais de 1 hora; dá para continuar usando o PC.
         </p>
         <p>O Windows pode pedir permissão de administrador em cada etapa.</p>
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
-          <Checkbox
-            checked={withRestorePoint}
-            onCheckedChange={(v) => setWithRestorePoint(v === true)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <ShieldCheck className="size-4 text-success" /> Criar ponto de restauração antes
-            </span>
-            <span className="mt-0.5 block text-xs">
-              Permite desfazer pelo Restaurar Sistema caso algo dê errado.
-            </span>
-          </span>
-        </label>
+        <CheckboxCard
+          checked={withRestorePoint}
+          onCheckedChange={setWithRestorePoint}
+          icon={ShieldCheck}
+          title="Criar ponto de restauração antes"
+          description="Permite desfazer pelo Restaurar Sistema caso algo dê errado."
+        />
       </ConfirmModal>
-    </Card>
+    </Panel>
   );
 }

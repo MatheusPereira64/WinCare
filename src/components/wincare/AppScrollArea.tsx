@@ -8,6 +8,11 @@ type AppScrollAreaProps = React.ComponentPropsWithoutRef<typeof ScrollAreaPrimit
   viewportClassName?: string;
   /** Ref do viewport — útil para auto-scroll (logs). */
   viewportRef?: React.Ref<HTMLDivElement>;
+  /**
+   * Nome da área rolável. Torna o viewport focável (Tab) para rolar com as
+   * setas do teclado e o anuncia como região ao Narrador.
+   */
+  viewportLabel?: string;
 };
 
 /**
@@ -17,7 +22,7 @@ type AppScrollAreaProps = React.ComponentPropsWithoutRef<typeof ScrollAreaPrimit
 const AppScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   AppScrollAreaProps
->(({ className, children, viewportClassName, viewportRef, ...props }, ref) => (
+>(({ className, children, viewportClassName, viewportRef, viewportLabel, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
     type="hover"
@@ -26,8 +31,9 @@ const AppScrollArea = React.forwardRef<
   >
     <ScrollAreaPrimitive.Viewport
       ref={viewportRef}
+      {...(viewportLabel ? { tabIndex: 0, role: "region", "aria-label": viewportLabel } : {})}
       className={cn(
-        "h-full w-full rounded-[inherit] outline-none [&>div]:!block [&>div]:!min-w-0",
+        "h-full w-full rounded-[inherit] outline-none focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&>div]:!block [&>div]:!min-w-0",
         viewportClassName,
       )}
     >

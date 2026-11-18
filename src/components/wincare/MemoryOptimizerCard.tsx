@@ -3,14 +3,17 @@ import { Loader2, MemoryStick, Shield, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { getNative, isNative, type MemoryOptimizeResult } from "@/lib/wincare/bridge";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useSystemInfo } from "@/lib/wincare/useSystem";
 import { cn } from "@/lib/utils";
+import { formatDecimal, formatGb } from "@/lib/wincare/format";
+import { TONE_TEXT, usageTone } from "@/lib/wincare/tone";
+import { Panel, PanelHeader } from "./Panel";
+import { StatusBadge } from "./StatusBadge";
 
 function formatGbFromMb(mb: number) {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  if (mb >= 1024) return `${formatDecimal(mb / 1024)} GB`;
   return `${Math.round(mb)} MB`;
 }
 
@@ -58,12 +61,12 @@ export function MemoryOptimizerCard({ compact = false }: { compact?: boolean }) 
       ? info.memoryUsedGb
       : (info.memoryUsage / 100) * (info.memoryTotalGb || 0);
 
-  const tone = usedPct >= 85 ? "text-destructive" : usedPct >= 70 ? "text-warning" : "text-primary";
+  const tone = TONE_TEXT[usageTone(usedPct)];
 
   const hint = useMemo(() => {
-    if (!native) return "Demonstração — no app desktop isso libera RAM de verdade.";
+    if (!native) return "Demonstração — no app desktop isso libera memória de verdade.";
     if (!elevated) return "Como administrador, também limpa a lista de espera do Windows.";
-    return "Reduz o working set dos processos e a lista de espera. Não fecha programas.";
+    return "Reduz a memória reservada pelos processos e a lista de espera. Não fecha programas.";
   }, [elevated, native]);
 
   const run = async () => {
@@ -86,31 +89,30 @@ export function MemoryOptimizerCard({ compact = false }: { compact?: boolean }) 
         toast.error(result.message || "Não foi possível otimizar a memória.");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Falha ao otimizar a memória.");
+      toast.error("Não foi possível otimizar a memória.", {
+        description: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Card className={cn("surface-panel border-border/60", compact ? "gap-3 p-4" : "gap-4 p-5")}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <MemoryStick className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight">Otimizar memória</h2>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>
-          </div>
-        </div>
-        {native && elevated && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">
-            <Shield className="size-3" />
-            Admin
-          </span>
-        )}
-      </div>
+    <Panel padding={compact ? "sm" : "md"} className={compact ? "gap-3" : undefined}>
+      <PanelHeader
+        icon={MemoryStick}
+        size="sm"
+        title="Otimizar memória"
+        badges={
+          native &&
+          elevated && (
+            <StatusBadge tone="success">
+              <Shield aria-hidden className="size-3" /> Administrador
+            </StatusBadge>
+          )
+        }
+        description={hint}
+      />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -119,7 +121,7 @@ export function MemoryOptimizerCard({ compact = false }: { compact?: boolean }) 
             <span className="text-lg text-muted-foreground">%</span>
           </p>
           <p className="text-xs text-muted-foreground">
-            {usedGb.toFixed(1)} / {info.memoryTotalGb || "—"} GB em uso
+            {formatGb(usedGb)} de {info.memoryTotalGb || "—"} GB em uso
           </p>
         </div>
         <Button
@@ -147,6 +149,6 @@ export function MemoryOptimizerCard({ compact = false }: { compact?: boolean }) 
           )}
         </p>
       )}
-    </Card>
+    </Panel>
   );
 }

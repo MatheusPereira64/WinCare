@@ -1,36 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  CircuitBoard,
-  Clock,
-  LayoutDashboard,
-  Lightbulb,
-  Monitor,
-  ShieldCheck,
-  Star,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CircuitBoard, Clock, LayoutDashboard, Monitor, ShieldCheck, Star } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { BatteryStatCard } from "@/components/wincare/BatteryStatCard";
 import { DiagnosticReportCard } from "@/components/wincare/DiagnosticReport";
 import { FullCheckCard } from "@/components/wincare/FullCheckCard";
 import { HealthRing } from "@/components/wincare/HealthRing";
-import { PageHeader } from "@/components/wincare/PageHeader";
-import { QuickActions, RecommendationsCard } from "@/components/wincare/RecommendationsCard";
+import { HistoryHighlights } from "@/components/wincare/HistoryHighlights";
 import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
-import {
-  RecommendationList,
-  RecommendationsHeaderLink,
-} from "@/components/wincare/RecommendationList";
+import { PageHeader } from "@/components/wincare/PageHeader";
+import { Panel } from "@/components/wincare/Panel";
+import { QuickActions } from "@/components/wincare/QuickActions";
+import { RecommendationsPanel } from "@/components/wincare/Recommendations";
 import { Sparkline } from "@/components/wincare/Sparkline";
 import { StatCard } from "@/components/wincare/StatCard";
+import { StatusBadge } from "@/components/wincare/StatusBadge";
 import { ToolCard } from "@/components/wincare/ToolCard";
-import { getNative, SIMULATED_DISK_USAGE, SIMULATED_STARTUP } from "@/lib/wincare/bridge";
-import { buildRecommendations } from "@/lib/wincare/intelligence";
+import { summarizeBattery } from "@/lib/wincare/battery";
+import { cn } from "@/lib/utils";
 import { useIntel } from "@/lib/wincare/intelligenceStore";
+import { useBatteryReport } from "@/lib/wincare/systemData";
 import { useStore } from "@/lib/wincare/store";
+import { TONE_FILL, usageTone } from "@/lib/wincare/tone";
+import { formatGb } from "@/lib/wincare/format";
 import { TOOLS } from "@/lib/wincare/tools";
-import type { DiskUsageFolder, StartupItem } from "@/lib/wincare/types";
 import { isSystemInfoLoading, useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/")({
@@ -52,62 +44,14 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-/* Já aparecem no card Manutenção, que olha todas as unidades e a proteção em tempo real. */
-const COVERED_BY_MAINTENANCE = new Set(["defender", "disk-full"]);
-
 function Dashboard() {
   const info = useSystemInfo();
+  const battery = useBatteryReport();
+  const hasBattery = !!(battery && summarizeBattery(battery));
   const disks = useDisks();
   const loading = isSystemInfoLoading(info);
   const favorites = useStore((s) => s.favorites);
   const samples = useIntel((s) => s.samples);
-  const startupNewIds = useIntel((s) => s.startupNewIds);
-  const startupKnown = useIntel((s) => s.startupKnown);
-  const newcomers = useMemo(() => {
-    const ids = new Set(startupNewIds);
-    return startupKnown.filter((k) => ids.has(k.id));
-  }, [startupNewIds, startupKnown]);
-  const [startup, setStartup] = useState<StartupItem[]>([]);
-  const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const native = getNative();
-      try {
-        const [boot, disk] = await Promise.all([
-          native?.listStartup?.() ?? SIMULATED_STARTUP,
-          native?.diskUsage?.() ?? SIMULATED_DISK_USAGE,
-        ]);
-        if (cancelled) return;
-        setStartup(Array.isArray(boot) ? boot : SIMULATED_STARTUP);
-        setFolders(Array.isArray(disk) ? disk : SIMULATED_DISK_USAGE);
-      } catch {
-        if (!cancelled) {
-          setStartup(SIMULATED_STARTUP);
-          setFolders(SIMULATED_DISK_USAGE);
-        }
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const recs = useMemo(
-    () =>
-      buildRecommendations({
-        info,
-        startup,
-        folders,
-        newcomers,
-        trend: samples,
-      })
-        .filter((rec) => !COVERED_BY_MAINTENANCE.has(rec.id))
-        .slice(0, 3),
-    [info, startup, folders, newcomers, samples],
-  );
 
   const favoriteTools = TOOLS.filter((t) => favorites.includes(t.id));
   const healthy = info.health >= 80;
@@ -124,40 +68,27 @@ function Dashboard() {
         }
       />
 
-      <Card className="hero-panel border-border/50 p-6 sm:p-8">
-        <div className="flex flex-wrap items-center gap-8">
+      <Panel variant="hero" className="@2xl/main:p-8">
+        {/* Estreito: anel em cima, centralizado; com espaço, lado a lado. */}
+        <div className="flex flex-col items-center gap-6 @xl/main:flex-row @xl/main:gap-8">
           <HealthRing value={info.health} loading={loading} />
-          <div className="min-w-0 flex-1 space-y-4">
+          <div className="@container/hero w-full min-w-0 flex-1 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant="outline"
-                className={
-                  loading
-                    ? "rounded-full border-border/60 px-3 text-muted-foreground"
-                    : healthy
-                      ? "rounded-full border-success/30 bg-success/10 px-3 text-success"
-                      : "rounded-full border-warning/30 bg-warning/10 px-3 text-warning"
-                }
+              <StatusBadge
+                dot={!loading}
+                tone={loading ? "neutral" : healthy ? "success" : "warning"}
               >
-                {!loading && (
-                  <span
-                    className={`size-1.5 rounded-full ${healthy ? "bg-success" : "bg-warning"}`}
-                  />
-                )}
-                {loading ? "Carregando…" : healthy ? "Sistema saudável" : "Requer atenção"}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="rounded-full border-border/60 px-3 text-muted-foreground"
-              >
-                <Monitor className="size-3" /> {info.hostname}
-              </Badge>
+                {loading ? "Lendo…" : healthy ? "Sistema saudável" : "Requer atenção"}
+              </StatusBadge>
+              <StatusBadge>
+                <Monitor className="size-3" aria-hidden /> {info.hostname}
+              </StatusBadge>
             </div>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              {info.osName} — Build {info.build}. Ligado há {info.uptime}. Última atualização do
+              {info.osName} — build {info.build}. Ligado há {info.uptime}. Última atualização do
               Windows: {info.lastUpdate}.
             </p>
-            <div className="grid max-w-2xl gap-x-8 gap-y-3 sm:grid-cols-3">
+            <div className="grid max-w-2xl gap-x-6 gap-y-3 @sm/hero:grid-cols-3 @lg/hero:gap-x-8">
               <HeroMeter
                 label="CPU"
                 value={info.cpuUsage}
@@ -170,7 +101,7 @@ function Dashboard() {
                 value={info.memoryUsage}
                 hint={
                   typeof info.memoryUsedGb === "number"
-                    ? `${info.memoryUsedGb} de ${info.memoryTotalGb} GB`
+                    ? `${formatGb(info.memoryUsedGb)} de ${info.memoryTotalGb} GB`
                     : `${info.memoryTotalGb} GB instalados`
                 }
               />
@@ -181,33 +112,27 @@ function Dashboard() {
               />
             </div>
             {samples.length > 3 && (
-              <div className="max-w-md text-primary/80">
+              <div className="max-w-md text-primary">
                 <p className="text-[11px] text-muted-foreground">Saúde nas últimas horas</p>
-                <Sparkline values={samples.map((s) => s.health)} />
+                <Sparkline values={samples.map((s) => s.health)} label="Saúde nas últimas horas" />
               </div>
             )}
           </div>
         </div>
-      </Card>
+      </Panel>
 
-      {recs.length > 0 && (
-        <Card className="surface-panel gap-2 border-border/60 p-5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
-                <Lightbulb className="size-4" />
-              </span>
-              <h2 className="text-base font-semibold tracking-tight">Recomendações</h2>
-            </div>
-            <RecommendationsHeaderLink />
-          </div>
-          <RecommendationList items={recs} compact />
-        </Card>
-      )}
+      <RecommendationsPanel variant="compact" info={info} />
 
       <MemoryOptimizerCard compact />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Com bateria são quatro cards (2 × 2 ou uma linha); sem, três (o último ocupa a linha em 2 colunas). */}
+      <div
+        className={cn(
+          "grid gap-4 @xl/main:grid-cols-2",
+          // Quatro em linha só com folga; senão 2 × 2 (os textos dos cards não cabem em 1/4).
+          hasBattery ? "@7xl/main:grid-cols-4" : "@4xl/main:grid-cols-3",
+        )}
+      >
         <StatCard
           icon={<CircuitBoard className="size-4" />}
           label="GPU"
@@ -232,14 +157,16 @@ function Dashboard() {
           icon={<ShieldCheck className="size-4" />}
           label="Windows Defender"
           value={info.defenderStatus}
-          hint={info.simulated ? "Dados simulados no modo demonstração" : "Dados nativos"}
+          hint={info.simulated ? "Dados simulados no modo demonstração" : "Lido agora no Windows"}
+          // Em duas colunas, o terceiro card ocupa a linha inteira em vez de ficar sozinho.
+          className={hasBattery ? undefined : "@xl/main:col-span-2 @4xl/main:col-span-1"}
         />
+        <BatteryStatCard />
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <RecommendationsCard system={info} disks={disks} loading={loading} />
-        <QuickActions />
-      </div>
+      <QuickActions />
+
+      <HistoryHighlights />
 
       <FullCheckCard />
 
@@ -248,10 +175,10 @@ function Dashboard() {
       {favoriteTools.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <Star className="size-4 text-warning" />
+            <Star className="size-4 text-warning" aria-hidden />
             <h2 className="text-lg font-semibold">Favoritos</h2>
           </div>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 @4xl/main:grid-cols-2">
             {favoriteTools.map((tool) => (
               <ToolCard key={tool.id} tool={tool} />
             ))}
@@ -265,7 +192,7 @@ function Dashboard() {
 /** Medidor compacto usado dentro do painel hero. */
 function HeroMeter({ label, value, hint }: { label: string; value: number; hint?: string }) {
   const clamped = Math.min(100, Math.max(0, value));
-  const tone = clamped >= 90 ? "bg-destructive" : clamped >= 75 ? "bg-warning" : "bg-primary";
+  const tone = TONE_FILL[usageTone(clamped)];
 
   return (
     <div className="space-y-1.5">
@@ -273,9 +200,17 @@ function HeroMeter({ label, value, hint }: { label: string; value: number; hint?
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         <span className="text-sm font-semibold tabular-nums">{clamped}%</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+      <div
+        role="progressbar"
+        aria-label={`Uso de ${label}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={clamped}
+        aria-valuetext={`${clamped}%${hint ? `, ${hint}` : ""}`}
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60 forced-colors:border forced-colors:border-[CanvasText]"
+      >
         <div
-          className={`h-full rounded-full transition-all duration-500 ${tone}`}
+          className={`h-full rounded-full transition-all duration-500 forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight] ${tone}`}
           style={{ width: `${clamped}%` }}
         />
       </div>

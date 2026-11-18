@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
+import { BatteryCard } from "@/components/wincare/BatteryCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
 
 export const Route = createFileRoute("/sistema")({
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/sistema")({
       icon={Gauge}
       subtitle="Energia do PC e acesso rápido às consoles administrativas do Windows."
       categories={["system"]}
+      leading={<BatteryCard />}
     />
   ),
 });

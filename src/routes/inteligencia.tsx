@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Brain, Lightbulb } from "lucide-react";
+import { Brain } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/wincare/PageHeader";
 import { GamingSessionCard, SystemProfilesCard } from "@/components/wincare/SystemProfilesCard";
 import { HealthTimelineCard, SnapshotCompareCard } from "@/components/wincare/HealthTimelineCard";
-import { RecommendationList } from "@/components/wincare/RecommendationList";
+import { RecommendationsPanel } from "@/components/wincare/Recommendations";
 import { SymptomDiagnosis } from "@/components/wincare/SymptomDiagnosis";
 import { getNative, isNative, SIMULATED_DISK_USAGE, SIMULATED_STARTUP } from "@/lib/wincare/bridge";
-import { buildRecommendations } from "@/lib/wincare/intelligence";
 import { hydrateIntelligence, useIntel } from "@/lib/wincare/intelligenceStore";
+import { handleRovingKeyDown } from "@/lib/wincare/roving";
+import { loadDiskUsageFolders, loadStartupItems } from "@/lib/wincare/systemData";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import type { DiskUsageFolder, StartupItem, TopProcess } from "@/lib/wincare/types";
 import { useSystemInfo } from "@/lib/wincare/useSystem";
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/inteligencia")({
 type Tab = "saude" | "diagnostico" | "perfis";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "saude", label: "Saúde e snapshots" },
+  { id: "saude", label: "Saúde e capturas" },
   { id: "diagnostico", label: "Diagnóstico" },
   { id: "perfis", label: "Perfis e jogos" },
 ];
@@ -46,23 +47,35 @@ const SIM_PROCESSES: TopProcess[] = [
 function IntelligencePage() {
   const info = useSystemInfo(8000);
   const samples = useIntel((s) => s.samples);
-  const startupNewIds = useIntel((s) => s.startupNewIds);
   const startupKnown = useIntel((s) => s.startupKnown);
-  const newcomers = useMemo(() => {
-    const ids = new Set(startupNewIds);
-    return startupKnown.filter((k) => ids.has(k.id));
-  }, [startupNewIds, startupKnown]);
   const [tab, setTab] = useState<Tab>("saude");
+  const tabsId = useId();
   const [folders, setFolders] = useState<DiskUsageFolder[]>([]);
   const [processes, setProcesses] = useState<TopProcess[]>([]);
 
-  /**
-   * Não chama listStartup/diskUsage/topProcesses ao montar.
-   * No Electron, listStartup extrai ícones no processo principal e diskUsage
-   * varre pastas — os dois travam cliques assim que a aba abre.
-   * O coletor já preenche startupKnown; diagnóstico pesado só na sub-aba.
+  const [startupFull, setStartupFull] = useState<StartupItem[] | null>(null);
+
+  /*
+   * Leituras pesadas (ícones da inicialização, varredura de pastas) vêm do cache
+   * compartilhado com o Dashboard e começam um pouco depois de a aba abrir.
+   * Até chegarem, usa a lista do coletor (sem uso de memória).
    */
+  useEffect(() => {
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void loadStartupItems().then(
+        (items) => !cancelled && setStartupFull(items),
+        () => {},
+      );
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, []);
+
   const startup = useMemo<StartupItem[]>(() => {
+    if (startupFull) return startupFull;
     if (startupKnown.length > 0) {
       return startupKnown.map((item) => ({
         id: item.id,
@@ -73,7 +86,7 @@ function IntelligencePage() {
       }));
     }
     return isNative() ? [] : SIMULATED_STARTUP;
-  }, [startupKnown]);
+  }, [startupFull, startupKnown]);
 
   useEffect(() => {
     hydrateIntelligence();
@@ -95,7 +108,7 @@ function IntelligencePage() {
       const native = getNative();
       try {
         const [disk, top] = await Promise.all([
-          native?.diskUsage?.() ?? SIMULATED_DISK_USAGE,
+          loadDiskUsageFolders(),
           native?.topProcesses?.() ?? (isNative() ? [] : SIM_PROCESSES),
         ]);
         if (cancelled) return;
@@ -116,33 +129,31 @@ function IntelligencePage() {
     };
   }, [tab]);
 
-  const recs = useMemo(
-    () =>
-      buildRecommendations({
-        info,
-        startup,
-        folders,
-        newcomers,
-        trend: samples,
-      }),
-    [info, startup, folders, newcomers, samples],
-  );
-
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Inteligência</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Histórico, recomendações com base no seu PC, diagnóstico por sintoma e perfis de uso.
-        </p>
-      </header>
+      <PageHeader
+        icon={Brain}
+        title="Inteligência"
+        subtitle="Histórico, recomendações com base no seu PC, diagnóstico por sintoma e perfis de uso."
+      />
 
-      <div className="flex flex-wrap gap-1.5">
+      {/* Abas (WAI-ARIA): só a aba ativa no Tab; setas/Home/End trocam. */}
+      <div
+        role="tablist"
+        aria-label="Seções da Inteligência"
+        className="flex flex-wrap gap-1.5"
+        onKeyDown={(e) => handleRovingKeyDown(e, "[role=tab]")}
+      >
         {TABS.map((item) => (
           <Button
             key={item.id}
             type="button"
             size="sm"
+            role="tab"
+            id={`${tabsId}-tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`${tabsId}-panel`}
+            tabIndex={tab === item.id ? 0 : -1}
             variant={tab === item.id ? "default" : "outline"}
             className="rounded-full"
             onClick={() => setTab(item.id)}
@@ -152,40 +163,34 @@ function IntelligencePage() {
         ))}
       </div>
 
-      {tab === "saude" && (
-        <div className="space-y-4">
-          <HealthTimelineCard samples={samples} />
-          <Card className="surface-panel gap-2 border-border/60 p-5">
-            <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
-                <Lightbulb className="size-4" />
-              </span>
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">Recomendações</h2>
-                <p className="text-xs text-muted-foreground">
-                  Com base em CPU, RAM, disco, boot e tendência de saúde.
-                </p>
-              </div>
-            </div>
-            <RecommendationList items={recs} />
-          </Card>
-          <SnapshotCompareCard info={info} startup={startup} processes={processes} />
-        </div>
-      )}
+      <div
+        role="tabpanel"
+        id={`${tabsId}-panel`}
+        aria-labelledby={`${tabsId}-tab-${tab}`}
+        className="space-y-4"
+      >
+        {tab === "saude" && (
+          <div className="space-y-4">
+            <HealthTimelineCard samples={samples} />
+            <RecommendationsPanel variant="full" info={info} />
+            <SnapshotCompareCard info={info} startup={startup} processes={processes} />
+          </div>
+        )}
 
-      {tab === "diagnostico" && (
-        <SymptomDiagnosis info={info} startup={startup} folders={folders} processes={processes} />
-      )}
+        {tab === "diagnostico" && (
+          <SymptomDiagnosis info={info} startup={startup} folders={folders} processes={processes} />
+        )}
 
-      {tab === "perfis" && (
-        <div className="space-y-4">
-          <SystemProfilesCard />
-          <GamingSessionCard />
-        </div>
-      )}
+        {tab === "perfis" && (
+          <div className="space-y-4">
+            <SystemProfilesCard />
+            <GamingSessionCard />
+          </div>
+        )}
+      </div>
 
       <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Brain className="size-3.5" />
+        <Brain className="size-3.5 shrink-0" />
         Arquivos grandes ficam na aba Disco. Mudanças no boot aparecem em Inicialização.
       </p>
     </div>

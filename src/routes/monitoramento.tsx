@@ -5,12 +5,17 @@ import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { AppScrollArea } from "@/components/wincare/AppScrollArea";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
+import { Panel } from "@/components/wincare/Panel";
+import { EmptyState } from "@/components/wincare/States";
+import { StatCard } from "@/components/wincare/StatCard";
 import { getNative } from "@/lib/wincare/bridge";
+import { formatGb } from "@/lib/wincare/format";
+import { pageHidden } from "@/lib/wincare/pageVisibility";
 import type { TopProcess } from "@/lib/wincare/types";
+import { useStore } from "@/lib/wincare/store";
 import { useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/monitoramento")({
@@ -44,7 +49,27 @@ const SIM_PROCESSES: TopProcess[] = [
   { name: "WinCare", pid: 4412, cpu: 2.1, memMb: 168 },
 ];
 
-function chartTheme(overrides: ApexOptions = {}): ApexOptions {
+/*
+ * Cores dos textos dos gráficos por tema (ApexCharts precisa de cor literal):
+ * mesmos tons de --muted-foreground / --foreground, >= 4.5:1 nos cards.
+ */
+const CHART_TEXT = {
+  dark: { muted: "#9aa2ae", strong: "#f1f4f7", grid: "rgba(148, 163, 184, 0.18)" },
+  light: { muted: "#545b66", strong: "#11161f", grid: "rgba(71, 85, 105, 0.18)" },
+} as const;
+
+type ChartMode = keyof typeof CHART_TEXT;
+
+/** Resumo em texto de uma série (o gráfico em si fica oculto para o leitor de tela). */
+function describeSeries(label: string, values: number[]) {
+  if (values.length === 0) return `${label}: sem dados ainda.`;
+  const now = values[values.length - 1];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return `${label} agora em ${now}%. Nas últimas ${values.length} leituras: mínimo ${min}%, máximo ${max}%.`;
+}
+
+function chartTheme(mode: ChartMode, overrides: ApexOptions = {}): ApexOptions {
   // Defaults por último nas chaves aninhadas — evita que `...overrides` no fim
   // apague toolbar:false e outros defaults (bug que deixava o zoom do ApexCharts aparecer).
   return {
@@ -53,30 +78,35 @@ function chartTheme(overrides: ApexOptions = {}): ApexOptions {
       background: "transparent",
       animations: { enabled: true, speed: 400 },
       fontFamily: "inherit",
+      // A camada acessível do Apex é em inglês e deixa o SVG/legenda no Tab;
+      // os gráficos ficam ocultos e cada um tem um resumo em texto em português.
+      accessibility: { enabled: false },
       ...overrides.chart,
       toolbar: { show: false, ...overrides.chart?.toolbar },
       zoom: { enabled: false, ...overrides.chart?.zoom },
     },
-    theme: { mode: "dark", ...overrides.theme },
+    theme: { mode, ...overrides.theme },
     grid: {
-      borderColor: "rgba(148, 163, 184, 0.18)",
+      borderColor: CHART_TEXT[mode].grid,
       strokeDashArray: 4,
       ...overrides.grid,
     },
     dataLabels: { enabled: false, ...overrides.dataLabels },
     stroke: { curve: "smooth", width: 2, ...overrides.stroke },
     tooltip: {
-      theme: "dark",
+      theme: mode,
       ...overrides.tooltip,
     },
     legend: {
-      labels: { colors: "#94a3b8" },
+      labels: { colors: CHART_TEXT[mode].muted },
       ...overrides.legend,
     },
   };
 }
 
 function MonitorPage() {
+  const mode: ChartMode = useStore((s) => s.theme);
+  const text = CHART_TEXT[mode];
   const info = useSystemInfo(2000);
   const disks = useDisks();
   const [data, setData] = useState<Point[]>([]);
@@ -115,7 +145,9 @@ function MonitorPage() {
 
   useEffect(() => {
     void refreshProcesses();
-    const id = setInterval(() => void refreshProcesses(), 8000);
+    const id = setInterval(() => {
+      if (!pageHidden()) void refreshProcesses();
+    }, 8000);
     return () => clearInterval(id);
   }, []);
 
@@ -125,17 +157,17 @@ function MonitorPage() {
 
   const radialOptions = useMemo(
     () =>
-      chartTheme({
+      chartTheme(mode, {
         chart: { type: "radialBar" },
         plotOptions: {
           radialBar: {
             hollow: { size: "42%" },
             track: { background: "rgba(148,163,184,0.12)", margin: 6 },
             dataLabels: {
-              name: { show: true, color: "#94a3b8", fontSize: "12px", offsetY: -8 },
+              name: { show: true, color: text.muted, fontSize: "12px", offsetY: -8 },
               value: {
                 show: true,
-                color: "#e2e8f0",
+                color: text.strong,
                 fontSize: "20px",
                 fontWeight: 600,
                 offsetY: 2,
@@ -144,7 +176,7 @@ function MonitorPage() {
               total: {
                 show: true,
                 label: "Saúde",
-                color: "#94a3b8",
+                color: text.muted,
                 fontSize: "12px",
                 formatter: () => `${Math.round(info.health)}`,
               },
@@ -155,12 +187,12 @@ function MonitorPage() {
         colors: ["#548dfc", "#43c6f5", "#a78bfa"],
         legend: { show: false },
       }),
-    [info.health],
+    [info.health, mode, text],
   );
 
   const areaCpuOptions = useMemo(
     () =>
-      chartTheme({
+      chartTheme(mode, {
         chart: { type: "area", sparkline: { enabled: false } },
         colors: ["#548dfc"],
         fill: {
@@ -170,7 +202,7 @@ function MonitorPage() {
         xaxis: {
           categories,
           labels: {
-            style: { colors: "#64748b", fontSize: "10px" },
+            style: { colors: text.muted, fontSize: "10px" },
             rotate: 0,
             hideOverlappingLabels: true,
           },
@@ -180,15 +212,15 @@ function MonitorPage() {
         yaxis: {
           min: 0,
           max: 100,
-          labels: { style: { colors: "#64748b", fontSize: "11px" }, formatter: (v) => `${v}%` },
+          labels: { style: { colors: text.muted, fontSize: "11px" }, formatter: (v) => `${v}%` },
         },
       }),
-    [categories],
+    [categories, mode, text],
   );
 
   const areaMemOptions = useMemo(
     () =>
-      chartTheme({
+      chartTheme(mode, {
         chart: { type: "area" },
         colors: ["#43c6f5"],
         fill: {
@@ -198,7 +230,7 @@ function MonitorPage() {
         xaxis: {
           categories,
           labels: {
-            style: { colors: "#64748b", fontSize: "10px" },
+            style: { colors: text.muted, fontSize: "10px" },
             rotate: 0,
             hideOverlappingLabels: true,
           },
@@ -208,27 +240,27 @@ function MonitorPage() {
         yaxis: {
           min: 0,
           max: 100,
-          labels: { style: { colors: "#64748b", fontSize: "11px" }, formatter: (v) => `${v}%` },
+          labels: { style: { colors: text.muted, fontSize: "11px" }, formatter: (v) => `${v}%` },
         },
       }),
-    [categories],
+    [categories, mode, text],
   );
 
   const diskBarOptions = useMemo(
     () =>
-      chartTheme({
+      chartTheme(mode, {
         chart: { type: "bar", stacked: false },
         plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: "55%" } },
         colors: ["#fbbf24", "#2e3650"],
         xaxis: {
           categories: disks.map((d) => d.letter),
           max: 100,
-          labels: { style: { colors: "#64748b" }, formatter: (v) => `${v}%` },
+          labels: { style: { colors: text.muted }, formatter: (v) => `${v}%` },
         },
-        yaxis: { labels: { style: { colors: "#94a3b8" } } },
+        yaxis: { labels: { style: { colors: text.muted } } },
         legend: { show: true },
       }),
-    [disks],
+    [disks, mode, text],
   );
 
   const diskBarSeries = useMemo(() => {
@@ -255,39 +287,41 @@ function MonitorPage() {
 
       <MemoryOptimizerCard />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricTile
-          icon={Cpu}
+      <div className="grid gap-4 @sm/main:grid-cols-2 @4xl/main:grid-cols-4">
+        <StatCard
+          icon={<Cpu className="size-4" />}
           label="CPU"
           value={`${info.cpuUsage}%`}
           hint={info.osName || "Processador"}
         />
-        <MetricTile
-          icon={MemoryStick}
+        <StatCard
+          icon={<MemoryStick className="size-4" />}
           label="Memória"
           value={`${info.memoryUsage}%`}
-          hint={`${info.memoryTotalGb} GB total`}
+          hint={`${info.memoryTotalGb} GB no total`}
         />
-        <MetricTile
-          icon={HardDrive}
+        <StatCard
+          icon={<HardDrive className="size-4" />}
           label="Disco C:"
           value={`${info.diskUsage}%`}
-          hint={`${info.diskTotalGb} GB total`}
+          hint={`${info.diskTotalGb} GB no total`}
         />
-        <MetricTile
-          icon={Activity}
+        <StatCard
+          icon={<Activity className="size-4" />}
           label="Saúde"
           value={`${info.health}`}
-          hint={`Uptime ${info.uptime}`}
+          hint={`Ligado há ${info.uptime}`}
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-        <Card className="surface-panel border-border/50 p-4">
-          <p className="mb-1 text-sm font-medium">Visão geral</p>
+      <div className="grid gap-4 @5xl/main:grid-cols-[340px_1fr]">
+        <Panel padding="sm" className="@container/overview gap-0">
+          <h2 className="mb-1 text-sm font-medium">Visão geral</h2>
           <p className="mb-2 text-xs text-muted-foreground">Uso atual dos principais recursos</p>
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
+          {/* Na coluna estreita a legenda vira uma linha de 3 abaixo do gráfico. */}
+          <div className="flex flex-col items-stretch gap-3 @md/overview:flex-row @md/overview:items-center">
+            {/* Os mesmos números estão na legenda ao lado (lida pelo Narrador). */}
+            <div className="min-w-0 flex-1" aria-hidden>
               <Chart
                 type="radialBar"
                 height={230}
@@ -295,7 +329,10 @@ function MonitorPage() {
                 series={[info.cpuUsage, info.memoryUsage, info.diskUsage]}
               />
             </div>
-            <ul className="flex w-full shrink-0 flex-col gap-2.5 sm:w-[132px]">
+            <ul
+              aria-label="Uso atual"
+              className="grid w-full shrink-0 grid-cols-3 gap-2 @md/overview:flex @md/overview:w-[132px] @md/overview:flex-col @md/overview:gap-2.5"
+            >
               <OverviewLegend
                 color="#548dfc"
                 label="CPU"
@@ -312,7 +349,7 @@ function MonitorPage() {
                 value={`${info.memoryUsage}%`}
                 hint={
                   typeof info.memoryUsedGb === "number"
-                    ? `${info.memoryUsedGb}/${info.memoryTotalGb} GB`
+                    ? `${formatGb(info.memoryUsedGb)} de ${info.memoryTotalGb} GB`
                     : `${info.memoryTotalGb} GB`
                 }
               />
@@ -324,36 +361,57 @@ function MonitorPage() {
               />
             </ul>
           </div>
-        </Card>
+        </Panel>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="surface-panel border-border/50 p-4">
-            <p className="mb-2 text-sm font-medium">CPU ao longo do tempo</p>
-            <Chart type="area" height={240} options={areaCpuOptions} series={cpuSeries} />
-          </Card>
-          <Card className="surface-panel border-border/50 p-4">
-            <p className="mb-2 text-sm font-medium">Memória ao longo do tempo</p>
-            <Chart type="area" height={240} options={areaMemOptions} series={memSeries} />
-          </Card>
+        <div className="grid gap-4 @xl/main:grid-cols-2">
+          <Panel padding="sm" className="min-w-0 gap-0">
+            <h2 className="mb-2 text-sm font-medium">CPU ao longo do tempo</h2>
+            <p className="sr-only">{describeSeries("CPU", cpuSeries[0].data)}</p>
+            <div aria-hidden>
+              <Chart type="area" height={240} options={areaCpuOptions} series={cpuSeries} />
+            </div>
+          </Panel>
+          <Panel padding="sm" className="min-w-0 gap-0">
+            <h2 className="mb-2 text-sm font-medium">Memória ao longo do tempo</h2>
+            <p className="sr-only">{describeSeries("Memória", memSeries[0].data)}</p>
+            <div aria-hidden>
+              <Chart type="area" height={240} options={areaMemOptions} series={memSeries} />
+            </div>
+          </Panel>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="surface-panel border-border/50 p-4">
-          <p className="mb-2 text-sm font-medium">Uso das unidades</p>
+      <div className="grid gap-4 @4xl/main:grid-cols-2">
+        <Panel padding="sm" className="min-w-0 gap-0">
+          <h2 className="mb-2 text-sm font-medium">Uso das unidades</h2>
           {disks.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Nenhuma unidade detectada.
-            </p>
+            <EmptyState
+              size="sm"
+              icon={HardDrive}
+              title="Nenhuma unidade detectada"
+              description="O Windows não informou unidades de disco."
+            />
           ) : (
-            <Chart type="bar" height={260} options={diskBarOptions} series={diskBarSeries} />
+            <>
+              <ul className="sr-only">
+                {disks.map((d, i) => (
+                  <li key={d.letter}>
+                    Unidade {d.letter}: {diskBarSeries[0].data[i]}% usado, {d.freeGb} GB livres de{" "}
+                    {d.totalGb} GB
+                  </li>
+                ))}
+              </ul>
+              <div aria-hidden>
+                <Chart type="bar" height={260} options={diskBarOptions} series={diskBarSeries} />
+              </div>
+            </>
           )}
-        </Card>
+        </Panel>
 
-        <Card className="surface-panel flex min-h-0 flex-col border-border/50 p-4">
+        <Panel padding="sm" className="min-h-0 min-w-0 gap-0">
           <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Processos (memória)</p>
+              <h2 className="text-sm font-medium">Processos (memória)</h2>
               <p className="text-xs text-muted-foreground">
                 {processes.length} processo{processes.length === 1 ? "" : "s"}
               </p>
@@ -362,6 +420,7 @@ function MonitorPage() {
               variant="ghost"
               size="sm"
               className="shrink-0 rounded-full"
+              aria-label="Atualizar lista de processos"
               onClick={() => void refreshProcesses()}
               disabled={procLoading}
             >
@@ -370,14 +429,20 @@ function MonitorPage() {
             </Button>
           </div>
 
-          <div className="mb-2 grid shrink-0 grid-cols-[minmax(5.5rem,8rem)_1fr_auto] gap-3 px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+          <div
+            aria-hidden
+            className="mb-2 grid shrink-0 grid-cols-[minmax(5.5rem,8rem)_1fr_auto] gap-3 px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
+          >
             <span>Processo</span>
             <span>Memória</span>
             <span className="text-right">CPU · MB</span>
           </div>
 
-          <AppScrollArea className="h-[min(20rem,48vh)] w-full sm:h-[min(22rem,52vh)] lg:h-[min(24rem,56vh)]">
-            <ul className="space-y-2.5 pr-3">
+          <AppScrollArea
+            viewportLabel="Processos por uso de memória"
+            className="h-[min(20rem,48vh)] w-full sm:h-[min(22rem,52vh)] lg:h-[min(24rem,56vh)]"
+          >
+            <ul className="space-y-2.5 pr-3" aria-label="Processos por uso de memória">
               {processes.map((p) => {
                 const pct = Math.max(4, Math.round((p.memMb / maxProcessMem) * 100));
                 return (
@@ -385,7 +450,11 @@ function MonitorPage() {
                     key={`${p.pid}-${p.name}`}
                     className="grid grid-cols-[minmax(5.5rem,8rem)_1fr_auto] items-center gap-3 rounded-lg px-1 py-1 hover:bg-muted/30"
                   >
-                    <div className="min-w-0">
+                    {/* Uma frase por processo para o Narrador; as colunas visuais ficam ocultas. */}
+                    <span className="sr-only">
+                      {p.name}, PID {p.pid}: {p.memMb} MB de memória, {p.cpu} segundos de CPU
+                    </span>
+                    <div className="min-w-0" aria-hidden>
                       <p
                         className="truncate text-sm font-semibold tracking-tight text-foreground"
                         title={p.name}
@@ -394,29 +463,35 @@ function MonitorPage() {
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground">#{p.pid}</p>
                     </div>
-                    <div className="h-2.5 min-w-0 overflow-hidden rounded-full bg-muted/55">
+                    <div
+                      aria-hidden
+                      className="h-2.5 min-w-0 overflow-hidden rounded-full bg-muted/55 forced-colors:border forced-colors:border-[CanvasText]"
+                    >
                       <div
-                        className="h-full rounded-full bg-[oklch(0.72_0.14_300)] transition-[width] duration-500"
+                        className="h-full rounded-full bg-[oklch(0.72_0.14_300)] transition-[width] duration-500 forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight]"
                         style={{ width: `${pct}%` }}
                         title={`${p.memMb} MB`}
                       />
                     </div>
-                    <div className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                      <span className="text-foreground/90">{p.cpu}s</span>
-                      <span className="mx-1 opacity-40">·</span>
+                    <div
+                      aria-hidden
+                      className="shrink-0 text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground"
+                    >
+                      <span className="text-foreground">{p.cpu}s</span>
+                      <span className="mx-1">·</span>
                       <span className="font-medium text-foreground">{p.memMb} MB</span>
                     </div>
                   </li>
                 );
               })}
               {processes.length === 0 && (
-                <li className="py-10 text-center text-sm text-muted-foreground">
-                  Nenhum processo listado.
+                <li>
+                  <EmptyState size="sm" icon={Activity} title="Nenhum processo listado" />
                 </li>
               )}
             </ul>
           </AppScrollArea>
-        </Card>
+        </Panel>
       </div>
     </div>
   );
@@ -431,7 +506,7 @@ function LiveBadge() {
       </span>
       <span className="text-xs font-semibold tracking-tight">Ao vivo</span>
       <span className="h-3 w-px bg-primary/25" aria-hidden />
-      <span className="text-[11px] font-medium text-primary/75">atualiza a cada 2s</span>
+      <span className="text-[11px] font-medium text-primary">atualiza a cada 2s</span>
     </div>
   );
 }
@@ -448,7 +523,7 @@ function OverviewLegend({
   hint: string;
 }) {
   return (
-    <li className="rounded-xl border border-border/50 bg-background/40 px-3 py-2">
+    <li className="surface-inset px-3 py-2">
       <div className="flex items-center gap-2">
         <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -456,34 +531,5 @@ function OverviewLegend({
       <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">{value}</p>
       <p className="truncate text-[11px] text-muted-foreground">{hint}</p>
     </li>
-  );
-}
-
-function MetricTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Cpu;
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <Card className="surface-panel hover-lift border-border/50 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
-        </div>
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Icon className="size-4" />
-        </div>
-      </div>
-    </Card>
   );
 }

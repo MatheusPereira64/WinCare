@@ -21,7 +21,13 @@ export function PageHeader({ icon: Icon, title, subtitle, badges, actions }: Pro
         )}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {/* Recebe o foco ao trocar de página (Narrador anuncia o título); não é interativo. */}
+            <h1
+              tabIndex={-1}
+              className="text-xl font-semibold tracking-tight outline-none @xl/main:text-2xl"
+            >
+              {title}
+            </h1>
             {badges}
           </div>
           {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}

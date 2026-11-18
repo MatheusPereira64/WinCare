@@ -35,28 +35,36 @@ const RULES: Rule[] = [
     reason: "Componente do Windows.",
   },
   {
+    // A própria entrada "Abrir com o Windows" do WinCare (Configurações → Bandeja e alertas).
+    match: /wincare/i,
+    advice: "keep",
+    impact: "low",
+    reason:
+      "Abre o WinCare só na bandeja para avisar sobre disco, temperatura e segurança. Para tirar, use Configurações → Bandeja e alertas.",
+  },
+  {
     match: /discord/i,
     advice: "disable",
     impact: "high",
-    reason: "O Discord é pesado no boot. Abra só quando for usar.",
+    reason: "O Discord pesa na inicialização. Abra só quando for usar.",
   },
   {
     match: /\bsteam\b/i,
     advice: "disable",
     impact: "high",
-    reason: "Launcher de jogos atrasa a inicialização. Abra o Steam quando for jogar.",
+    reason: "A Steam atrasa a inicialização. Abra quando for jogar.",
   },
   {
     match: /epicgames|epic games launcher/i,
     advice: "disable",
     impact: "high",
-    reason: "Launcher da Epic não precisa abrir com o Windows.",
+    reason: "A Epic Games não precisa abrir com o Windows.",
   },
   {
     match: /ubisoft|uplay|battle\.net|blizzard|eadesktop|origin\.exe|riotclient/i,
     advice: "disable",
     impact: "high",
-    reason: "Launcher de jogos — inicie manualmente quando for jogar.",
+    reason: "Loja de jogos — abra quando for jogar.",
   },
   {
     match: /spotify/i,
@@ -68,13 +76,13 @@ const RULES: Rule[] = [
     match: /adobe.*(gc|creative|update|arm|gcinvoker)|creative cloud/i,
     advice: "disable",
     impact: "high",
-    reason: "Atualizador da Adobe costuma atrasar o boot.",
+    reason: "O atualizador da Adobe costuma atrasar a inicialização.",
   },
   {
     match: /skype|utorrent|bittorrent|ccleaner|iotune|yourphone/i,
     advice: "disable",
     impact: "medium",
-    reason: "Não é essencial no boot e costuma só ocupar memória.",
+    reason: "Não é essencial ao ligar o PC e costuma só ocupar memória.",
   },
   {
     match: /onedrive/i,
@@ -86,13 +94,14 @@ const RULES: Rule[] = [
     match: /dropbox|googledrivesync|google drive|icloud/i,
     advice: "consider",
     impact: "medium",
-    reason: "Sincronização na nuvem: útil, mas atrasa o boot se você não precisar na hora.",
+    reason:
+      "Sincronização na nuvem: útil, mas atrasa a inicialização se você não precisar na hora.",
   },
   {
     match: /teams|ms-teams/i,
     advice: "consider",
     impact: "high",
-    reason: "O Teams é pesado. Desative no boot se não atender chamadas assim que ligar o PC.",
+    reason: "O Teams é pesado. Desative se não atender chamadas assim que ligar o PC.",
   },
   {
     match: /slack|zoom/i,
@@ -206,12 +215,12 @@ export function diagnoseStartup(items: StartupItem[]): StartupDiagnosis {
 
   const summary =
     enabled.length === 0
-      ? "Nenhum programa inicia com o Windows. O boot deve estar rápido."
+      ? "Nenhum programa abre com o Windows. A inicialização deve estar rápida."
       : load === "heavy"
-        ? `Há ${enabled.length} programas no boot e ${highImpactEnabled} com impacto alto (~${totalMemMb} MB na RAM). Desative os pesados para o PC ligar mais rápido.`
+        ? `${enabled.length} programas abrem com o Windows, ${highImpactEnabled} com impacto alto (cerca de ${totalMemMb} MB de memória). Desative os pesados para o PC ligar mais rápido.`
         : load === "moderate"
-          ? `Há ${enabled.length} programas ativos (~${totalMemMb} MB). Alguns podem atrasar a inicialização — veja as recomendações abaixo.`
-          : `Inicialização leve: ${enabled.length} programa(s) ativo(s) e cerca de ${totalMemMb} MB em uso.`;
+          ? `${enabled.length} programas abrem com o Windows (cerca de ${totalMemMb} MB). Alguns podem atrasar a inicialização — veja as sugestões abaixo.`
+          : `Inicialização leve: ${enabled.length} ${enabled.length === 1 ? "programa ativo" : "programas ativos"} e cerca de ${totalMemMb} MB em uso.`;
 
   const recommendations: StartupRecommendation[] = enabled
     .filter((i) => i.recommendation === "disable" || i.recommendation === "consider")
@@ -219,7 +228,7 @@ export function diagnoseStartup(items: StartupItem[]): StartupDiagnosis {
       id: i.id,
       name: i.name,
       advice: i.recommendation as Exclude<StartupAdvice, "keep">,
-      reason: i.recommendationReason || "Pode atrasar o boot.",
+      reason: i.recommendationReason || "Pode atrasar a inicialização.",
       impact: i.impact ?? "unknown",
       memMb: i.memMb ?? 0,
       requiresAdmin: i.location === "hklm-run" || !!i.requiresAdmin,

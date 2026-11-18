@@ -276,7 +276,7 @@ const requiresClosedApp = (category) => category !== "cache";
 
 async function cleanCleanerTargets(ids) {
   const running = await listRunningProcesses();
-  const summary = { ok: true, freedBytes: 0, removed: 0, skipped: 0, blocked: [] };
+  const summary = { ok: true, freedBytes: 0, removed: 0, skipped: 0, blocked: [], apps: [] };
   for (const id of Array.isArray(ids) ? ids : []) {
     const target = lastScan.get(String(id));
     if (!target) continue;
@@ -288,8 +288,10 @@ async function cleanCleanerTargets(ids) {
     summary.freedBytes += out.freedBytes;
     summary.removed += out.removed;
     summary.skipped += out.skipped;
+    if (out.removed > 0) summary.apps.push(target.appName);
   }
   summary.blocked = [...new Set(summary.blocked)];
+  summary.apps = [...new Set(summary.apps)];
   return summary;
 }
 

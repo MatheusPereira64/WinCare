@@ -1,19 +1,27 @@
 import * as React from "react";
 
-const MOBILE_BREAKPOINT = 768;
+/**
+ * `true` enquanto a área visível (em pixels CSS) for mais estreita que `breakpoint`.
+ *
+ * Lê o valor já no primeiro render (useSyncExternalStore), sem o "pulo" de um
+ * layout largo que só depois se ajusta. Com zoom ou escala do Windows a
+ * largura CSS já vem reduzida, então os mesmos limites valem para tudo.
+ */
+export function useViewportBelow(breakpoint: number) {
+  const query = `(max-width: ${breakpoint - 0.02}px)`;
 
-export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);
+  const subscribe = React.useCallback(
+    (onChange: () => void) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    [query],
+  );
 
-  React.useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    };
-    mql.addEventListener("change", onChange);
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-
-  return !!isMobile;
+  return React.useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
 }

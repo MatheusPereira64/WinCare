@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CheckCircle2,
   CircleAlert,
@@ -12,13 +12,9 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   createRestorePoint,
@@ -31,9 +27,14 @@ import {
 import { formatBytes } from "@/lib/wincare/report";
 import { useStore } from "@/lib/wincare/store";
 import type { InstalledProgram, LeftoverItem, LeftoverRemoval } from "@/lib/wincare/types";
+import { TONE_CALLOUT } from "@/lib/wincare/tone";
+import { useResource } from "@/lib/wincare/useResource";
+import { CheckboxCard } from "./CheckboxCard";
 import { ChoiceChips } from "./ChoiceChips";
 import { ModalShell } from "./ConfirmModal";
-import { EmptyState } from "./EmptyState";
+import { ListPanel, Panel } from "./Panel";
+import { EmptyState, LoadingState, ResourceView } from "./States";
+import { StatusBadge } from "./StatusBadge";
 import { PageHeader } from "./PageHeader";
 
 type SortKey = "name" | "size" | "date";
@@ -70,60 +71,33 @@ function ProgramIcon({ program }: { program: InstalledProgram }) {
     );
   }
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-semibold text-primary">
+    <span
+      aria-hidden
+      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-semibold text-primary"
+    >
       {firstLetter(program.name)}
     </span>
   );
 }
 
+async function loadPrograms() {
+  const out = await listPrograms();
+  if (!out.ok) throw new Error(out.reason);
+  return out.items;
+}
+
 export function ProgramUninstaller() {
-  const [programs, setPrograms] = useState<InstalledProgram[]>([]);
-  const [loading, setLoading] = useState(true);
+  const resource = useResource(loadPrograms, {
+    errorMessage: "Não foi possível listar os programas.",
+  });
+  const { reload: refresh, refreshing, status } = resource;
+  const programs = useMemo(() => resource.data ?? [], [resource.data]);
+  const loading = status === "loading";
   const [sort, setSort] = useState<SortKey>("name");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [letter, setLetter] = useState("Todas");
   const [target, setTarget] = useState<InstalledProgram | null>(null);
   const [openedAt] = useState(() => Date.now());
-
-  const load = useCallback(async () => {
-    const out = await listPrograms();
-    if (!out.ok) throw new Error(out.reason);
-    return out.items;
-  }, []);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      setPrograms(await load());
-    } catch (err) {
-      toast.error("Não foi possível listar os programas.", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void load()
-      .then((items) => {
-        if (!cancelled) setPrograms(items);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          toast.error("Não foi possível listar os programas.", {
-            description: err instanceof Error ? err.message : undefined,
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [load]);
 
   const filtered = useMemo(() => {
     const cutoff = openedAt - RECENT_DAYS * 86_400_000;
@@ -161,13 +135,10 @@ export function ProgramUninstaller() {
         title="Programas"
         subtitle="Desinstale programas e remova o que eles deixaram para trás."
         badges={
-          !loading && (
-            <Badge
-              variant="outline"
-              className="rounded-full border-border/60 text-muted-foreground"
-            >
+          status === "ready" && (
+            <StatusBadge>
               {programs.length} instalados · {formatBytes(totalBytes)}
-            </Badge>
+            </StatusBadge>
           )
         }
         actions={
@@ -187,17 +158,17 @@ export function ProgramUninstaller() {
               variant="secondary"
               size="sm"
               className="rounded-full"
-              disabled={loading}
+              disabled={loading || refreshing}
               onClick={() => void refresh()}
             >
-              {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              {loading || refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
               Atualizar
             </Button>
           </>
         }
       />
 
-      <Card className="surface-panel gap-3 border-border/50 p-4">
+      <Panel padding="sm" className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Mostrar</span>
@@ -222,103 +193,100 @@ export function ProgramUninstaller() {
           </div>
         </div>
         {letters.length > 1 && (
-          <div role="group" aria-label="Filtrar pela inicial" className="flex flex-wrap gap-1">
-            {["Todas", ...letters].map((l) => (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={letter === l}
-                onClick={() => setLetter(l)}
-                className={cn(
-                  "h-7 min-w-7 rounded-md px-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  letter === l
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                )}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <ChoiceChips
+            variant="letter"
+            label="Filtrar pela inicial"
+            value={letter}
+            onChange={setLetter}
+            options={["Todas", ...letters].map((l) => ({
+              value: l,
+              label: l,
+              ariaLabel: l === "#" ? "Números e símbolos" : undefined,
+            }))}
+          />
         )}
-      </Card>
+      </Panel>
 
-      {loading && programs.length === 0 ? (
-        <div className="space-y-2" aria-label="Carregando programas">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-[60px] w-full rounded-xl" />
-          ))}
-        </div>
-      ) : visible.length === 0 ? (
-        <EmptyState
-          icon={PackageSearch}
-          title="Nenhum programa aqui"
-          description="Tente outro filtro para ver mais programas."
-          action={
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setFilter("all");
-                setLetter("Todas");
-              }}
-            >
-              Mostrar todos
-            </Button>
-          }
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-          <ul className="divide-y divide-border/40">
-            {visible.map((program) => (
-              <li
-                key={program.id}
-                className="group flex items-center gap-3.5 px-4 py-2.5 transition-colors hover:bg-muted/30"
-              >
-                <ProgramIcon program={program} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium" title={program.name}>
-                      {program.name}
-                    </span>
-                    {program.critical && (
-                      <Badge
-                        variant="outline"
-                        className="rounded-full border-warning/40 bg-warning/10 text-warning"
-                        title="Outros programas costumam depender deste componente"
-                      >
-                        Componente
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {[
-                      program.publisher,
-                      program.version && `v${program.version}`,
-                      formatDate(program.installDate),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-muted-foreground sm:block">
-                  {program.sizeBytes > 0 ? formatBytes(program.sizeBytes) : "—"}
-                </span>
+      <ResourceView
+        resource={resource}
+        errorTitle="Não foi possível listar os programas"
+        loading={<LoadingState label="Lendo os programas instalados…" rows={6} />}
+      >
+        {() =>
+          visible.length === 0 ? (
+            <EmptyState
+              icon={PackageSearch}
+              title="Nenhum programa aqui"
+              description={
+                programs.length === 0
+                  ? "O Windows não informou nenhum programa instalado."
+                  : "Nenhum programa corresponde a este filtro."
+              }
+              action={
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  className="shrink-0 rounded-full"
-                  onClick={() => setTarget(program)}
+                  onClick={() => {
+                    setFilter("all");
+                    setLetter("Todas");
+                  }}
                 >
-                  <Trash2 /> Desinstalar
+                  Mostrar todos
                 </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+              }
+            />
+          ) : (
+            <ListPanel label="Programas instalados">
+              {visible.map((program) => (
+                <li
+                  key={program.id}
+                  className="group flex items-center gap-3.5 px-4 py-2.5 transition-colors hover:bg-muted/30"
+                >
+                  <ProgramIcon program={program} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium" title={program.name}>
+                        {program.name}
+                      </span>
+                      {program.critical && (
+                        <StatusBadge
+                          tone="warning"
+                          title="Outros programas costumam depender deste componente"
+                        >
+                          Componente
+                        </StatusBadge>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[
+                        program.publisher,
+                        program.version && `v${program.version}`,
+                        formatDate(program.installDate),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <span className="hidden w-20 shrink-0 text-right text-sm whitespace-nowrap tabular-nums text-muted-foreground @md/main:block">
+                    {program.sizeBytes > 0 ? formatBytes(program.sizeBytes) : "—"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 rounded-full"
+                    aria-label={`Desinstalar ${program.name}`}
+                    onClick={() => setTarget(program)}
+                  >
+                    <Trash2 /> Desinstalar
+                  </Button>
+                </li>
+              ))}
+            </ListPanel>
+          )
+        }
+      </ResourceView>
 
       {target && (
         <UninstallWizard
@@ -502,6 +470,7 @@ function UninstallWizard({
     <ModalShell
       open
       locked={busy}
+      describeBody={stage !== "leftovers"}
       className="max-w-2xl"
       title={<span className="min-w-0 truncate">Desinstalar {program.name}</span>}
       icon={<ProgramIcon program={program} />}
@@ -516,27 +485,19 @@ function UninstallWizard({
             remover qualquer coisa.
           </p>
           {program.critical && (
-            <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-warning">
+            <p className={cn("flex items-start gap-2 rounded-xl border p-3", TONE_CALLOUT.warning)}>
               <CircleAlert className="mt-0.5 size-4 shrink-0" />
               Este é um componente usado por outros programas. Eles podem parar de funcionar sem
               ele.
             </p>
           )}
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
-            <Checkbox
-              checked={wantRestorePoint}
-              onCheckedChange={(v) => setWantRestorePoint(v === true)}
-              className="mt-0.5"
-            />
-            <span>
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
-                <ShieldCheck className="size-4 text-success" /> Criar ponto de restauração antes
-              </span>
-              <span className="mt-0.5 block text-xs">
-                Recomendado para drivers e programas grandes.
-              </span>
-            </span>
-          </label>
+          <CheckboxCard
+            checked={wantRestorePoint}
+            onCheckedChange={setWantRestorePoint}
+            icon={ShieldCheck}
+            title="Criar ponto de restauração antes"
+            description="Recomendado para drivers e programas grandes."
+          />
           {error && (
             <p role="alert" className="flex items-start gap-2 text-destructive">
               <CircleAlert className="mt-0.5 size-4 shrink-0" />
@@ -561,7 +522,7 @@ function UninstallWizard({
       {stage === "removing" && <Waiting title="Removendo os itens selecionados…" />}
 
       {stage === "still-installed" && (
-        <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-warning">
+        <p className={cn("flex items-start gap-2 rounded-xl border p-3", TONE_CALLOUT.warning)}>
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <span>
             O programa ainda aparece como instalado. Se o desinstalador continua aberto, termine por
@@ -598,7 +559,7 @@ function UninstallWizard({
               : "Programa desinstalado, sem resíduos encontrados."}
           </p>
           {removal?.failed.length ? (
-            <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-warning">
+            <div className={cn("rounded-xl border p-3", TONE_CALLOUT.warning)}>
               <p className="font-medium">Não foi possível remover:</p>
               <ul className="mt-1 space-y-1 text-xs">
                 {removal.failed.map((f) => (
@@ -649,14 +610,15 @@ function LeftoverRow({
         : "Vai para a Lixeira";
   return (
     <li>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-background/40 p-3 hover:bg-muted/30">
+      <label className="surface-inset flex cursor-pointer flex-wrap items-start gap-x-3 gap-y-2 p-3 hover:bg-muted/30">
         <Checkbox
           checked={checked}
           onCheckedChange={(v) => onToggle(item.id, v === true)}
           className="mt-0.5"
         />
         <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1">
+        {/* Em janelas estreitas o selo desce para a linha de baixo em vez de espremer o caminho. */}
+        <span className="min-w-48 flex-1">
           <span className="block font-mono text-xs break-all text-foreground">{item.path}</span>
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             {item.reason}
@@ -667,17 +629,12 @@ function LeftoverRow({
             )}
           </span>
         </span>
-        <Badge
-          variant="outline"
-          className={cn(
-            "shrink-0 rounded-full",
-            item.kind === "folder" && item.requiresAdmin
-              ? "border-warning/40 text-warning"
-              : "border-border/70 text-muted-foreground",
-          )}
+        <StatusBadge
+          tone={item.kind === "folder" && item.requiresAdmin ? "warning" : "neutral"}
+          className="ml-auto shrink-0"
         >
           {destiny}
-        </Badge>
+        </StatusBadge>
       </label>
     </li>
   );

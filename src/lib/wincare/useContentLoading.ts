@@ -1,22 +1,20 @@
-import { useEffect, useRef, useState } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import { useAwaitingFirstSystemSample } from "./useSystem";
 
 const SPLASH_MS = 900;
-const NAV_MS = 450;
 const BOOT_FAILSAFE_MS = 8000;
 
 /**
- * Loading global: splash na abertura, 1ª amostra nativa do sistema, e troca de rota.
+ * Único carregamento de tela inteira: a abertura do app (marca + 1ª leitura
+ * do sistema, no máximo 8 s). Trocar de página não mostra carregamento
+ * artificial — cada tela mostra LoadingState onde ainda faltam dados
+ * (docs/design-system.md → "Estados").
  */
 export function useContentLoading() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const awaitingSystem = useAwaitingFirstSystemSample();
   const [splash, setSplash] = useState(true);
-  const [navBusy, setNavBusy] = useState(false);
   const [bootStuck, setBootStuck] = useState(false);
-  const firstNav = useRef(true);
 
   useEffect(() => {
     const t = window.setTimeout(() => setSplash(false), SPLASH_MS);
@@ -29,19 +27,6 @@ export function useContentLoading() {
     return () => window.clearTimeout(t);
   }, [awaitingSystem]);
 
-  useEffect(() => {
-    if (firstNav.current) {
-      firstNav.current = false;
-      return;
-    }
-    setNavBusy(true);
-    const t = window.setTimeout(() => setNavBusy(false), NAV_MS);
-    return () => window.clearTimeout(t);
-  }, [pathname]);
-
-  const booting = splash || (awaitingSystem && !bootStuck);
-  const visible = booting || navBusy;
-  const label = booting ? "Lendo informações do sistema…" : "Carregando…";
-
-  return { visible, label };
+  const visible = splash || (awaitingSystem && !bootStuck);
+  return { visible, label: "Lendo informações do sistema…" };
 }

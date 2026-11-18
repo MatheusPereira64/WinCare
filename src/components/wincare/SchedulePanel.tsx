@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Brush,
   CalendarClock,
@@ -13,80 +13,33 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { listSchedules, removeSchedule, runScheduleNow, saveSchedule } from "@/lib/wincare/bridge";
+import {
+  describeConfig,
+  FREQUENCIES,
+  JOB_TEXT,
+  MONTH_DAYS,
+  TIMES,
+  WEEK_DAYS,
+} from "@/lib/wincare/schedule";
 import { formatBytes } from "@/lib/wincare/report";
-import type {
-  ScheduleConfig,
-  ScheduleEntry,
-  ScheduleHistoryEntry,
-  ScheduleJob,
-} from "@/lib/wincare/types";
+import type { ScheduleEntry, ScheduleHistoryEntry, ScheduleJob } from "@/lib/wincare/types";
+import { cn } from "@/lib/utils";
+import { invalidateSystemData } from "@/lib/wincare/systemData";
+import { TONE_CALLOUT } from "@/lib/wincare/tone";
+import { useResource } from "@/lib/wincare/useResource";
 import { ChoiceChips } from "./ChoiceChips";
-import { EmptyState } from "./EmptyState";
 import { PageHeader } from "./PageHeader";
+import { ListPanel, Panel, PanelHeader } from "./Panel";
+import { EmptyState, LoadingState, ResourceView } from "./States";
+import { StatusBadge } from "./StatusBadge";
 
-const JOB_INFO: Record<
-  ScheduleJob,
-  { title: string; icon: typeof Brush; description: string; includes: string[] }
-> = {
-  cleanup: {
-    title: "Limpeza automática",
-    icon: Brush,
-    description: "Libera espaço sem pedir nada e sem mexer nos seus dados de navegação.",
-    includes: [
-      "Temporários com mais de 24 horas",
-      "Cache de navegadores e apps que estiverem fechados",
-      "Cookies, histórico e senhas ficam intactos",
-    ],
-  },
-  "full-check": {
-    title: "Verificação completa",
-    icon: ShieldCheck,
-    description: "Procura e corrige problemas no Windows. Pode levar até 1 hora em segundo plano.",
-    includes: [
-      "Ponto de restauração antes de tudo",
-      "SFC e DISM (verifica e repara a imagem)",
-      "Verificação de disco somente leitura",
-    ],
-  },
+const JOB_ICON: Record<ScheduleJob, typeof Brush> = {
+  cleanup: Brush,
+  "full-check": ShieldCheck,
 };
-
-const FREQUENCIES: { value: ScheduleConfig["frequency"]; label: string }[] = [
-  { value: "daily", label: "Todo dia" },
-  { value: "weekly", label: "Toda semana" },
-  { value: "monthly", label: "Todo mês" },
-];
-
-const WEEK_DAYS = [
-  { value: 0, label: "Dom" },
-  { value: 1, label: "Seg" },
-  { value: 2, label: "Ter" },
-  { value: 3, label: "Qua" },
-  { value: 4, label: "Qui" },
-  { value: 5, label: "Sex" },
-  { value: 6, label: "Sáb" },
-];
-
-const MONTH_DAYS = [1, 5, 10, 15, 20, 25].map((d) => ({ value: d, label: `Dia ${d}` }));
-
-const TIMES = ["08:00", "12:00", "18:00", "20:00", "22:00"].map((t) => ({ value: t, label: t }));
-
-const WEEK_DAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-
-function describeConfig(config: ScheduleConfig) {
-  if (config.frequency === "daily") return `Todo dia às ${config.time}`;
-  if (config.frequency === "weekly") {
-    const day = WEEK_DAY_NAMES[config.weekDay];
-    const prefix = config.weekDay === 0 || config.weekDay === 6 ? "Todo" : "Toda";
-    return `${prefix} ${day} às ${config.time}`;
-  }
-  return `Todo dia ${config.monthDay} do mês às ${config.time}`;
-}
 
 const formatDateTime = (iso: string | null) =>
   iso
@@ -99,47 +52,21 @@ const formatDateTime = (iso: string | null) =>
       })
     : "—";
 
+async function loadOverview() {
+  const out = await listSchedules();
+  if (!out.ok) throw new Error(out.reason);
+  return out;
+}
+
 export function SchedulePanel() {
-  const [entries, setEntries] = useState<ScheduleEntry[]>([]);
-  const [history, setHistory] = useState<ScheduleHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const apply = useCallback((out: Awaited<ReturnType<typeof listSchedules>>) => {
-    if (!out.ok) throw new Error(out.reason);
-    setEntries(out.items);
-    setHistory(out.history);
-  }, []);
-
-  const refresh = useCallback(async () => {
-    try {
-      apply(await listSchedules());
-    } catch (err) {
-      toast.error("Não foi possível consultar o Agendador de Tarefas.", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    }
-  }, [apply]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void listSchedules()
-      .then((out) => {
-        if (!cancelled) apply(out);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          toast.error("Não foi possível consultar o Agendador de Tarefas.", {
-            description: err instanceof Error ? err.message : undefined,
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apply]);
+  const resource = useResource(loadOverview, {
+    errorMessage: "Não foi possível consultar o Agendador de Tarefas.",
+  });
+  const history = resource.data?.history ?? [];
+  const refresh = async () => {
+    invalidateSystemData("schedules");
+    await resource.reload();
+  };
 
   return (
     <div className="space-y-6" data-wincare-schedule>
@@ -149,46 +76,55 @@ export function SchedulePanel() {
         subtitle="Deixe a manutenção rodar sozinha pelo Agendador de Tarefas do Windows, mesmo com o WinCare fechado."
       />
 
-      {loading ? (
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Skeleton className="h-96 rounded-2xl" />
-          <Skeleton className="h-96 rounded-2xl" />
-        </div>
-      ) : (
-        <div className="grid items-start gap-4 xl:grid-cols-2">
-          {entries.map((entry) => (
-            <ScheduleCard
-              key={entry.job}
-              entry={entry}
-              lastOutcome={history.find((h) => h.job === entry.job)}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <ResourceView
+        resource={resource}
+        errorTitle="Não foi possível consultar o Agendador de Tarefas"
+        loading={
+          <LoadingState label="Consultando o Agendador de Tarefas…" variant="cards" rows={2} />
+        }
+      >
+        {(overview) => (
+          <div className="grid items-start gap-4 @4xl/main:grid-cols-2">
+            {overview.items.map((entry) => (
+              <ScheduleCard
+                key={entry.job}
+                entry={entry}
+                lastOutcome={overview.history.find((h) => h.job === entry.job)}
+                onChanged={refresh}
+              />
+            ))}
+          </div>
+        )}
+      </ResourceView>
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <History className="size-4 text-muted-foreground" /> Execuções recentes
-        </h2>
-        {history.length === 0 ? (
-          <EmptyState
-            icon={History}
-            title="Nenhuma execução ainda"
-            description="Quando uma rotina rodar, o resultado aparece aqui e em uma notificação do Windows."
-          />
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-            <ul className="divide-y divide-border/40">
+      {resource.status === "ready" && (
+        <section className="space-y-3" aria-labelledby="schedule-history-title">
+          <h2
+            id="schedule-history-title"
+            className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+          >
+            <History aria-hidden className="size-4 text-muted-foreground" /> Execuções recentes
+          </h2>
+          {history.length === 0 ? (
+            <EmptyState
+              icon={History}
+              title="Nenhuma execução ainda"
+              description="Quando uma rotina rodar, o resultado aparece aqui e em uma notificação do Windows."
+            />
+          ) : (
+            <ListPanel label="Execuções recentes">
               {history.slice(0, 10).map((run) => (
                 <li key={run.id} className="flex items-start gap-3 px-4 py-3">
                   {run.ok ? (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                    <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
                   ) : (
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                    <XCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{run.label}</p>
+                    <p className="text-sm font-medium">
+                      <span className="sr-only">{run.ok ? "Concluída: " : "Falhou: "}</span>
+                      {run.label}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {run.summary}
                       {typeof run.freedBytes === "number" && run.freedBytes > 0
@@ -196,15 +132,15 @@ export function SchedulePanel() {
                         : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                     {formatDateTime(run.startedAt)}
                   </span>
                 </li>
               ))}
-            </ul>
-          </div>
-        )}
-      </section>
+            </ListPanel>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -218,11 +154,11 @@ function ScheduleCard({
   lastOutcome?: ScheduleHistoryEntry;
   onChanged: () => Promise<void>;
 }) {
-  const info = JOB_INFO[entry.job];
+  const info = JOB_TEXT[entry.job];
   const [config, setConfig] = useState(entry.config);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(config) !== JSON.stringify(entry.config);
-  const Icon = info.icon;
+  const Icon = JOB_ICON[entry.job];
 
   const save = async () => {
     setBusy(true);
@@ -266,41 +202,33 @@ function ScheduleCard({
   };
 
   return (
-    <Card className="surface-panel gap-4 border-border/50 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <Icon className="size-5" />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold tracking-tight">{info.title}</h2>
-              {entry.enabled ? (
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-success/30 bg-success/10 text-success"
-                >
-                  Ativa
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="rounded-full text-muted-foreground">
-                  Desativada
-                </Badge>
-              )}
-            </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">{info.description}</p>
-          </div>
-        </div>
-        {busy ? (
-          <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
-        ) : (
-          <Switch
-            checked={entry.enabled}
-            aria-label={`Ativar ${info.title}`}
-            onCheckedChange={(v) => void (v ? save() : disable())}
-          />
-        )}
-      </div>
+    <Panel>
+      <PanelHeader
+        icon={Icon}
+        title={info.title}
+        badges={
+          entry.enabled ? (
+            <StatusBadge tone="success">Ativa</StatusBadge>
+          ) : (
+            <StatusBadge>Desativada</StatusBadge>
+          )
+        }
+        description={info.description}
+        actions={
+          busy ? (
+            <Loader2
+              aria-label="Salvando"
+              className="size-5 shrink-0 animate-spin text-muted-foreground"
+            />
+          ) : (
+            <Switch
+              checked={entry.enabled}
+              aria-label={info.title}
+              onCheckedChange={(v) => void (v ? save() : disable())}
+            />
+          )
+        }
+      />
 
       <ul className="space-y-1 text-xs text-muted-foreground">
         {info.includes.map((line) => (
@@ -311,7 +239,7 @@ function ScheduleCard({
         ))}
       </ul>
 
-      <div className="space-y-3 rounded-xl border border-border/50 bg-background/40 p-3.5">
+      <div className="surface-inset @container space-y-3 p-3.5">
         <Field label="Frequência">
           <ChoiceChips
             label="Frequência"
@@ -355,7 +283,12 @@ function ScheduleCard({
       </div>
 
       {entry.stale && (
-        <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+        <p
+          className={cn(
+            "flex items-start gap-2 rounded-xl border p-3 text-xs",
+            TONE_CALLOUT.warning,
+          )}
+        >
           <CircleAlert className="mt-px size-4 shrink-0" />A pasta do WinCare mudou de lugar e esta
           rotina aponta para o local antigo. Clique em Salvar para corrigir.
         </p>
@@ -369,7 +302,7 @@ function ScheduleCard({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <dl className="text-xs text-muted-foreground">
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-x-1.5">
             <dt>{entry.enabled ? "Próxima:" : "Vai rodar:"}</dt>
             <dd className="font-medium text-foreground">
               {entry.enabled && entry.nextRun && !dirty
@@ -387,7 +320,7 @@ function ScheduleCard({
           )}
         </dl>
         {entry.enabled && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -412,13 +345,13 @@ function ScheduleCard({
           </div>
         )}
       </div>
-    </Card>
+    </Panel>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1.5 sm:grid-cols-[5.5rem_1fr] sm:items-center">
+    <div className="grid gap-1.5 @xs:grid-cols-[5.5rem_1fr] @xs:items-center">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </div>

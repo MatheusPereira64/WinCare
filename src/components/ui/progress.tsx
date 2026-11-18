@@ -11,11 +11,16 @@ const Progress = React.forwardRef<
 >(({ className, value, ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
-    className={cn("relative h-2 w-full overflow-hidden rounded-full bg-primary/20", className)}
+    // `value` precisa chegar ao Root: sem ele a barra é anunciada como indeterminada.
+    value={value}
+    className={cn(
+      "relative h-2 w-full overflow-hidden rounded-full bg-primary/20 forced-colors:border forced-colors:border-[CanvasText]",
+      className,
+    )}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
+      className="h-full w-full flex-1 bg-primary transition-all forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight]"
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>

@@ -11,6 +11,8 @@ const {
   net,
   Menu,
   dialog,
+  powerMonitor,
+  screen,
 } = require("electron");
 const { spawn, exec, execFile } = require("child_process");
 const fs = require("fs");
@@ -24,6 +26,15 @@ const { isWindowsAdmin, psFileJson } = require("./powershell.cjs");
 const { registerNativeActions } = require("./native-actions.cjs");
 const { parseJobArg, resolveSelfLaunch, runScheduledJob } = require("./scheduler.cjs");
 const { optimizeMemory } = require("./memory-optimizer.cjs");
+const history = require("./maintenance-history.cjs");
+const background = require("./background.cjs");
+const { countBatteries, readBatteryReport, writeFullBatteryReport } = require("./battery.cjs");
+const {
+  computeWindowBounds,
+  isDevToolsShortcut,
+  pageShortcutForInput,
+  zoomCommandForInput,
+} = require("./window-ui.cjs");
 
 /** Espaço de uma unidade via Node (mais confiável que WMI no Electron). */
 function readDriveSpace(rootPath) {
@@ -69,6 +80,9 @@ const APP_ID = "com.wincare.desktop";
 app.setName(APP_NAME);
 process.title = APP_NAME;
 
+/** %APPDATA%\WinCare — compartilhada com a rotina agendada (que usa outro userData). */
+const sharedDataDir = () => path.join(app.getPath("appData"), app.getName());
+
 if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
@@ -80,16 +94,17 @@ if (scheduledJob) {
   app.disableHardwareAcceleration();
 }
 
+/** Aberto pela entrada "Abrir com o Windows": começa só na bandeja, sem janela. */
+const launchedHidden = !scheduledJob && process.argv.includes(background.HIDDEN_ARG);
+/** Sair de verdade (menu, bandeja, atualização): o fechar da janela não esconde. */
+let isQuitting = false;
+
 const hasSingleInstanceLock = !scheduledJob && app.requestSingleInstanceLock();
 if (!scheduledJob && !hasSingleInstanceLock) {
   app.quit();
 } else if (!scheduledJob) {
-  app.on("second-instance", () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-  });
+  // Abrir o WinCare de novo (atalho, .exe) mostra a janela que está na bandeja.
+  app.on("second-instance", () => openApp({}));
 }
 
 function attachRendererConsoleLogger(webContents) {
@@ -113,6 +128,15 @@ function clearRendererStorage() {
     .clearStorageData({ storages: ["localstorage"] })
     .then(() => ({ ok: true }))
     .catch(() => ({ ok: false }));
+}
+
+/**
+ * O renderer guarda o zoom nas Configurações e o aplica; o processo principal
+ * só traduz teclas, roda do mouse e menu em comandos ("in" | "out" | "reset").
+ */
+function sendZoomCommand(command) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("wincare:zoomCommand", command);
 }
 
 function buildAppMenu() {
@@ -189,7 +213,40 @@ function buildAppMenu() {
         {
           label: "Ferramentas de desenvolvedor",
           accelerator: "F12",
+          // A tecla é tratada no before-input-event; aqui só mostra o atalho.
+          registerAccelerator: false,
           click: () => mainWindow?.webContents.toggleDevTools(),
+        },
+        { type: "separator" },
+        {
+          label: "Aumentar zoom",
+          accelerator: "CmdOrCtrl+Plus",
+          registerAccelerator: false,
+          click: () => sendZoomCommand("in"),
+        },
+        {
+          label: "Diminuir zoom",
+          accelerator: "CmdOrCtrl+-",
+          registerAccelerator: false,
+          click: () => sendZoomCommand("out"),
+        },
+        {
+          label: "Tamanho padrão (100%)",
+          accelerator: "CmdOrCtrl+0",
+          registerAccelerator: false,
+          click: () => sendZoomCommand("reset"),
+        },
+        { type: "separator" },
+        {
+          label: "Atalhos de teclado",
+          accelerator: "F1",
+          // F1 e "?" já são tratados na página; aqui só mostra a tecla.
+          registerAccelerator: false,
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("wincare:showShortcuts");
+            }
+          },
         },
         { type: "separator" },
         { role: "togglefullscreen", label: "Tela cheia" },
@@ -209,19 +266,52 @@ function resolveAppIcon() {
   return undefined;
 }
 
-function createWindow() {
+/**
+ * Mostra a janela (criando se o app está só na bandeja) e, se pedido, abre uma
+ * página ou executa um comando da bandeja ("quick-checkup").
+ */
+function openApp({ to, command } = {}) {
+  const route = background.isAllowedRoute(to) ? to : undefined;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    // A janela nova pede o comando pendente ao montar (wincare:takeTrayCommand).
+    background.setPendingCommand(command);
+    createWindow(route);
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  if (route) mainWindow.webContents.send("wincare:trayCommand", { type: "navigate", to: route });
+  if (command) mainWindow.webContents.send("wincare:trayCommand", command);
+}
+
+/** Última leitura do sistema (o monitor de temperatura reaproveita com a janela aberta). */
+let lastSystemInfo = null;
+
+function createWindow(initialRoute) {
   const icon =
     resolveAppIcon() ||
     (fs.existsSync(path.join(__dirname, "icon.ico"))
       ? path.join(__dirname, "icon.ico")
       : undefined);
+  // Cabe no monitor onde está o cursor, já descontando a escala do Windows.
+  let workArea;
+  try {
+    workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  } catch {
+    workArea = undefined;
+  }
+  const bounds = computeWindowBounds(workArea);
   mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 900,
-    minWidth: 1024,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: bounds.minWidth,
+    minHeight: bounds.minHeight,
+    show: false,
     backgroundColor: "#0d1117",
     title: APP_NAME,
-    minHeight: 640,
     autoHideMenuBar: true,
     ...(icon ? { icon } : {}),
     webPreferences: {
@@ -238,10 +328,37 @@ function createWindow() {
     }
   }
 
-  mainWindow.webContents.on("before-input-event", (_event, input) => {
-    if (input.key === "F12") {
+  // Maximiza antes de exibir: a janela não pisca no tamanho menor antes.
+  // (maximize() já a torna visível, mas sem foco — show() foca.)
+  if (bounds.maximize) mainWindow.maximize();
+  mainWindow.show();
+
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    // preventDefault: o acelerador do menu não alterna de novo.
+    if (isDevToolsShortcut(input)) {
+      event.preventDefault();
       mainWindow.webContents.toggleDevTools();
+      return;
     }
+    // Ctrl +, Ctrl −, Ctrl 0 (e teclado numérico). preventDefault evita que a
+    // página ou o menu processem a mesma tecla de novo.
+    const zoom = zoomCommandForInput(input);
+    if (zoom) {
+      event.preventDefault();
+      sendZoomCommand(zoom);
+      return;
+    }
+    // Alt+1…9 / Alt+0: tratado aqui para não passar pelo menu (mnemônicos / "ding" do Windows).
+    const page = pageShortcutForInput(input);
+    if (page) {
+      event.preventDefault();
+      mainWindow.webContents.send("wincare:pageShortcut", page);
+    }
+  });
+
+  // Ctrl + roda do mouse: o Electron só avisa, quem aplica é o renderer.
+  mainWindow.webContents.on("zoom-changed", (_event, direction) => {
+    if (direction === "in" || direction === "out") sendZoomCommand(direction);
   });
 
   attachRendererConsoleLogger(mainWindow.webContents);
@@ -254,7 +371,18 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
-  mainWindow.loadURL("app://wincare/index.html");
+  // "Manter na bandeja": fechar esconde a janela; Sair (menu/bandeja) fecha de verdade.
+  mainWindow.on("close", (event) => {
+    if (isQuitting || !background.keepInTray()) return;
+    event.preventDefault();
+    mainWindow.hide();
+    background.onHiddenToTray();
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+
+  mainWindow.loadURL(`app://wincare/index.html${initialRoute ? `#${initialRoute}` : ""}`);
   logger.log("window", "Janela criada", { url: "app://wincare/index.html" });
 }
 
@@ -267,7 +395,9 @@ protocol.registerSchemesAsPrivileged([
 if (scheduledJob) {
   app.whenReady().then(async () => {
     logger.initLogger(app);
+    history.initHistory(sharedDataDir());
     const exitCode = await runScheduledJob(scheduledJob);
+    history.flushHistory();
     app.exit(exitCode);
   });
 } else if (hasSingleInstanceLock) {
@@ -276,6 +406,14 @@ if (scheduledJob) {
     logger.log("app", "WinCare iniciado", {
       userData: app.getPath("userData"),
       logFile: logger.getLogPaths().logFile,
+    });
+    // Histórico de manutenção: a tela atualiza sozinha quando algo é registrado.
+    history.initHistory(sharedDataDir(), {
+      onChange: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("wincare:historyChanged");
+        }
+      },
     });
     buildAppMenu();
     protocol.handle("app", (request) => {
@@ -294,9 +432,32 @@ if (scheduledJob) {
       }
       return net.fetch(url.pathToFileURL(filePath).toString());
     });
-    createWindow();
+    if (!launchedHidden) createWindow();
+    background.initBackground({
+      getWindow: () => mainWindow,
+      openApp,
+      quit: () => app.quit(),
+      iconPath: resolveAppIcon(),
+      badgeSourcePath: [
+        path.join(__dirname, "assets", "icon-256.png"),
+        path.join(__dirname, "assets", "icon.png"),
+      ].find((p) => fs.existsSync(p)),
+      launchedHidden,
+      appId: APP_ID,
+      getRecentSystemInfo: () => lastSystemInfo,
+    });
+    // Sem bandeja (falhou ao criar) não dá para ficar só em segundo plano.
+    if (launchedHidden && !background.keepInTray()) createWindow();
+  });
+  app.on("before-quit", () => {
+    isQuitting = true;
   });
   app.on("window-all-closed", () => process.platform !== "darwin" && app.quit());
+  // A média de saúde do dia ainda na memória vai para o disco antes de sair.
+  app.on("will-quit", () => {
+    history.flushHistory();
+    background.disposeBackground();
+  });
   app.on("activate", () => BrowserWindow.getAllWindows().length === 0 && createWindow());
 }
 
@@ -666,7 +827,15 @@ function runElevatedCommand(event, { command, runId, limitMs = LONG_REPAIR_TIMEO
 }
 
 /** Runs a command through cmd.exe and streams stdout/stderr back to the renderer. */
-ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutMs }) => {
+ipcMain.handle("wincare:run", async (event, payload) => {
+  const startedAt = Date.now();
+  const out = await runCommand(event, payload);
+  // Reparos e limpezas entram no histórico com o resultado real do comando.
+  history.recordCommand(payload?.command, out, Date.now() - startedAt);
+  return out;
+});
+
+async function runCommand(event, { command, runId, elevated, timeoutMs }) {
   try {
     const limitMs = commandTimeoutMs(command, timeoutMs);
 
@@ -794,7 +963,7 @@ ipcMain.handle("wincare:run", async (event, { command, runId, elevated, timeoutM
       result: error instanceof Error ? error.message : "Falha ao executar o comando.",
     };
   }
-});
+}
 
 ipcMain.handle("wincare:getLogPath", () => logger.getLogPaths());
 
@@ -955,7 +1124,16 @@ const psJson = (script, timeoutMs = 20000) =>
 
 ipcMain.handle("wincare:optimizeMemory", async () => {
   try {
-    return await optimizeMemory();
+    const out = await optimizeMemory();
+    if (out?.ok && out.freedMb > 0) {
+      history.recordEvent({
+        kind: "optimize",
+        action: "memory",
+        title: "Memória otimizada",
+        detail: `${Math.round(out.freedMb).toLocaleString("pt-BR")} MB de RAM liberados`,
+      });
+    }
+    return out;
   } catch (error) {
     logger.error("memory", "optimizeMemory", error instanceof Error ? error.message : error);
     return {
@@ -1021,16 +1199,20 @@ ipcMain.handle("wincare:systemInfo", async () => {
     simulated: false,
   };
 
+  let info = base;
   try {
-    return await enrichSystemInfo(base, { cpuFromWmi });
+    info = await enrichSystemInfo(base, { cpuFromWmi });
   } catch (error) {
     logger.warn(
       "metrics",
       "Falha ao enriquecer métricas",
       error instanceof Error ? error.message : error,
     );
-    return base;
   }
+  // Saúde ao longo do tempo (média por dia) para o "antes e depois" do Histórico.
+  history.recordHealth(info.health);
+  lastSystemInfo = { at: Date.now(), info };
+  return info;
 });
 
 ipcMain.handle("wincare:disks", async () => {
@@ -1467,7 +1649,34 @@ function ensureRegKey(key) {
 }
 
 /** Ativa/desativa item de inicialização (HKCU e pasta Startup) em Node — sem PowerShell. */
-ipcMain.handle("wincare:setStartupEnabled", async (_e, { id, enabled }) => {
+/** Nome legível de um item de inicialização a partir do id ("hkcu-run:Discord" → "Discord"). */
+function startupDisplayName(id) {
+  const raw = String(id || "").replace(/^(hkcu-run|hklm-run|startup-folder):/, "");
+  return (
+    path.win32
+      .basename(raw)
+      .replace(/\.disabled$/i, "")
+      .replace(/\.lnk$/i, "") || "Programa"
+  );
+}
+
+ipcMain.handle("wincare:setStartupEnabled", async (_e, payload) => {
+  const out = await setStartupEnabled(payload || {});
+  if (out?.ok) {
+    const name = startupDisplayName(payload?.id);
+    history.recordEvent({
+      kind: "optimize",
+      action: payload?.enabled ? "startup-enable" : "startup-disable",
+      subject: name,
+      title: payload?.enabled
+        ? `${name} voltou a abrir com o Windows`
+        : `${name} não abre mais com o Windows`,
+    });
+  }
+  return out;
+});
+
+async function setStartupEnabled({ id, enabled }) {
   if (process.platform !== "win32") return { ok: false, reason: "not-windows" };
   try {
     const safeId = String(id || "");
@@ -1555,7 +1764,7 @@ ipcMain.handle("wincare:setStartupEnabled", async (_e, { id, enabled }) => {
       reason: error instanceof Error ? error.message : "Falha ao alterar inicializacao.",
     };
   }
-});
+}
 
 /** Processos com maior uso de CPU/memoria (amostra). */
 ipcMain.handle("wincare:topProcesses", async () => {
@@ -1640,6 +1849,12 @@ foreach ($t in $targets) {
 });
 
 const CLEARABLE_FOLDERS = new Set(["temp-user", "temp-win", "recycle", "inet-cache"]);
+const DISK_FOLDER_TITLES = {
+  "temp-user": "Temporários do usuário limpos",
+  "temp-win": "Temporários do Windows limpos",
+  recycle: "Lixeira esvaziada",
+  "inet-cache": "Cache de internet limpo",
+};
 
 ipcMain.handle("wincare:clearDiskFolder", async (_e, { id }) => {
   if (process.platform !== "win32") return { ok: false, reason: "not-windows" };
@@ -1675,8 +1890,17 @@ switch ($id) {
 `,
       90000,
     );
-    if (result && typeof result === "object") return result;
-    return { ok: true, freedBytes: 0 };
+    const out = result && typeof result === "object" ? result : { ok: true, freedBytes: 0 };
+    if (out.ok) {
+      history.recordEvent({
+        kind: "cleanup",
+        action: `folder-${folderId}`,
+        title: DISK_FOLDER_TITLES[folderId],
+        // A Lixeira não informa o tamanho aqui (o script devolve 1 quando esvaziou).
+        freedBytes: folderId === "recycle" ? undefined : out.freedBytes,
+      });
+    }
+    return out;
   } catch (error) {
     return {
       ok: false,
@@ -1744,6 +1968,56 @@ ipcMain.handle("wincare:powerPlan", async (_e, payload = {}) => {
   const plans = parsePowerPlans(listed);
   const active = plans.find((p) => p.active) || null;
   return { ok: true, plans, active };
+});
+
+/* Bateria: saúde, ciclos e histórico do `powercfg /batteryreport`, mais o estado de energia agora. */
+ipcMain.handle("wincare:batteryReport", async () => {
+  if (process.platform !== "win32") {
+    return { ok: false, reason: "not-windows", hasBattery: false, batteries: [], history: [] };
+  }
+  try {
+    // Desktop: a consulta CIM basta; o relatório só é gerado quando há bateria.
+    if ((await countBatteries()) === 0) {
+      return { ok: true, hasBattery: false, batteries: [], history: [] };
+    }
+    const report = await readBatteryReport();
+    if (!report.hasBattery) return report;
+    const plans = parsePowerPlans(await runPowerCfg(["/list"]));
+    const active = plans.find((p) => p.active) || null;
+    return {
+      ...report,
+      onBattery: powerMonitor.isOnBatteryPower(),
+      activePlan: active ? { guid: active.guid, name: active.name } : null,
+    };
+  } catch (error) {
+    logger.error("battery", "batteryReport falhou", error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao ler a bateria.",
+      hasBattery: false,
+      batteries: [],
+      history: [],
+    };
+  }
+});
+
+/* Relatório completo do Windows (HTML) na pasta de dados do app, aberto no navegador padrão. */
+ipcMain.handle("wincare:openBatteryReport", async () => {
+  try {
+    const file = await writeFullBatteryReport(path.join(app.getPath("userData"), "reports"));
+    const error = await shell.openPath(file);
+    return error ? { ok: false, reason: error } : { ok: true, path: file };
+  } catch (error) {
+    logger.error(
+      "battery",
+      "openBatteryReport falhou",
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "Falha ao gerar o relatório.",
+    };
+  }
 });
 
 function collectStorageIntel() {
@@ -1833,15 +2107,23 @@ ipcMain.handle("wincare:storageIntel", async () => {
   }
 });
 
-ipcMain.handle("wincare:saveTextFile", async (_e, { content, defaultName }) => {
+/** Tipo do arquivo pela extensão do nome sugerido (relatório em .txt, histórico em .csv/.json). */
+const SAVE_FILTERS = {
+  txt: { name: "Texto", extensions: ["txt"] },
+  csv: { name: "Planilha CSV", extensions: ["csv"] },
+  json: { name: "JSON", extensions: ["json"] },
+};
+
+ipcMain.handle("wincare:saveTextFile", async (_e, { content, defaultName, title }) => {
   const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const name = String(
+    defaultName || `WinCare-relatorio-${new Date().toISOString().slice(0, 10)}.txt`,
+  );
+  const ext = path.extname(name).slice(1).toLowerCase();
   const result = await dialog.showSaveDialog(win || undefined, {
-    title: "Salvar relatório WinCare",
-    defaultPath: defaultName || `WinCare-relatorio-${new Date().toISOString().slice(0, 10)}.txt`,
-    filters: [
-      { name: "Texto", extensions: ["txt"] },
-      { name: "Todos", extensions: ["*"] },
-    ],
+    title: typeof title === "string" && title ? title.slice(0, 120) : "Salvar relatório WinCare",
+    defaultPath: name,
+    filters: [SAVE_FILTERS[ext] || SAVE_FILTERS.txt, { name: "Todos", extensions: ["*"] }],
   });
   if (result.canceled || !result.filePath) return { ok: false, reason: "cancelled" };
   try {

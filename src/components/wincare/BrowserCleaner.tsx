@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AppWindow,
   ChevronDown,
@@ -12,17 +12,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { cleanCleaner, scanCleaner } from "@/lib/wincare/bridge";
 import { formatBytes } from "@/lib/wincare/report";
 import type { CleanerCategory, CleanerItem } from "@/lib/wincare/types";
+import { plural } from "@/lib/wincare/format";
+import { invalidateSystemData } from "@/lib/wincare/systemData";
+import { TONE_CALLOUT } from "@/lib/wincare/tone";
+import { useResource } from "@/lib/wincare/useResource";
 import { ConfirmModal } from "./ConfirmModal";
-import { EmptyState } from "./EmptyState";
+import { Panel, PanelHeader } from "./Panel";
+import { EmptyState, LoadingState, ResourceView } from "./States";
+import { StatusBadge } from "./StatusBadge";
 
 const CATEGORY: Record<CleanerCategory, { label: string; hint: string; risky: boolean }> = {
   cache: {
@@ -75,52 +78,24 @@ function groupByApp(items: CleanerItem[]): AppGroup[] {
 const defaultSelection = (items: CleanerItem[]) =>
   new Set(items.filter((i) => i.category === "cache").map((i) => i.id));
 
+async function scan() {
+  const out = await scanCleaner();
+  if (!out.ok) throw new Error(out.reason);
+  return out.items;
+}
+
 export function BrowserCleaner() {
-  const [items, setItems] = useState<CleanerItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const resource = useResource(scan, {
+    errorMessage: "Não foi possível analisar os navegadores e aplicativos.",
+    onLoad: (list) => setSelected(defaultSelection(list)),
+  });
+  const { reload: refresh, refreshing, status } = resource;
+  const items = useMemo(() => resource.data ?? [], [resource.data]);
+  const loading = status === "loading" || refreshing;
   const [cleaning, setCleaning] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const out = await scanCleaner();
-      if (!out.ok) throw new Error(out.reason);
-      setItems(out.items);
-      setSelected(defaultSelection(out.items));
-    } catch (err) {
-      toast.error("Não foi possível analisar navegadores e apps.", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void scanCleaner()
-      .then((out) => {
-        if (cancelled) return;
-        if (!out.ok) throw new Error(out.reason);
-        setItems(out.items);
-        setSelected(defaultSelection(out.items));
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        toast.error("Não foi possível analisar navegadores e apps.", {
-          description: err instanceof Error ? err.message : undefined,
-        });
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const groups = useMemo(() => groupByApp(items), [items]);
   const selectedItems = useMemo(
@@ -145,9 +120,12 @@ export function BrowserCleaner() {
     try {
       const out = await cleanCleaner(selectedItems.map((i) => i.id));
       if (!out.ok) throw new Error(out.reason);
-      const kept = out.skipped ? ` ${out.skipped} arquivos em uso foram mantidos.` : "";
+      invalidateSystemData("folders");
+      const kept = out.skipped
+        ? ` ${plural(out.skipped, "arquivo em uso foi mantido", "arquivos em uso foram mantidos")}.`
+        : "";
       toast.success(`${formatBytes(out.freedBytes ?? 0)} liberados`, {
-        description: `${out.removed ?? 0} arquivos removidos.${kept}`,
+        description: `${plural(out.removed ?? 0, "arquivo removido", "arquivos removidos")}.${kept}`,
       });
       if (out.blocked?.length) {
         toast.warning("Alguns itens não foram limpos", {
@@ -156,7 +134,9 @@ export function BrowserCleaner() {
       }
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha na limpeza.");
+      toast.error("Não foi possível concluir a limpeza.", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setCleaning(false);
     }
@@ -166,135 +146,125 @@ export function BrowserCleaner() {
   const hasRiskySelection = selectedItems.some((i) => CATEGORY[i.category].risky);
 
   return (
-    <Card className="hero-panel gap-4 border-border/50 p-5 sm:p-6" data-wincare-cleaner>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary">
-            <Sparkles className="size-5" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Navegadores e aplicativos</h2>
-            <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
-              Veja exatamente o que será apagado antes de limpar. Senhas, favoritos e extensões
-              nunca são tocados.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={() => void refresh()}
-            className="rounded-full"
-          >
-            {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Analisar
-          </Button>
-          <Button
-            type="button"
-            disabled={busy || selectedItems.length === 0}
-            onClick={() => setConfirming(true)}
-            className="rounded-full px-5"
-          >
-            {cleaning ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            {cleaning ? "Limpando…" : `Limpar ${formatBytes(selectedBytes)}`}
-          </Button>
-        </div>
-      </div>
+    <Panel variant="hero" padding="lg" data-wincare-cleaner>
+      <PanelHeader
+        icon={Sparkles}
+        title="Navegadores e aplicativos"
+        description="Veja exatamente o que será apagado antes de limpar. Senhas, favoritos e extensões nunca são tocados."
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => void refresh()}
+              className="rounded-full"
+            >
+              {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              Analisar de novo
+            </Button>
+            <Button
+              type="button"
+              disabled={busy || selectedItems.length === 0}
+              onClick={() => setConfirming(true)}
+              className="rounded-full px-5"
+            >
+              {cleaning ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              {cleaning ? "Limpando…" : `Limpar ${formatBytes(selectedBytes)}`}
+            </Button>
+          </>
+        }
+      />
 
-      {loading && items.length === 0 ? (
-        <div className="space-y-2" aria-label="Analisando navegadores e aplicativos">
-          <p className="text-xs text-muted-foreground">
-            Medindo caches e dados de navegação. Pode levar até um minuto.
-          </p>
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : groups.length === 0 ? (
-        <EmptyState
-          icon={PartyPopper}
-          title="Nada para limpar"
-          description="Não encontramos caches ou dados de navegação nos navegadores e apps conhecidos."
-        />
-      ) : (
-        <>
-          <p className="text-xs text-muted-foreground">
-            {formatBytes(totalBytes)} encontrados em {groups.length}{" "}
-            {groups.length === 1 ? "aplicativo" : "aplicativos"}. Cookies e histórico ficam
-            desmarcados até você escolher.
-          </p>
-          <div className="space-y-2">
-            {groups.map((group) => {
-              const open = expanded === group.appId;
-              const Icon = group.appKind === "browser" ? Globe : AppWindow;
-              const chosen = group.items.filter((i) => selected.has(i.id) && !isLocked(i));
-              return (
-                <div
-                  key={group.appId}
-                  className="overflow-hidden rounded-xl border border-border/60 bg-background/40"
-                >
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setExpanded(open ? null : group.appId)}
-                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
-                      <Icon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium">{group.appName}</span>
-                        {group.running && (
-                          <Badge
-                            variant="outline"
-                            className="rounded-full border-warning/40 bg-warning/10 text-warning"
-                          >
-                            Aberto
-                          </Badge>
-                        )}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {chosen.length
-                          ? chosen
-                              .map((i) => CATEGORY[i.category].label)
-                              .filter(unique)
-                              .join(", ")
-                          : "Nada selecionado"}
-                      </span>
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {formatBytes(group.sizeBytes)}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "size-4 shrink-0 text-muted-foreground transition-transform",
-                        open && "rotate-180",
-                      )}
-                    />
-                  </button>
-                  {open && (
-                    <div className="animate-fade-in divide-y divide-border/40 border-t border-border/50">
-                      {group.items.map((item) => (
-                        <CleanerRow
-                          key={item.id}
-                          item={item}
-                          checked={selected.has(item.id) && !isLocked(item)}
-                          disabled={busy}
-                          onToggle={toggle}
+      <ResourceView
+        resource={resource}
+        errorTitle="Não foi possível analisar os navegadores e aplicativos"
+        loading={
+          <LoadingState label="Medindo caches e dados de navegação (pode levar até um minuto)…" />
+        }
+      >
+        {() =>
+          groups.length === 0 ? (
+            <EmptyState
+              icon={PartyPopper}
+              title="Nada para limpar"
+              description="Não encontramos caches ou dados de navegação nos navegadores e apps conhecidos."
+            />
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {formatBytes(totalBytes)} encontrados em{" "}
+                {plural(groups.length, "aplicativo", "aplicativos")}. Cookies e histórico ficam
+                desmarcados até você escolher.
+              </p>
+              <div className="space-y-2">
+                {groups.map((group) => {
+                  const open = expanded === group.appId;
+                  const Icon = group.appKind === "browser" ? Globe : AppWindow;
+                  const chosen = group.items.filter((i) => selected.has(i.id) && !isLocked(i));
+                  return (
+                    <div key={group.appId} className="surface-inset overflow-hidden">
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        aria-controls={`cleaner-group-${group.appId}`}
+                        onClick={() => setExpanded(open ? null : group.appId)}
+                        className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden focus-visible:ring-inset"
+                      >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-muted-foreground">
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{group.appName}</span>
+                            {group.running && <StatusBadge tone="warning">Aberto</StatusBadge>}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {chosen.length
+                              ? chosen
+                                  .map((i) => CATEGORY[i.category].label)
+                                  .filter(unique)
+                                  .join(", ")
+                              : "Nada selecionado"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold whitespace-nowrap tabular-nums">
+                          {formatBytes(group.sizeBytes)}
+                        </span>
+                        <ChevronDown
+                          className={cn(
+                            "size-4 shrink-0 text-muted-foreground transition-transform",
+                            open && "rotate-180",
+                          )}
                         />
-                      ))}
+                      </button>
+                      {open && (
+                        <div
+                          id={`cleaner-group-${group.appId}`}
+                          role="group"
+                          aria-label={`Itens de ${group.appName}`}
+                          className="animate-fade-in divide-y divide-border/60 border-t border-border/60"
+                        >
+                          {group.items.map((item) => (
+                            <CleanerRow
+                              key={item.id}
+                              item={item}
+                              checked={selected.has(item.id) && !isLocked(item)}
+                              disabled={busy}
+                              onToggle={toggle}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+                  );
+                })}
+              </div>
+            </>
+          )
+        }
+      </ResourceView>
 
       <ConfirmModal
         open={confirming}
@@ -307,22 +277,24 @@ export function BrowserCleaner() {
         <ul className="space-y-1.5">
           {selectedItems.map((item) => (
             <li key={item.id} className="flex items-baseline justify-between gap-3">
-              <span>
+              <span className="min-w-0">
                 <span className="text-foreground">{item.appName}</span>
                 {item.profile && ` · ${item.profile}`} · {CATEGORY[item.category].label}
               </span>
-              <span className="shrink-0 tabular-nums">{formatBytes(item.sizeBytes)}</span>
+              <span className="shrink-0 whitespace-nowrap tabular-nums">
+                {formatBytes(item.sizeBytes)}
+              </span>
             </li>
           ))}
         </ul>
         {hasRiskySelection && (
-          <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-warning">
+          <p className={cn("flex items-start gap-2 rounded-xl border p-3", TONE_CALLOUT.warning)}>
             <CircleAlert className="mt-0.5 size-4 shrink-0" />
             Cookies e histórico não podem ser recuperados depois de apagados.
           </p>
         )}
       </ConfirmModal>
-    </Card>
+    </Panel>
   );
 }
 
@@ -398,7 +370,7 @@ function CleanerRow({
             </ul>
           )}
         </div>
-        <span className="text-sm tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-muted-foreground">
           {formatBytes(item.sizeBytes)}
         </span>
       </div>

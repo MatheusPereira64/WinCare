@@ -9,6 +9,7 @@ import {
 } from "@/lib/wincare/intelligence";
 import { getIntelState, hydrateIntelligence, intelActions } from "@/lib/wincare/intelligenceStore";
 import type { TopProcess } from "@/lib/wincare/types";
+import { pageHidden } from "@/lib/wincare/pageVisibility";
 import { useSystemInfo } from "@/lib/wincare/useSystem";
 
 const SIM_PROCESSES: TopProcess[] = [
@@ -52,7 +53,12 @@ export function IntelligenceCollector() {
       }
     };
     const t = window.setTimeout(() => void bootWatch(), 2500);
-    const id = window.setInterval(() => void bootWatch(), 3 * 60 * 1000);
+    const id = window.setInterval(
+      () => {
+        if (!pageHidden()) void bootWatch();
+      },
+      3 * 60 * 1000,
+    );
     return () => {
       cancelled = true;
       window.clearTimeout(t);
@@ -104,7 +110,10 @@ export function IntelligenceCollector() {
         if (idleTicks.current >= 3) intelActions.endSession();
       }
     };
-    const id = window.setInterval(() => void tickGames(), 15000);
+    // Na bandeja não acompanha jogos: o processo principal fica leve.
+    const id = window.setInterval(() => {
+      if (!pageHidden()) void tickGames();
+    }, 15000);
     const first = window.setTimeout(() => void tickGames(), 5000);
     return () => {
       cancelled = true;

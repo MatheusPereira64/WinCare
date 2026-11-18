@@ -79,7 +79,7 @@ export function useAppUpdater(options?: { autoCheck?: boolean; promptOnAvailable
         return next;
       } catch (error) {
         if (!silent) {
-          toast.error("Falha ao consultar o GitHub", {
+          toast.error("Não foi possível verificar atualizações", {
             description: error instanceof Error ? error.message : undefined,
           });
         }
@@ -101,7 +101,7 @@ export function useAppUpdater(options?: { autoCheck?: boolean; promptOnAvailable
     try {
       const result = await native.applyUpdate();
       if (result.ok) {
-        toast.success(result.message || "Atualizando...", {
+        toast.success(result.message || "Atualizando…", {
           description: "O WinCare vai fechar e reabrir na nova versão.",
         });
       } else if (result.reason === "auto-update-unavailable") {
@@ -117,7 +117,7 @@ export function useAppUpdater(options?: { autoCheck?: boolean; promptOnAvailable
       }
       return result;
     } catch (error) {
-      toast.error("Falha ao aplicar a atualização", {
+      toast.error("Não foi possível atualizar", {
         description: error instanceof Error ? error.message : undefined,
       });
       return null;

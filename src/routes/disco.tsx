@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { HardDrive, Thermometer } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
+import { IconChip } from "@/components/wincare/IconChip";
+import { Panel } from "@/components/wincare/Panel";
+import { EmptyState, LoadingState } from "@/components/wincare/States";
+import { StatusBadge } from "@/components/wincare/StatusBadge";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { StorageIntelCard } from "@/components/wincare/StorageIntelCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
-import { useDisks } from "@/lib/wincare/useSystem";
+import { useDiskList } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/disco")({
   head: () => ({
@@ -29,7 +31,7 @@ export const Route = createFileRoute("/disco")({
 });
 
 function DiskPage() {
-  const disks = useDisks();
+  const { disks, loading } = useDiskList();
 
   return (
     <div className="space-y-8">
@@ -40,50 +42,63 @@ function DiskPage() {
           subtitle="Integridade das unidades instaladas, espaço disponível e pastas que mais ocupam."
         />
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {disks.map((disk) => {
-            const used = Math.round(((disk.totalGb - disk.freeGb) / disk.totalGb) * 100);
-            return (
-              <Card key={disk.letter} className="surface-panel gap-4 border-border/60 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                      <HardDrive className="size-5" />
-                    </span>
-                    <div>
-                      <p className="font-semibold">
-                        {disk.letter} — {disk.model}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{disk.type}</p>
+        {loading ? (
+          <LoadingState label="Lendo as unidades de disco…" variant="block" />
+        ) : disks.length === 0 ? (
+          <EmptyState
+            icon={HardDrive}
+            title="Nenhuma unidade informada"
+            description="O Windows não respondeu com as unidades de disco. Tente abrir esta página de novo em instantes."
+          />
+        ) : (
+          <div className="grid gap-4 @4xl/main:grid-cols-2">
+            {disks.map((disk) => {
+              const used = Math.round(((disk.totalGb - disk.freeGb) / disk.totalGb) * 100);
+              return (
+                <Panel key={disk.letter}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <IconChip icon={HardDrive} />
+                      <div className="min-w-0">
+                        <p
+                          className="truncate font-semibold"
+                          title={`${disk.letter} — ${disk.model}`}
+                        >
+                          {disk.letter} — {disk.model}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{disk.type}</p>
+                      </div>
                     </div>
+                    <StatusBadge
+                      tone={disk.smart === "OK" ? "success" : "danger"}
+                      className="shrink-0"
+                      title="Autodiagnóstico do disco (SMART)"
+                    >
+                      SMART {disk.smart}
+                    </StatusBadge>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={`rounded-full ${
-                      disk.smart === "OK"
-                        ? "border-success/30 bg-success/10 text-success"
-                        : "border-destructive/30 bg-destructive/10 text-destructive"
-                    }`}
-                  >
-                    SMART {disk.smart}
-                  </Badge>
-                </div>
 
-                <Progress value={used} className="h-2" />
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-                  <span>
-                    {disk.freeGb} GB livres de {disk.totalGb} GB ({used}% usado)
-                  </span>
-                  {typeof disk.temperature === "number" && (
-                    <span className="flex items-center gap-1">
-                      <Thermometer className="size-4" /> {disk.temperature} °C
+                  <Progress
+                    value={used}
+                    className="h-2"
+                    aria-label={`Uso da unidade ${disk.letter}`}
+                    aria-valuetext={`${used}% usado, ${disk.freeGb} GB livres de ${disk.totalGb} GB`}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                    <span>
+                      {disk.freeGb} GB livres de {disk.totalGb} GB ({used}% usado)
                     </span>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                    {typeof disk.temperature === "number" && (
+                      <span className="flex items-center gap-1">
+                        <Thermometer aria-hidden className="size-4" /> {disk.temperature} °C
+                      </span>
+                    )}
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <DiskSpaceAnalyzer />

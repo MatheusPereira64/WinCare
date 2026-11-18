@@ -1,5 +1,8 @@
+import { INERT_MARKER } from "./useFocusTrap";
+
 /**
  * Limpa locks de pointer/scroll/inert deixados pelo Radix (Dialog/Sheet).
+ * Não mexe no `inert` intencional dos modais do WinCare (marcado com INERT_MARKER).
  *
  * IMPORTANTE: nunca remove nós do DOM gerenciados pelo React — isso no Electron
  * deixa a UI “morta” (scroll nativo ainda funciona, cliques não).
@@ -23,7 +26,7 @@ export function unlockUi() {
   document.body.removeAttribute("inert");
 
   const root = document.getElementById("root");
-  if (root instanceof HTMLElement) {
+  if (root instanceof HTMLElement && !root.hasAttribute(INERT_MARKER)) {
     root.removeAttribute("inert");
     root.removeAttribute("aria-hidden");
     root.removeAttribute("data-aria-hidden");
@@ -33,7 +36,11 @@ export function unlockUi() {
   for (const child of document.body.children) {
     if (!(child instanceof HTMLElement)) continue;
     clearPe(child);
-    if (child.hasAttribute("inert") && !child.hasAttribute("data-radix-portal")) {
+    if (
+      child.hasAttribute("inert") &&
+      !child.hasAttribute("data-radix-portal") &&
+      !child.hasAttribute(INERT_MARKER)
+    ) {
       child.removeAttribute("inert");
     }
   }
@@ -51,7 +58,7 @@ export function unlockUi() {
     });
 
   document.querySelectorAll<HTMLElement>("[inert]").forEach((el) => {
-    if (el.closest('[data-state="open"]')) return;
+    if (el.closest('[data-state="open"]') || el.hasAttribute(INERT_MARKER)) return;
     el.removeAttribute("inert");
   });
 }

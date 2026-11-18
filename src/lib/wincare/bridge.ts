@@ -1,10 +1,27 @@
+import {
+  demoBackgroundState,
+  demoCheckNow,
+  demoSnooze,
+  demoUpdateBackground,
+  onDemoBackgroundChanged,
+} from "./backgroundDemo";
+import {
+  clearDemoHistory,
+  getDemoHistory,
+  onDemoHistoryChanged,
+  recordDemoEvent,
+} from "./historyDemo";
 import type {
+  BackgroundSettingsPatch,
+  BatteryReport,
+  BackgroundState,
   CleanerItem,
   CleanerResult,
   DiskDrive,
   DiskUsageFolder,
   InstalledProgram,
   LeftoverItem,
+  MaintenanceHistory,
   LeftoverRemoval,
   LeftoverScan,
   RestorePointResult,
@@ -14,6 +31,7 @@ import type {
   ScheduleJob,
   ScheduleOverview,
   StartupItem,
+  TrayCommand,
   SystemInfo,
   Tool,
   TopProcess,
@@ -127,14 +145,26 @@ export interface NativeBridge {
     plans: PowerPlanInfo[];
     active: PowerPlanInfo | null;
   }>;
+  batteryReport?: () => Promise<BatteryReport>;
+  openBatteryReport?: () => Promise<{ ok: boolean; path?: string; reason?: string }>;
   saveTextFile?: (
     content: string,
     defaultName?: string,
+    /** Título da janela "Salvar como". O tipo do arquivo vem da extensão do nome. */
+    title?: string,
   ) => Promise<{ ok: boolean; path?: string; reason?: string }>;
   isElevated: () => Promise<boolean>;
   restartAsAdmin: () => Promise<{ ok: boolean; reason?: string }>;
   clearStorage?: () => Promise<{ ok: boolean }>;
   setNativeTheme?: (theme: "dark" | "light") => Promise<void>;
+  /** Zoom do Chromium para a janela (1 = 100%). Síncrono, aplicado antes do próximo quadro. */
+  setZoomFactor?: (factor: number) => void;
+  /** Ctrl +/−/0, Ctrl + roda do mouse e menu Exibir chegam por aqui a partir do processo principal. */
+  onZoomCommand?: (handler: (command: "in" | "out" | "reset") => void) => () => void;
+  /** Alt+1…9 / Alt+0 interceptados no processo principal (dígito da página). */
+  onPageShortcut?: (handler: (digit: string) => void) => () => void;
+  /** Menu Exibir → Atalhos de teclado. */
+  onShowShortcuts?: (handler: () => void) => () => void;
   cleanerScan?: () => Promise<{ ok: boolean; reason?: string; items: CleanerItem[] }>;
   cleanerClean?: (ids: string[]) => Promise<CleanerResult>;
   listPrograms?: () => Promise<{ ok: boolean; reason?: string; items: InstalledProgram[] }>;
@@ -149,6 +179,21 @@ export interface NativeBridge {
   ) => Promise<{ ok: boolean; reason?: string }>;
   removeSchedule?: (job: ScheduleJob) => Promise<{ ok: boolean; reason?: string }>;
   runScheduleNow?: (job: ScheduleJob) => Promise<{ ok: boolean; reason?: string }>;
+  /** Histórico de manutenção gravado pelo processo principal. */
+  maintenanceHistory?: () => Promise<MaintenanceHistory>;
+  clearMaintenanceHistory?: () => Promise<{ ok: boolean; reason?: string }>;
+  /** Avisa quando algo entra no histórico (o app aberto registrou uma ação). */
+  onHistoryChanged?: (handler: () => void) => () => void;
+  /** Bandeja, abrir com o Windows e alertas em segundo plano. */
+  backgroundState?: () => Promise<BackgroundState>;
+  setBackgroundSettings?: (patch: BackgroundSettingsPatch) => Promise<BackgroundState>;
+  checkAlertsNow?: () => Promise<BackgroundState>;
+  snoozeAlerts?: (hours: number) => Promise<BackgroundState>;
+  testNotification?: () => Promise<{ ok: boolean }>;
+  onBackgroundChanged?: (handler: (state: BackgroundState) => void) => () => void;
+  /** Pedido da bandeja/notificação que chegou antes da janela existir. */
+  takeTrayCommand?: () => Promise<TrayCommand | null>;
+  onTrayCommand?: (handler: (command: TrayCommand) => void) => () => void;
 }
 
 export function getNative(): NativeBridge | null {
@@ -472,6 +517,48 @@ export const SIMULATED_STARTUP: StartupItem[] = [
   },
 ];
 
+/** Notebook de demonstração: bateria com ~13% de desgaste, quase sempre na tomada. */
+export const SIMULATED_BATTERY: BatteryReport = {
+  ok: true,
+  hasBattery: true,
+  scannedAt: "2026-11-18T12:00:00Z",
+  platformRole: "Mobile",
+  batteries: [
+    {
+      name: "DELL 7FHHV",
+      manufacturer: "SMP",
+      chemistry: "LiP",
+      designMwh: 56000,
+      fullChargeMwh: 48740,
+      cycleCount: 412,
+    },
+  ],
+  history: [
+    { date: "2025-06-28", fullChargeMwh: 55420, designMwh: 56000 },
+    { date: "2025-07-28", fullChargeMwh: 55180, designMwh: 56000 },
+    { date: "2025-08-28", fullChargeMwh: 54960, designMwh: 56000 },
+    { date: "2025-09-28", fullChargeMwh: 54610, designMwh: 56000 },
+    { date: "2025-10-28", fullChargeMwh: 54200, designMwh: 56000 },
+    { date: "2025-11-28", fullChargeMwh: 53950, designMwh: 56000 },
+    { date: "2025-12-28", fullChargeMwh: 53480, designMwh: 56000 },
+    { date: "2026-01-28", fullChargeMwh: 52990, designMwh: 56000 },
+    { date: "2026-02-28", fullChargeMwh: 52700, designMwh: 56000 },
+    { date: "2026-03-28", fullChargeMwh: 52210, designMwh: 56000 },
+    { date: "2026-04-28", fullChargeMwh: 51830, designMwh: 56000 },
+    { date: "2026-05-28", fullChargeMwh: 51400, designMwh: 56000 },
+    { date: "2026-06-28", fullChargeMwh: 50880, designMwh: 56000 },
+    { date: "2026-07-28", fullChargeMwh: 50510, designMwh: 56000 },
+    { date: "2026-08-28", fullChargeMwh: 49960, designMwh: 56000 },
+    { date: "2026-09-28", fullChargeMwh: 49620, designMwh: 56000 },
+    { date: "2026-10-28", fullChargeMwh: 49170, designMwh: 56000 },
+    { date: "2026-11-28", fullChargeMwh: 48740, designMwh: 56000 },
+  ],
+  runtime: { fullChargeSec: 15000, designSec: 17220 },
+  acShare: 0.92,
+  onBattery: false,
+  activePlan: { guid: "381b4222-f694-41f0-9685-ff5bb260df2e", name: "Equilibrado" },
+};
+
 export const SIMULATED_DISK_USAGE: DiskUsageFolder[] = [
   {
     id: "temp-user",
@@ -785,6 +872,11 @@ export async function createRestorePoint(description: string): Promise<RestorePo
   const native = getNative();
   if (native?.createRestorePoint) return native.createRestorePoint(description);
   await sleep(1400);
+  recordDemoEvent({
+    kind: "safety",
+    action: "restore-point",
+    title: "Ponto de restauração criado",
+  });
   return { ok: true, status: "created", message: "Ponto de restauração criado (demonstração)." };
 }
 
@@ -804,13 +896,19 @@ export async function cleanCleaner(ids: string[]): Promise<CleanerResult> {
   if (native?.cleanerClean) return native.cleanerClean(ids);
   await sleep(1100);
   const items = SIMULATED_CLEANER.filter((i) => ids.includes(i.id));
-  return {
-    ok: true,
-    freedBytes: items.reduce((sum, i) => sum + i.sizeBytes, 0),
-    removed: items.reduce((sum, i) => sum + i.fileCount, 0),
-    skipped: 0,
-    blocked: [],
-  };
+  const freedBytes = items.reduce((sum, i) => sum + i.sizeBytes, 0);
+  const removed = items.reduce((sum, i) => sum + i.fileCount, 0);
+  if (items.length) {
+    const apps = [...new Set(items.map((i) => i.appName))];
+    recordDemoEvent({
+      kind: "cleanup",
+      action: "cleaner",
+      title: "Navegadores e apps limpos",
+      detail: `${apps.slice(0, 3).join(", ")}${apps.length > 3 ? ` e mais ${apps.length - 3}` : ""} · ${removed.toLocaleString("pt-BR")} arquivos`,
+      freedBytes,
+    });
+  }
+  return { ok: true, freedBytes, removed, skipped: 0, blocked: [] };
 }
 
 export async function listPrograms(): Promise<{
@@ -828,6 +926,16 @@ export async function uninstallProgram(id: string): Promise<UninstallResult> {
   const native = getNative();
   if (native?.uninstallProgram) return native.uninstallProgram(id);
   await sleep(1800);
+  const program = SIMULATED_PROGRAMS.find((p) => p.id === id);
+  demoLeftoversProgram = program?.name ?? "";
+  recordDemoEvent({
+    kind: "uninstall",
+    action: "uninstall",
+    title: `${program?.name ?? "Programa"} desinstalado`,
+    subject: program?.name,
+    freedBytes: program?.sizeBytes,
+    estimated: true,
+  });
   return { ok: true, exitCode: 0, stillInstalled: false };
 }
 
@@ -843,14 +951,24 @@ export async function removeLeftovers(ids: string[]): Promise<LeftoverRemoval> {
   if (native?.removeLeftovers) return native.removeLeftovers(ids);
   await sleep(900);
   const items = SIMULATED_LEFTOVERS.filter((i) => ids.includes(i.id));
-  return {
-    ok: true,
-    removed: items.length,
-    freedBytes: items.reduce((sum, i) => sum + i.sizeBytes, 0),
-    failed: [],
-    backupDir: null,
-  };
+  const freedBytes = items.reduce((sum, i) => sum + i.sizeBytes, 0);
+  if (items.length) {
+    recordDemoEvent({
+      kind: "cleanup",
+      action: "leftovers",
+      title: demoLeftoversProgram
+        ? `Sobras de ${demoLeftoversProgram} removidas`
+        : "Sobras de programa removidas",
+      subject: demoLeftoversProgram || undefined,
+      detail: `${items.length} ${items.length === 1 ? "item removido" : "itens removidos"}`,
+      freedBytes,
+    });
+  }
+  return { ok: true, removed: items.length, freedBytes, failed: [], backupDir: null };
 }
+
+/** Programa desinstalado por último na demonstração (para o histórico das sobras). */
+let demoLeftoversProgram = "";
 
 export async function listSchedules(): Promise<ScheduleOverview> {
   const native = getNative();
@@ -893,4 +1011,122 @@ export async function runScheduleNow(job: ScheduleJob): Promise<{ ok: boolean; r
 export async function openWindowsTarget(command: string): Promise<void> {
   const native = getNative();
   if (native) await native.run(command, () => {});
+}
+
+/* Bateria: relatório do Windows no app; notebook simulado no navegador. */
+
+export async function loadBatteryReport(): Promise<BatteryReport> {
+  const native = getNative();
+  if (native?.batteryReport) {
+    const report = await native.batteryReport();
+    if (!report.ok && report.reason !== "not-windows") {
+      throw new Error(report.reason || "Não foi possível ler a bateria.");
+    }
+    return report;
+  }
+  await sleep(500);
+  return SIMULATED_BATTERY;
+}
+
+/** Abre o relatório completo do Windows (HTML). No navegador não há relatório real. */
+export async function openFullBatteryReport(): Promise<{
+  ok: boolean;
+  reason?: string;
+  demo?: boolean;
+}> {
+  const native = getNative();
+  if (native?.openBatteryReport) return native.openBatteryReport();
+  return { ok: false, demo: true, reason: "Disponível só no app para Windows." };
+}
+
+/* Histórico de manutenção: gravado pelo processo principal; demonstração no navegador. */
+
+export async function loadMaintenanceHistory(): Promise<MaintenanceHistory> {
+  const native = getNative();
+  if (native?.maintenanceHistory) return native.maintenanceHistory();
+  await sleep(250);
+  return getDemoHistory();
+}
+
+export async function clearMaintenanceHistory(): Promise<{ ok: boolean; reason?: string }> {
+  const native = getNative();
+  if (native?.clearMaintenanceHistory) return native.clearMaintenanceHistory();
+  clearDemoHistory();
+  return { ok: true };
+}
+
+/** Chama `handler` quando um evento novo entra no histórico. */
+export function onMaintenanceHistoryChanged(handler: () => void): () => void {
+  const native = getNative();
+  if (native) return native.onHistoryChanged?.(handler) ?? (() => {});
+  return onDemoHistoryChanged(handler);
+}
+
+/**
+ * Salva um arquivo gerado pela interface: "Salvar como" do Windows no app,
+ * download comum no navegador. `cancelled` quando o usuário fecha a janela.
+ */
+export async function saveGeneratedFile(
+  content: string,
+  fileName: string,
+  options: { title?: string; mime?: string } = {},
+): Promise<{ ok: boolean; path?: string; cancelled?: boolean; reason?: string }> {
+  const native = getNative();
+  if (native?.saveTextFile) {
+    const out = await native.saveTextFile(content, fileName, options.title);
+    return out.ok ? out : { ...out, cancelled: out.reason === "cancelled" };
+  }
+  const blob = new Blob([content], { type: options.mime ?? "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { ok: true };
+}
+
+/* Bandeja e alertas em segundo plano (processo principal); demonstração no navegador. */
+
+export async function getBackgroundState(): Promise<BackgroundState> {
+  const native = getNative();
+  if (native?.backgroundState) return native.backgroundState();
+  await sleep(200);
+  return demoBackgroundState(SIMULATED_SYSTEM.lastUpdate);
+}
+
+export async function updateBackgroundSettings(
+  patch: BackgroundSettingsPatch,
+): Promise<BackgroundState> {
+  const native = getNative();
+  if (native?.setBackgroundSettings) return native.setBackgroundSettings(patch);
+  return demoUpdateBackground(patch, SIMULATED_SYSTEM.lastUpdate);
+}
+
+export async function checkAlertsNow(): Promise<BackgroundState> {
+  const native = getNative();
+  if (native?.checkAlertsNow) return native.checkAlertsNow();
+  await sleep(700);
+  return demoCheckNow(SIMULATED_SYSTEM.lastUpdate);
+}
+
+export async function snoozeAlerts(hours: number): Promise<BackgroundState> {
+  const native = getNative();
+  if (native?.snoozeAlerts) return native.snoozeAlerts(hours);
+  return demoSnooze(hours, SIMULATED_SYSTEM.lastUpdate);
+}
+
+/** `demo`: no navegador não há notificação do Windows (a tela mostra uma prévia). */
+export async function sendTestNotification(): Promise<{ ok: boolean; demo?: boolean }> {
+  const native = getNative();
+  if (native?.testNotification) return native.testNotification();
+  return { ok: true, demo: true };
+}
+
+export function onBackgroundChanged(handler: (state: BackgroundState) => void): () => void {
+  const native = getNative();
+  if (native) return native.onBackgroundChanged?.(handler) ?? (() => {});
+  return onDemoBackgroundChanged(handler);
 }

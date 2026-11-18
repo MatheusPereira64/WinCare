@@ -28,8 +28,13 @@ const SAMPLE_GAP_MS = 10 * 60 * 1000;
 const MAX_SNAPSHOTS = 12;
 const MAX_SESSIONS = 20;
 
+/*
+ * Sem amostras até hydrateIntelligence() rodar no cliente: o histórico de
+ * demonstração usa o relógio, e gerá-lo no carregamento do módulo fazia o HTML
+ * do servidor ("Última: … 17:14") divergir da hidratação no navegador (17:15).
+ */
 const initial: IntelState = {
-  samples: seedHealthHistory(),
+  samples: [],
   snapshots: [],
   startupKnown: [],
   startupNewIds: [],
@@ -131,7 +136,8 @@ export function useIntel<T>(selector: (s: IntelState) => T): T {
   return useSyncExternalStore(
     subscribe,
     () => selector(getSnapshot()),
-    () => selector(getSnapshot()),
+    // Servidor e hidratação leem o mesmo estado fixo; o cliente troca pelo real logo depois.
+    () => selector(initial),
   );
 }
 

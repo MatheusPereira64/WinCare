@@ -13,7 +13,7 @@ export const Route = createFileRoute("/inicializacao")({
       { property: "og:title", content: "Gerenciador de inicialização | WinCare" },
       {
         property: "og:description",
-        content: "Controle a inicialização do Windows e reduza lentidão no boot.",
+        content: "Controle a inicialização do Windows e ligue o PC mais rápido.",
       },
     ],
   }),

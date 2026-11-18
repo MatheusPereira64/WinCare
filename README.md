@@ -42,7 +42,7 @@ Não precisa instalar Node.js nem clonar o projeto.
 1. Abra a página de **[Releases](https://github.com/MatheusPereira64/WinCare/releases/latest)**
 2. Baixe o arquivo **`WinCare-Windows-x64.zip`**
 3. Extraia a pasta (botão direito → **Extrair tudo**)
-4. Abra **`WinCare.exe`**
+4. Abra **`WinCare.exe`** — na primeira vez, uma introdução de 4 passos explica o que o app faz (e o que nunca faz), ajusta as preferências e sugere agendar a limpeza semanal
 
 ### Dicas rápidas
 
@@ -114,7 +114,9 @@ npm run wincare:dev
 | `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` para distribuição |
 | `npm run wincare:clear-data` | Limpa histórico salvo localmente |
 | `npm run wincare:screenshots` | Regera as prévias do README (dados simulados) |
-| `npm test` | Testa as proteções contra exclusão indevida |
+| `npm test` | Testes rápidos: processo principal + lógica e componentes (Vitest) |
+| `npm run test:e2e` | Fluxos principais no Chromium (Playwright, modo demonstração) |
+| `npm run test:visual` | Compara as telas com a linha de base (Playwright no Docker) |
 | `npm run dev` | Preview web (modo demonstração) |
 | `npm run build` | Build web para produção |
 | `npm run lint` | Verifica o código com ESLint |
@@ -160,19 +162,29 @@ Status SMART, espaço por unidade e informações dos volumes.
 
 ### Sistema
 
+**Bateria** (só em notebooks): saúde em %, desgaste, ciclos de carga, capacidade e autonomia estimada, gráfico da capacidade mês a mês e dicas de energia, lidos do `powercfg /batteryreport`. "Relatório completo" abre o relatório HTML do Windows. Também aparece um resumo no Dashboard.
+
 Atalhos para Gerenciador de Dispositivos, Discos, Serviços, Registro, Eventos, Tarefas, Painel de Controle e Configurações do Windows.
 
 ### Monitoramento
 
 Gráficos de CPU e memória em tempo real (modo nativo usa dados reais).
 
+### Histórico
+
+O “antes e depois” da manutenção: espaço liberado, programas removidos, reparos feitos e a saúde do PC em **7, 30 ou 90 dias**, gráfico **semana a semana**, **linha do tempo** de tudo o que o WinCare fez (inclusive rotinas agendadas) e **exportação em CSV ou JSON**. Gravado pelo processo principal com o resultado real de cada ação, separado dos logs e com tamanho limitado.
+
 ### Logs
 
 Histórico das execuções com opção de copiar logs.
 
+### Bandeja e alertas
+
+Ícone na bandeja com atalhos (checkup rápido, liberar espaço, histórico, configurações, silenciar, sair), opção de **manter na bandeja ao fechar** e de **abrir com o Windows minimizado na bandeja**. Um monitor leve no processo principal avisa com notificação do Windows sobre **disco do sistema quase cheio**, **temperatura alta**, **Defender desligado** (sem outro antivírus) e **Windows Update atrasado** — uma vez por problema, nunca com a janela em foco e no máximo um aviso a cada 10 minutos. Detalhes e limites em [FUNCIONALIDADES.md](docs/FUNCIONALIDADES.md#bandeja-e-alertas-desktop).
+
 ### Configurações
 
-Tema claro/escuro, confirmação de comandos críticos, ponto de restauração automático, avisos ao abrir, **Executar como administrador** e limpeza de dados locais.
+Tema claro/escuro, confirmação de comandos críticos, ponto de restauração automático, avisos ao abrir, **bandeja e alertas**, **Executar como administrador** e limpeza de dados locais.
 
 ---
 
@@ -221,6 +233,8 @@ Localmente, `npm run wincare:package` usa as mesmas variáveis (ou `WINCARE_SIGN
 - Logs do processo principal: `%APPDATA%\WinCare\logs\wincare.log`
 - Backups do registro feitos ao remover resíduos: `%APPDATA%\WinCare\registry-backups\`
 - Rotinas agendadas: `%APPDATA%\WinCare\schedules.json` e `schedule-history.json`
+- Histórico de manutenção: `%APPDATA%\WinCare\maintenance-history.json` (até 1.500 registros e 512 KB; apague em **Histórico → Apagar**)
+- Bandeja e alertas: `%APPDATA%\WinCare\background.json`; “Abrir com o Windows” fica em `HKCU\…\Run` (valor `WinCare`) e o nome/ícone das notificações em `HKCU\Software\Classes\AppUserModelId\com.wincare.desktop`
 - Menu **WinCare → Abrir arquivo de log** (tecla **Alt** no app desktop)
 - Limpar histórico: **Configurações → Dados locais** ou `npm run wincare:clear-data`
 
@@ -248,13 +262,14 @@ Localmente, `npm run wincare:package` usa as mesmas variáveis (ou `WINCARE_SIGN
 WinCare/
 ├── src/                 # Interface React (rotas, componentes, lógica)
 ├── electron/            # Shell desktop (main, preload, renderer)
-├── scripts/             # Launcher, empacote ZIP, limpeza de dados
-├── .github/workflows/   # Release automática no GitHub
+├── scripts/             # Launcher, empacote ZIP, limpeza de dados, servidor dos testes
+├── e2e/                 # Playwright: fluxos (e2e/flows) e regressão visual (e2e/visual)
+├── .github/workflows/   # Testes no CI e release automática no GitHub
 ├── docs/                # Documentação (especificação original)
 └── dist/                # Build da interface (gerado)
 ```
 
-Detalhes técnicos do Electron: [electron/README.md](electron/README.md).
+Detalhes técnicos do Electron: [electron/README.md](electron/README.md). Testes: [docs/testes.md](docs/testes.md).
 
 ---
 

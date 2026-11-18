@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Card } from "@/components/ui/card";
 
-export type StatTone = "primary" | "success" | "warning" | "destructive";
+import { cn } from "@/lib/utils";
+import { TONE_FILL, TONE_SOFT, usageTone, type Tone } from "@/lib/wincare/tone";
+import { Panel } from "./Panel";
 
 interface Props {
   icon: ReactNode;
@@ -9,52 +10,46 @@ interface Props {
   value: string;
   hint?: string;
   progress?: number;
-  /** Cor do chip do ícone e da barra; por padrão segue o nível de uso. */
-  tone?: StatTone;
+  /** Tom do ícone e da barra; por padrão segue o nível de uso (usageTone). */
+  tone?: Tone;
+  className?: string;
 }
 
-const chipTone: Record<StatTone, string> = {
-  primary: "bg-primary/15 text-primary",
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
-  destructive: "bg-destructive/15 text-destructive",
-};
-
-const barTone: Record<StatTone, string> = {
-  primary: "bg-primary",
-  success: "bg-success",
-  warning: "bg-warning",
-  destructive: "bg-destructive",
-};
-
-/** Tom automático conforme a pressão do recurso (uso %). */
-function autoTone(progress?: number): StatTone {
-  if (typeof progress !== "number") return "primary";
-  if (progress >= 90) return "destructive";
-  if (progress >= 75) return "warning";
-  return "primary";
-}
-
-export function StatCard({ icon, label, value, hint, progress, tone }: Props) {
-  const t = tone ?? autoTone(progress);
+/** Número de destaque com rótulo, ícone e barra opcional (Dashboard). */
+export function StatCard({ icon, label, value, hint, progress, tone, className }: Props) {
+  const t = tone ?? (typeof progress === "number" ? usageTone(progress) : "primary");
 
   return (
-    <Card className="surface-panel hover-lift gap-3 border-border/50 p-5">
+    <Panel variant="interactive" className={cn("gap-3", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {label}
         </span>
         <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${chipTone[t]}`}
+          aria-hidden
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+            TONE_SOFT[t],
+          )}
         >
           {icon}
         </span>
       </div>
       <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
       {typeof progress === "number" && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
+        <div
+          role="progressbar"
+          aria-label={`Uso de ${label}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(Math.min(100, Math.max(0, progress)))}
+          className="h-1.5 w-full overflow-hidden rounded-full bg-muted forced-colors:border forced-colors:border-[CanvasText]"
+        >
           <div
-            className={`h-full rounded-full transition-all duration-500 ${barTone[t]}`}
+            className={cn(
+              "h-full rounded-full transition-all duration-500 forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight]",
+              TONE_FILL[t],
+            )}
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
           />
         </div>
@@ -64,6 +59,6 @@ export function StatCard({ icon, label, value, hint, progress, tone }: Props) {
           {hint}
         </p>
       )}
-    </Card>
+    </Panel>
   );
 }

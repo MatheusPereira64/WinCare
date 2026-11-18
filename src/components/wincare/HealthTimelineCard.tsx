@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { Camera, Trash2 } from "lucide-react";
+import { Activity, Camera, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ChoiceChips } from "@/components/wincare/ChoiceChips";
 import { Sparkline } from "@/components/wincare/Sparkline";
+import { Panel, PanelHeader } from "./Panel";
+import { EmptyState } from "./States";
 import { diffSnapshots, snapshotFromState, type HealthSample } from "@/lib/wincare/intelligence";
 import { intelActions, useIntel } from "@/lib/wincare/intelligenceStore";
 import type { StartupItem, SystemInfo, TopProcess } from "@/lib/wincare/types";
@@ -27,39 +29,37 @@ export function HealthTimelineCard({ samples }: { samples: HealthSample[] }) {
   const delta = last && first ? last.health - first.health : 0;
 
   return (
-    <Card className="surface-panel gap-4 border-border/60 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Linha do tempo da saúde</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Amostras a cada ~10 min enquanto o WinCare está aberto.
-            {last ? ` Última: ${formatWhen(last.ts)}.` : ""}
-          </p>
-        </div>
-        {last && (
-          <p className="text-sm tabular-nums text-muted-foreground">
-            Saúde {last.health}%{" "}
-            <span className={delta >= 0 ? "text-success" : "text-destructive"}>
-              {delta >= 0 ? "+" : ""}
-              {delta} vs início
-            </span>
-          </p>
-        )}
-      </div>
+    <Panel className="@container">
+      <PanelHeader
+        icon={Activity}
+        title="Linha do tempo da saúde"
+        description={`Uma medição a cada ~10 min enquanto o WinCare está aberto.${last ? ` Última: ${formatWhen(last.ts)}.` : ""}`}
+        actions={
+          last && (
+            <p className="text-sm tabular-nums text-muted-foreground">
+              Saúde {last.health}%{" "}
+              <span className={delta >= 0 ? "text-success" : "text-destructive"}>
+                ({delta >= 0 ? "+" : ""}
+                {delta} desde o início)
+              </span>
+            </p>
+          )
+        }
+      />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 @lg:grid-cols-3" role="list" aria-label="Tendências">
         <Meter label="Saúde" values={health} suffix="%" />
         <Meter label="CPU" values={cpu} suffix="%" />
-        <Meter label="RAM" values={ram} suffix="%" />
+        <Meter label="Memória" values={ram} suffix="%" />
       </div>
-    </Card>
+    </Panel>
   );
 }
 
 function Meter({ label, values, suffix }: { label: string; values: number[]; suffix: string }) {
   const current = values[values.length - 1];
   return (
-    <div className="rounded-xl border border-border/40 bg-background/40 p-3">
+    <div role="listitem" className="surface-inset p-3">
       <div className="flex items-baseline justify-between">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-sm font-semibold tabular-nums">
@@ -67,7 +67,7 @@ function Meter({ label, values, suffix }: { label: string; values: number[]; suf
         </p>
       </div>
       <div className="mt-2 text-primary">
-        <Sparkline values={values} />
+        <Sparkline values={values} label={`${label}: tendência`} suffix={suffix} />
       </div>
     </div>
   );
@@ -93,48 +93,53 @@ export function SnapshotCompareCard({
   const capture = () => {
     const snap = snapshotFromState(info, startup, processes);
     intelActions.addSnapshot(snap);
-    toast.success("Snapshot salvo", { description: snap.label });
+    toast.success("Captura salva", { description: snap.label });
   };
 
   return (
-    <Card className="surface-panel gap-4 border-border/60 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Antes e depois</h2>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Capture o estado do PC, faça uma limpeza ou mude o boot e compare os números.
-          </p>
-        </div>
-        <Button
-          type="button"
-          className="rounded-full"
-          onClick={capture}
-          disabled={info.hostname === "…"}
-        >
-          <Camera /> Capturar agora
-        </Button>
-      </div>
+    <Panel className="@container">
+      <PanelHeader
+        icon={Camera}
+        title="Antes e depois"
+        description="Capture o estado do PC, faça uma limpeza ou mude a inicialização e compare os números."
+        actions={
+          <Button
+            type="button"
+            className="rounded-full"
+            onClick={capture}
+            disabled={info.hostname === "…"}
+          >
+            <Camera /> Capturar agora
+          </Button>
+        }
+      />
 
       {snapshots.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Nenhum snapshot ainda. Capture o estado atual.
-        </p>
+        <EmptyState
+          size="sm"
+          icon={Camera}
+          title="Nenhuma captura ainda"
+          description="Capture o estado atual antes de uma limpeza para comparar depois."
+        />
       )}
 
       {snapshots.length > 0 && (
-        <ul className="divide-y divide-border/40">
+        <ul className="divide-y divide-border/60" aria-label="Capturas">
           {snapshots.slice(0, 6).map((snap) => (
             <li key={snap.id} className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{snap.label}</p>
                 <p className="text-xs text-muted-foreground">
-                  Saúde {snap.health}% · RAM {snap.ram}% · {snap.startupEnabled} no boot
+                  Saúde {snap.health}% · memória {snap.ram}% · {snap.startupEnabled} na
+                  inicialização
                 </p>
               </div>
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
+                className="shrink-0"
+                aria-label={`Remover ${snap.label}`}
                 onClick={() => intelActions.removeSnapshot(snap.id)}
               >
                 <Trash2 className="size-4" />
@@ -145,7 +150,7 @@ export function SnapshotCompareCard({
       )}
 
       {snapshots.length >= 2 && left && right && (
-        <div className="space-y-3 border-t border-border/40 pt-3">
+        <div className="space-y-3 border-t border-border/60 pt-3">
           <PickerRow
             label="Antes"
             selectedId={left.id}
@@ -158,14 +163,14 @@ export function SnapshotCompareCard({
             snapshots={snapshots}
             onSelect={setRightId}
           />
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 @lg:grid-cols-2">
             {rows.map((row) => (
               <div
                 key={row.label}
-                className="flex items-center justify-between rounded-lg bg-background/50 px-3 py-2 text-sm"
+                className="surface-inset flex items-center justify-between px-3 py-2 text-sm"
               >
-                <span className="text-muted-foreground">{row.label}</span>
-                <span className="tabular-nums">
+                <span className="min-w-0 text-muted-foreground">{row.label}</span>
+                <span className="shrink-0 tabular-nums">
                   {row.before} → {row.after}{" "}
                   {row.delta != null && row.delta !== 0 && (
                     <span
@@ -187,11 +192,11 @@ export function SnapshotCompareCard({
           </div>
         </div>
       )}
-    </Card>
+    </Panel>
   );
 }
 
-/** Botões no lugar de &lt;select&gt; — nativo no Electron trava a UI ao montar a aba. */
+/** Escolha do snapshot (radiogroup) — botões no lugar de <select>, que trava a UI no Electron. */
 function PickerRow({
   label,
   selectedId,
@@ -205,21 +210,15 @@ function PickerRow({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {snapshots.map((s) => (
-          <Button
-            key={`${label}-${s.id}`}
-            type="button"
-            size="sm"
-            variant={s.id === selectedId ? "default" : "outline"}
-            className="h-8 rounded-full px-2.5 text-[11px]"
-            onClick={() => onSelect(s.id)}
-          >
-            {formatWhen(s.ts)}
-          </Button>
-        ))}
-      </div>
+      <p className="mb-1.5 text-[11px] font-medium text-muted-foreground" aria-hidden>
+        {label}
+      </p>
+      <ChoiceChips
+        label={`Captura ${label.toLowerCase()}`}
+        value={selectedId}
+        onChange={onSelect}
+        options={snapshots.map((snap) => ({ value: snap.id, label: formatWhen(snap.ts) }))}
+      />
     </div>
   );
 }

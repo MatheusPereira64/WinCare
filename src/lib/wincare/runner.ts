@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { createRestorePoint, getNative, simulateRun } from "./bridge";
 import { normalizeCmdText } from "./commandFeed";
+import { recordDemoToolRun } from "./historyDemo";
 import { actions, getStoreState } from "./store";
 import { resolveCommand } from "./tools";
 import type { LogLine, RunRecord, Tool } from "./types";
@@ -171,7 +172,7 @@ export function useToolRunner(tool: Tool) {
         const native = getNative();
 
         if (tool.restorePoint && getStoreState().autoRestorePoint && !options.skipRestorePoint) {
-          push("Criando ponto de restauração antes de continuar...", "info");
+          push("Criando ponto de restauração antes de continuar…", "info");
           const point = await createRestorePoint(tool.name);
           if (!point.ok) {
             restorePointFailed = true;
@@ -185,14 +186,16 @@ export function useToolRunner(tool: Tool) {
         if (tool.nativeAction === "restore-point") {
           const point = await createRestorePoint("ponto manual");
           code = point.ok ? 0 : 1;
-          result = point.message ?? (point.ok ? "Ponto de restauração criado." : "Falha.");
+          result =
+            point.message ??
+            (point.ok ? "Ponto de restauração criado." : "Ponto de restauração não foi criado.");
         } else if (native) {
           let elevated = false;
           if (tool.requiresAdmin) {
             const isAdmin = await native.isElevated();
             elevated = !isAdmin;
             if (elevated) {
-              push("Solicitando elevação via UAC (Executar como administrador)...", "warn");
+              push("Pedindo permissão de administrador (UAC)…", "warn");
             }
           }
           const out = await native.run(command, (chunk) => pushChunk(chunk), {
@@ -205,10 +208,12 @@ export function useToolRunner(tool: Tool) {
           const out = await simulateRun({ ...tool, command }, (l) => push(l));
           code = out.code;
           result = out.result;
+          // No app, quem registra é o processo principal; aqui, o histórico de demonstração.
+          recordDemoToolRun(tool.id, code === 0, Date.now() - started);
         }
       } catch (err) {
         code = 1;
-        result = err instanceof Error ? err.message : "Falha ao executar o comando.";
+        result = err instanceof Error ? err.message : "Não foi possível executar o comando.";
         console.error("[WinCare] falha ao executar", tool.id, err);
       } finally {
         clearInterval(timer);

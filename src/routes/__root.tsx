@@ -8,8 +8,8 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
-import { Loader2, Moon, Shield, ShieldCheck, Sun } from "lucide-react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { Loader2, Moon, SearchX, Shield, ShieldCheck, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import appCss from "../styles.css?url";
@@ -17,7 +17,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppSidebar } from "@/components/wincare/AppSidebar";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
 import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
@@ -31,25 +30,28 @@ import { UpdateAvailableModal } from "@/components/wincare/UpdateAvailableModal"
 import { IntelligenceCollector } from "@/components/wincare/IntelligenceCollector";
 import { PageLoadingOverlay } from "@/components/wincare/PageLoading";
 import { useContentLoading } from "@/lib/wincare/useContentLoading";
+import { EmptyState, ErrorState } from "@/components/wincare/States";
+import { StatusBadge } from "@/components/wincare/StatusBadge";
+import { ZoomController, ZoomIndicator } from "@/components/wincare/ZoomController";
+import { FirstRunWizard } from "@/components/wincare/FirstRunWizard";
+import { TrayBridge } from "@/components/wincare/TrayBridge";
+import { KeyboardShortcuts, ShortcutsButton } from "@/components/wincare/KeyboardShortcuts";
+import { PAGE_TITLES } from "@/lib/wincare/navigation";
+import { INERT_MARKER } from "@/lib/wincare/useFocusTrap";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Página não encontrada</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Esta ferramenta não existe ou foi movida.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Voltar ao dashboard
-          </Link>
-        </div>
-      </div>
+    <div className="flex min-h-[60svh] items-center justify-center px-4">
+      <EmptyState
+        icon={SearchX}
+        title="Página não encontrada"
+        description="Esta tela não existe ou foi movida."
+        action={
+          <Button asChild size="sm">
+            <Link to="/">Voltar ao Dashboard</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -62,32 +64,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Esta página não carregou
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Algo deu errado. Tente novamente ou volte ao início.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Tentar novamente
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Ir para o início
-          </a>
-        </div>
-      </div>
+    <div className="flex min-h-[60svh] items-center justify-center px-4">
+      <ErrorState
+        title="Esta tela não carregou"
+        description="Algo deu errado. Tente de novo ou volte ao início."
+        onRetry={() => {
+          void router.invalidate();
+          reset();
+        }}
+        secondaryAction={
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/">Ir para o início</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -125,7 +115,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/**
+ * Web (TanStack Start): o shell é o documento inteiro e o React hidrata o `document`.
+ *
+ * App desktop: o React monta em `#root` (electron/renderer/main.tsx). Lá o shell
+ * NÃO pode renderizar <html>/<body>: o React 19 adotaria o <body> real como nó
+ * da própria árvore — que está dentro do <body> — e eventos tratados no
+ * document/body (o `selectionchange` ao focar um campo de texto, portais no
+ * body) entravam num loop infinito no despacho de eventos do React, travando
+ * a janela. Era a causa das "cliques mortos" ao focar a busca ou abrir overlays.
+ * `<title>`/`<meta>` do HeadContent continuam indo para o <head> (React 19).
+ */
 function RootShell({ children }: { children: ReactNode }) {
+  if (typeof document !== "undefined" && document.getElementById("root")) {
+    return (
+      <>
+        <HeadContent />
+        {children}
+      </>
+    );
+  }
   return (
     <html lang="pt-BR">
       <head>
@@ -138,22 +147,6 @@ function RootShell({ children }: { children: ReactNode }) {
     </html>
   );
 }
-
-const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/reparo": "Reparo",
-  "/limpeza": "Limpeza",
-  "/programas": "Programas",
-  "/agendamento": "Agendamento",
-  "/disco": "Disco",
-  "/inicializacao": "Inicialização",
-  "/sistema": "Sistema",
-  "/redes": "Redes",
-  "/monitoramento": "Monitoramento",
-  "/logs": "Logs",
-  "/configuracoes": "Configurações",
-  "/inteligencia": "Inteligência",
-};
 
 const CATEGORY_PAGE: Record<ToolCategory, string> = {
   repair: "/reparo",
@@ -172,7 +165,7 @@ function RunningIndicator() {
     <Link
       to={first.id === "full-check" ? "/" : CATEGORY_PAGE[first.category]}
       title={runs.map((r) => r.tool.name).join(", ")}
-      className="animate-fade-in flex max-w-64 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+      className="animate-fade-in flex max-w-40 min-w-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/15 @2xl/topbar:max-w-64"
     >
       <Loader2 className="size-3.5 shrink-0 animate-spin" />
       <span className="truncate">
@@ -195,70 +188,72 @@ function TopBar() {
       return;
     }
     if (out.ok) {
-      toast.info("Reiniciando com privilégios de administrador...");
+      toast.info("Reabrindo como administrador…");
       return;
     }
-    toast.error("Não foi possível solicitar elevação.", {
+    toast.error("Não foi possível pedir permissão de administrador.", {
       description:
         out.reason ??
-        "Tente clicar com o botão direito no app e escolher Executar como administrador.",
+        "Clique com o botão direito no WinCare e escolha “Executar como administrador”.",
     });
   };
 
   return (
-    <header className="sticky top-0 z-[60] flex h-14 items-center gap-3 border-b border-border/50 bg-background/70 px-4 backdrop-blur-md pointer-events-auto">
-      <SidebarTrigger className="rounded-lg" />
-      <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-        <span className="text-sm font-semibold tracking-tight">WinCare</span>
+    // Container query na própria barra: os selos somem conforme o espaço real
+    // (barra lateral aberta, zoom e escala do Windows entram na conta).
+    <header className="@container/topbar sticky top-0 z-[60] flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/70 px-3 backdrop-blur-md pointer-events-auto sm:gap-3 sm:px-4 short:h-12">
+      <SidebarTrigger className="shrink-0 rounded-lg" />
+      <div className="flex min-w-0 items-center gap-2.5 whitespace-nowrap">
+        <span className="hidden shrink-0 text-sm font-semibold tracking-tight @md/topbar:inline">
+          WinCare
+        </span>
         {pageTitle && (
           <>
-            <span className="text-muted-foreground/40">/</span>
+            <span className="hidden text-muted-foreground/40 @md/topbar:inline" aria-hidden>
+              /
+            </span>
             <span className="truncate text-sm text-muted-foreground">{pageTitle}</span>
           </>
         )}
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex min-w-0 items-center gap-2">
         <RunningIndicator />
         {!isNative() && (
-          <Badge
-            variant="outline"
-            className="hidden rounded-full border-primary/30 bg-primary/10 px-3 text-primary md:inline-flex"
-          >
-            <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+          <StatusBadge tone="primary" dot className="hidden shrink-0 @3xl/topbar:inline-flex">
             Demonstração
-          </Badge>
+          </StatusBadge>
         )}
         {native && elevated === true && (
-          <Badge
-            variant="outline"
-            className="hidden rounded-full border-success/30 bg-success/10 px-3 text-success sm:inline-flex"
-          >
-            <ShieldCheck className="size-3 shrink-0" /> Admin
-          </Badge>
+          <StatusBadge tone="success" className="hidden shrink-0 @2xl/topbar:inline-flex">
+            <ShieldCheck aria-hidden className="size-3 shrink-0" /> Administrador
+          </StatusBadge>
         )}
         {native && elevated === false && (
-          <Badge
-            variant="outline"
-            className="hidden rounded-full border-warning/30 bg-warning/10 px-3 text-warning sm:inline-flex"
-          >
-            <Shield className="size-3 shrink-0" /> Usuário padrão
-          </Badge>
+          <StatusBadge tone="warning" className="hidden shrink-0 @3xl/topbar:inline-flex">
+            <Shield aria-hidden className="size-3 shrink-0" /> Usuário padrão
+          </StatusBadge>
         )}
         {native && elevated === false && (
           <Button
             variant="secondary"
             size="sm"
-            className="hidden rounded-full sm:inline-flex"
+            className="shrink-0 rounded-full"
+            title="Reabrir como administrador"
+            aria-label="Reabrir como administrador"
             onClick={() => void handleRestartAsAdmin()}
           >
-            <ShieldCheck className="size-4" /> Executar como admin
+            <ShieldCheck className="size-4" />
+            <span className="hidden @2xl/topbar:inline">Reabrir como admin</span>
           </Button>
         )}
+        <ZoomIndicator />
+        <ShortcutsButton />
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Alternar tema"
-          className="rounded-full"
+          aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+          title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+          className="shrink-0 rounded-full"
           onClick={() => actions.setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? <Sun /> : <Moon />}
@@ -270,6 +265,8 @@ function TopBar() {
 
 function StartupUpdateCheck() {
   const autoCheckUpdates = useStore((s) => s.autoCheckUpdates);
+  // Na primeira execução a introdução vem antes; o aviso de versão nova espera.
+  const onboardingDone = useStore((s) => s.onboardingDone);
   const { version, info, applying, progress, promptOpen, apply, openReleasePage, dismissPrompt } =
     useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
 
@@ -284,7 +281,7 @@ function StartupUpdateCheck() {
 
   return (
     <UpdateAvailableModal
-      open={promptOpen}
+      open={promptOpen && onboardingDone}
       currentVersion={info?.currentVersion || version}
       latestVersion={info?.latestVersion || ""}
       canAutoUpdate={!!info?.canAutoUpdate}
@@ -301,24 +298,108 @@ function AppLoadingLayer() {
   return <PageLoadingOverlay visible={visible} label={label} />;
 }
 
-/** Fecha o Sheet mobile e remove locks Radix em toda navegação. */
+/** Fecha a gaveta / painel sobreposto e remove locks Radix em toda navegação. */
 function RouteUiGuard() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, setOpenOverlay } = useSidebar();
 
   useEffect(() => {
     setOpenMobile(false);
+    setOpenOverlay(false);
     unlockUi();
     const t = window.setTimeout(unlockUi, 250);
     return () => window.clearTimeout(t);
-  }, [pathname, setOpenMobile]);
+  }, [pathname, setOpenMobile, setOpenOverlay]);
 
   return null;
 }
 
+/** Leva o foco ao título da página (ou ao <main>) — o Narrador anuncia onde está. */
+function focusPageStart() {
+  const main = document.getElementById("conteudo");
+  const heading = main?.querySelector<HTMLElement>("h1");
+  const target = heading ?? main;
+  if (!target) return;
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+}
+
+/** Primeiro item do Tab: pula a barra lateral e o cabeçalho. */
+function SkipLink() {
+  return (
+    <a
+      href="#conteudo"
+      // Roteamento por hash: o href mudaria a rota, então só move o foco.
+      onClick={(event) => {
+        event.preventDefault();
+        focusPageStart();
+      }}
+      className="sr-only rounded-lg bg-primary-solid px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[300]"
+    >
+      Pular para o conteúdo
+    </a>
+  );
+}
+
+function AppContentColumn() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
+  const { isMobile, openMobile, openOverlay } = useSidebar();
+  // Barra lateral aberta por cima: o resto fica inerte (teclado e Narrador).
+  const covered = isMobile ? openMobile : openOverlay;
+
+  // Quem rola é a área de conteúdo (não a janela): cada página abre no topo,
+  // e o foco vai para o título da nova página (depois de a barra devolver o foco).
+  useEffect(() => {
+    scrollerRef.current?.scrollTo({ top: 0 });
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const t = window.setTimeout(focusPageStart, 80);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
+
+  return (
+    <div
+      className="relative z-0 flex h-svh min-w-0 flex-1 flex-col overflow-hidden"
+      inert={covered || undefined}
+      {...(covered ? { [INERT_MARKER]: "" } : {})}
+    >
+      <TopBar />
+      <main
+        id="conteudo"
+        tabIndex={-1}
+        data-wincare-content
+        className="app-ambient relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden outline-none"
+      >
+        <div
+          ref={scrollerRef}
+          data-wincare-scroll
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6"
+        >
+          {/*
+            Container das páginas: grids usam @container/main (largura real
+            do conteúdo, já sem a barra lateral) em vez da largura da janela.
+          */}
+          <div
+            key={pathname}
+            className="@container/main animate-fade-in mx-auto w-full max-w-[1500px]"
+          >
+            {/* Required: nested routes render here. */}
+            <Outlet />
+          </div>
+        </div>
+        <AppLoadingLayer />
+      </main>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
 
   // Hidrata preferências antes dos efeitos filhos (ex.: checagem de update).
   useEffect(() => {
@@ -339,28 +420,23 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <div className="flex min-h-svh w-full bg-background">
+      <SidebarProvider open={sidebarOpen} onOpenChange={actions.setSidebarOpen}>
+        <SkipLink />
+        {/*
+          Altura travada na janela: o cabeçalho fica fixo e só o conteúdo rola,
+          então o carregamento e os avisos ficam sempre na área visível.
+        */}
+        <div className="flex h-svh w-full bg-background">
           <AppSidebar />
-          <div className="relative z-0 flex min-h-svh min-w-0 flex-1 flex-col overflow-hidden">
-            <TopBar />
-            <main
-              data-wincare-content
-              className="app-ambient relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden"
-            >
-              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-6">
-                <div key={pathname} className="animate-fade-in mx-auto w-full max-w-[1500px]">
-                  {/* Required: nested routes render here. */}
-                  <Outlet />
-                </div>
-              </div>
-              <AppLoadingLayer />
-            </main>
-          </div>
+          <AppContentColumn />
         </div>
-        <Toaster />
+        <Toaster containerAriaLabel="Notificações" />
         <StartupUpdateCheck />
         <IntelligenceCollector />
+        <ZoomController />
+        <KeyboardShortcuts />
+        <FirstRunWizard />
+        <TrayBridge />
         <RouteUiGuard />
       </SidebarProvider>
     </QueryClientProvider>

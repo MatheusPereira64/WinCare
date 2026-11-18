@@ -33,16 +33,16 @@ export function LogView({
     <div
       className={cn(
         "overflow-hidden bg-background/70",
-        plain ? "" : "rounded-xl border border-border/50",
+        plain ? "" : "rounded-xl border border-border/60",
       )}
     >
       {!plain && (
-        <div className="flex items-center gap-2 border-b border-border/40 bg-muted/30 px-3 py-1.5">
+        <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-3 py-1.5">
           <Terminal className="size-3.5 text-muted-foreground" />
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
             Saída do comando
           </span>
-          <span className="ml-auto text-[11px] tabular-nums text-muted-foreground/60">
+          <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
             {lines.length} {lines.length === 1 ? "linha" : "linhas"}
           </span>
         </div>
@@ -51,14 +51,18 @@ export function LogView({
         className={cn("h-56", className)}
         viewportClassName="p-3 font-mono text-[11px] leading-relaxed"
         viewportRef={viewportRef}
+        viewportLabel="Saída do comando"
       >
         {lines.map((line, i) => {
           const text = normalizeCmdText(line.text);
           if (!text) return null;
           return (
             <div key={i} className="animate-fade-in flex gap-2">
-              <span className="shrink-0 text-muted-foreground/50">{line.time}</span>
-              <span className={kindStyle[line.kind]}>{text}</span>
+              <span className="shrink-0 text-muted-foreground">{line.time}</span>
+              {/* Caminhos e URLs longos quebram em vez de forçar rolagem lateral. */}
+              <span className={cn("min-w-0 [overflow-wrap:anywhere]", kindStyle[line.kind])}>
+                {text}
+              </span>
             </div>
           );
         })}

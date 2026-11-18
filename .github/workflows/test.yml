@@ -17,9 +17,11 @@ concurrency:
 permissions:
   contents: read
 
+# Detalhes de cada etapa e como rodar localmente: docs/testes.md
+
 jobs:
   quality:
-    name: Lint, types, unused & build
+    name: Lint, types, unit tests & build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,8 +39,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Safety tests
-        run: npm test
+      - name: Main-process tests (node --test)
+        run: npm run test:main
+
+      - name: Renderer tests (Vitest + Testing Library)
+        run: npm run test:coverage
 
       - name: Lint
         run: npm run lint
@@ -54,3 +59,90 @@ jobs:
 
       - name: Build (Electron renderer)
         run: npm run wincare:build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Align npm with lockfile
+        run: npm install -g npm@11.16.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build (Electron renderer)
+        run: npm run wincare:build
+
+      - name: Run E2E flows
+        run: npx playwright test --project=e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  visual:
+    name: Visual regression (Playwright)
+    runs-on: ubuntu-latest
+    # Mesma imagem do `npm run test:visual` local: fontes e renderização idênticas às referências.
+    # Ao atualizar @playwright/test, troque a tag e regrave as referências (docs/testes.md).
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --ipc=host
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Align npm with lockfile
+        run: npm install -g npm@11.16.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Electron renderer)
+        run: npm run wincare:build
+
+      - name: Compare screenshots with baseline
+        run: npx playwright test --project=visual
+
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-diffs
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

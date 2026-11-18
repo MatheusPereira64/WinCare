@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useId, useState } from "react";
 import {
   Brush,
   Code2,
@@ -16,28 +16,30 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { formatLog, useToolRunner, type RunOptions } from "@/lib/wincare/runner";
 import { useFavorite, useStore } from "@/lib/wincare/store";
 import { getCommandPreview, resolveCommand, RISK_LABEL } from "@/lib/wincare/tools";
 import type { RunRecord, Tool, ToolCategory } from "@/lib/wincare/types";
+import { TONE_SOFT, type Tone } from "@/lib/wincare/tone";
+import { CheckboxCard } from "./CheckboxCard";
 import { ConfirmModal } from "./ConfirmModal";
 import { CommandFeed } from "./CommandFeed";
+import { IconChip } from "./IconChip";
+import { Panel } from "./Panel";
+import { StatusBadge } from "./StatusBadge";
 
-const riskStyle: Record<string, string> = {
-  safe: "border-success/30 bg-success/10 text-success",
-  warning: "border-warning/30 bg-warning/10 text-warning",
-  advanced: "border-destructive/30 bg-destructive/10 text-destructive",
+/** Selo de risco: seguro = verde; o ícone da ferramenta segura fica no tom primário. */
+const RISK_TONE: Record<Tool["risk"], Tone> = {
+  safe: "success",
+  warning: "warning",
+  advanced: "danger",
 };
-
-const riskChip: Record<string, string> = {
-  safe: "bg-primary/15 text-primary",
-  warning: "bg-warning/15 text-warning",
-  advanced: "bg-destructive/15 text-destructive",
+const RISK_ICON_TONE: Record<Tool["risk"], Tone> = {
+  safe: "primary",
+  warning: "warning",
+  advanced: "danger",
 };
 
 const categoryIcon: Record<ToolCategory, typeof Wrench> = {
@@ -66,7 +68,7 @@ function useToolAction(tool: Tool) {
         },
       });
     } else if (finished.status === "error") {
-      toast.error(finished.result || "Falha na execução");
+      toast.error(finished.result || `Não foi possível concluir: ${tool.name}`);
     } else {
       toast.success(finished.result || "Concluído");
     }
@@ -110,31 +112,17 @@ function ToolConfirmModal({ tool, open, defaultRestorePoint, onCancel, onConfirm
     >
       <p>{tool.description}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className={cn("rounded-full", riskStyle[tool.risk])}>
-          Risco: {RISK_LABEL[tool.risk]}
-        </Badge>
-        {tool.requiresAdmin && (
-          <Badge variant="outline" className="rounded-full text-muted-foreground">
-            O Windows pode pedir permissão (UAC)
-          </Badge>
-        )}
+        <StatusBadge tone={RISK_TONE[tool.risk]}>Risco: {RISK_LABEL[tool.risk]}</StatusBadge>
+        {tool.requiresAdmin && <StatusBadge>O Windows pode pedir permissão (UAC)</StatusBadge>}
       </div>
       {offerRestorePoint && (
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
-          <Checkbox
-            checked={restorePoint}
-            onCheckedChange={(v) => setRestorePoint(v === true)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <ShieldCheck className="size-4 text-success" /> Criar ponto de restauração antes
-            </span>
-            <span className="mt-0.5 block text-xs">
-              Permite desfazer pelo Restaurar Sistema caso algo dê errado.
-            </span>
-          </span>
-        </label>
+        <CheckboxCard
+          checked={restorePoint}
+          onCheckedChange={setRestorePoint}
+          icon={ShieldCheck}
+          title="Criar ponto de restauração antes"
+          description="Permite desfazer pelo Restaurar Sistema caso algo dê errado."
+        />
       )}
       <details className="text-xs">
         <summary className="cursor-pointer select-none hover:text-foreground">
@@ -154,6 +142,8 @@ function ToolCardInner({ tool }: { tool: Tool }) {
     useToolAction(tool);
   const { isFavorite, toggle } = useFavorite(tool.id);
   const [showCommand, setShowCommand] = useState(false);
+  const titleId = useId();
+  const commandId = useId();
 
   const finished = !state.running && state.status !== "idle";
 
@@ -165,44 +155,26 @@ function ToolCardInner({ tool }: { tool: Tool }) {
   const CategoryIcon = categoryIcon[tool.category] ?? Wrench;
 
   return (
-    <Card
-      className={cn(
-        "surface-panel hover-lift flex flex-col gap-3.5 border-border/50 p-5",
-        state.running && "border-primary/50",
-      )}
+    <Panel
+      variant="interactive"
+      role="article"
+      aria-labelledby={titleId}
+      className={cn("gap-3.5", state.running && "border-primary/50")}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span
-            className={cn(
-              "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl",
-              riskChip[tool.risk],
-            )}
-          >
-            <CategoryIcon className="size-5" />
-          </span>
+          <IconChip icon={CategoryIcon} tone={RISK_ICON_TONE[tool.risk]} className="mt-0.5" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <h3 className="mr-1 text-[15px] font-semibold tracking-tight">{tool.name}</h3>
-              <Badge variant="outline" className={cn("rounded-full", riskStyle[tool.risk])}>
-                {RISK_LABEL[tool.risk]}
-              </Badge>
-              {tool.requiresAdmin && (
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-border/70 text-muted-foreground"
-                >
-                  Admin
-                </Badge>
-              )}
+              <h3 id={titleId} className="mr-1 text-[15px] font-semibold tracking-tight">
+                {tool.name}
+              </h3>
+              <StatusBadge tone={RISK_TONE[tool.risk]}>{RISK_LABEL[tool.risk]}</StatusBadge>
+              {tool.requiresAdmin && <StatusBadge>Administrador</StatusBadge>}
               {tool.restorePoint && autoRestorePoint && (
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-border/70 text-muted-foreground"
-                  title="Cria um ponto de restauração antes de executar"
-                >
-                  <ShieldCheck className="size-3" /> Com ponto
-                </Badge>
+                <StatusBadge title="Cria um ponto de restauração antes de executar">
+                  <ShieldCheck aria-hidden className="size-3" /> Com ponto de restauração
+                </StatusBadge>
               )}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>
@@ -212,7 +184,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
           type="button"
           variant="ghost"
           size="icon"
-          aria-label={isFavorite ? "Remover dos favoritos" : "Favoritar ferramenta"}
+          aria-label={`Favoritar ${tool.name}`}
           aria-pressed={isFavorite}
           onClick={toggle}
           className={cn(
@@ -230,6 +202,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
           size="sm"
           onClick={start}
           disabled={state.running}
+          aria-label={`${state.running ? "Executando…" : tool.launcher ? "Abrir" : "Executar"} ${tool.name}`}
           className="rounded-full px-4"
         >
           {state.running ? (
@@ -246,6 +219,8 @@ function ToolCardInner({ tool }: { tool: Tool }) {
           size="sm"
           variant="ghost"
           aria-expanded={showCommand}
+          aria-controls={commandId}
+          aria-label={`Comando de ${tool.name}`}
           onClick={() => setShowCommand((v) => !v)}
           className="rounded-full text-muted-foreground"
         >
@@ -257,6 +232,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
             size="sm"
             variant="ghost"
             onClick={copy}
+            aria-label={`Copiar log de ${tool.name}`}
             className="rounded-full text-muted-foreground"
           >
             <Copy /> Copiar
@@ -268,6 +244,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
             size="sm"
             variant="ghost"
             onClick={reset}
+            aria-label={`Limpar resultado de ${tool.name}`}
             className="rounded-full text-muted-foreground"
           >
             <X /> Limpar
@@ -277,6 +254,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
 
       {showCommand && (
         <code
+          id={commandId}
           className="animate-fade-in block rounded-lg border border-border/40 bg-background/50 px-2.5 py-1.5 font-mono text-xs break-all text-muted-foreground"
           title={getCommandPreview(tool)}
         >
@@ -313,7 +291,7 @@ function ToolCardInner({ tool }: { tool: Tool }) {
           execute(options);
         }}
       />
-    </Card>
+    </Panel>
   );
 }
 
@@ -324,7 +302,6 @@ function ToolTileInner({ tool }: { tool: Tool }) {
   const { state, start, execute, confirming, setConfirming, autoRestorePoint } =
     useToolAction(tool);
   const CategoryIcon = tool.launcher ? ExternalLink : categoryIcon[tool.category];
-
   return (
     <>
       <button
@@ -332,15 +309,17 @@ function ToolTileInner({ tool }: { tool: Tool }) {
         onClick={start}
         disabled={state.running}
         title={tool.description}
+        aria-busy={state.running || undefined}
         className={cn(
-          "surface-panel hover-lift group flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card p-3.5 text-left",
-          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-70",
+          "surface-panel hover-lift group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 text-left",
+          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden disabled:opacity-70",
         )}
       >
         <span
+          aria-hidden
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-xl",
-            riskChip[tool.risk],
+            TONE_SOFT[RISK_ICON_TONE[tool.risk]],
           )}
         >
           {state.running ? (
@@ -351,6 +330,8 @@ function ToolTileInner({ tool }: { tool: Tool }) {
         </span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{tool.name}</span>
+          {/* Ponto invisível separa nome e descrição na leitura do Narrador. */}
+          <span className="sr-only">. </span>
           <span className="line-clamp-2 text-xs text-muted-foreground">{tool.description}</span>
         </span>
       </button>

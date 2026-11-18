@@ -1,3 +1,4 @@
+import { formatDecimal } from "./format";
 import { diagnoseStartup, enrichStartupItems, IMPACT_LABEL } from "./startupAdvice";
 import type { DiskDrive, DiskUsageFolder, RunRecord, StartupItem, SystemInfo } from "./types";
 
@@ -16,7 +17,7 @@ export function formatBytes(bytes: number) {
     n /= 1024;
     i++;
   }
-  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  return `${formatDecimal(n, i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 export function buildDiagnosticReport(input: {
@@ -101,7 +102,7 @@ export function buildDiagnosticReport(input: {
   }
 
   if (diagnosis.recommendations.length > 0) {
-    lines.push("", "▸ RECOMENDAÇÕES (desativar no boot)");
+    lines.push("", "▸ RECOMENDAÇÕES (desativar na inicialização)");
     for (const rec of diagnosis.recommendations) {
       const tag = rec.advice === "disable" ? "DESATIVAR" : "AVALIAR";
       lines.push(`  [${tag}] ${rec.name}${rec.memMb ? ` (${rec.memMb} MB)` : ""} — ${rec.reason}`);

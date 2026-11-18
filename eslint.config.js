@@ -6,7 +6,18 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi", "electron-release", "src/routeTree.gen.ts"] },
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      "electron-release",
+      "src/routeTree.gen.ts",
+      "coverage",
+      "test-results",
+      "playwright-report",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -52,6 +63,13 @@ export default tseslint.config(
     rules: {
       // TanStack Router exige `export const Route` junto do componente da página.
       "react-refresh/only-export-components": "off",
+    },
+  },
+  {
+    files: ["e2e/**/*.ts"],
+    rules: {
+      // Fixtures do Playwright recebem `use(...)`: não é o hook do React.
+      "react-hooks/rules-of-hooks": "off",
     },
   },
   eslintPluginPrettier,

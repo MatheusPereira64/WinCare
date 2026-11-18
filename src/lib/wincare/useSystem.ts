@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { getNative, isNative, SIMULATED_DISKS, SIMULATED_SYSTEM } from "./bridge";
+import { onPageVisible, pageHidden } from "./pageVisibility";
+import { loadDisks, useSystemDataVersion } from "./systemData";
 import type { DiskDrive, SystemInfo } from "./types";
 
 const bootListeners = new Set<() => void>();
@@ -130,38 +132,54 @@ export function useSystemInfo(pollMs = 3000) {
     };
 
     void tick();
-    const id = setInterval(() => void tick(), pollMs);
+    // Escondida na bandeja/minimizada: não lê; ao voltar, lê na hora.
+    const id = setInterval(() => {
+      if (!pageHidden()) void tick();
+    }, pollMs);
+    const offVisible = onPageVisible(() => void tick());
     return () => {
       alive = false;
       clearInterval(id);
+      offVisible();
     };
   }, [pollMs]);
 
   return info;
 }
 
-export function useDisks() {
+/** Unidades com estado de carga (para telas que mostram carregando/vazio). */
+export function useDiskList() {
   const [disks, setDisks] = useState<DiskDrive[]>(initialDisks);
+  const [loading, setLoading] = useState(
+    () => typeof window !== "undefined" && isNative() && !nativeDisksCache,
+  );
+  // Lê de novo quando alguém invalida os dados (ex.: checkup rápido).
+  const dataVersion = useSystemDataVersion();
 
   useEffect(() => {
-    const native = getNative();
-    if (!native) {
-      setDisks(SIMULATED_DISKS);
-      return;
-    }
-    native
-      .disks()
+    let alive = true;
+    loadDisks()
       .then((rows) => {
-        nativeDisksCache = rows;
-        setDisks(rows);
+        if (isNative()) nativeDisksCache = rows;
+        if (alive) setDisks(rows);
       })
       .catch(() => {
         // Sem fallback mock no desktop.
-        if (!nativeDisksCache) setDisks([]);
+        if (alive && !nativeDisksCache) setDisks([]);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
       });
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [dataVersion]);
 
-  return disks;
+  return { disks, loading };
+}
+
+export function useDisks() {
+  return useDiskList().disks;
 }
 
 /** Útil para UI: true enquanto o desktop ainda não recebeu a 1ª amostra real. */

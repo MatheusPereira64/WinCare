@@ -263,3 +263,123 @@ export interface ScheduleOverview {
   items: ScheduleEntry[];
   history: ScheduleHistoryEntry[];
 }
+
+/* Histórico de manutenção (gravado pelo processo principal, ver electron/maintenance-history.cjs). */
+
+export type MaintenanceKind = "cleanup" | "uninstall" | "repair" | "check" | "optimize" | "safety";
+
+export interface MaintenanceEvent {
+  id: string;
+  /** Quando terminou (ms desde 1970). */
+  ts: number;
+  kind: MaintenanceKind;
+  /** Ação específica ("sfc", "cleaner", "scheduled-cleanup"…). */
+  action: string;
+  title: string;
+  detail?: string;
+  /** Nome do programa/app envolvido (desinstalação, inicialização). */
+  subject?: string;
+  ok: boolean;
+  source: "manual" | "scheduled";
+  freedBytes?: number;
+  /** O espaço é o tamanho informado pelo programa (desinstalação), não medido. */
+  estimated?: boolean;
+  durationMs?: number;
+}
+
+/** Média da nota de saúde em um dia (calendário local, "2026-11-03"). */
+export interface HealthDay {
+  day: string;
+  avg: number;
+  min: number;
+  max: number;
+  /** Leituras no dia (uma a cada 5 min no máximo). */
+  n: number;
+}
+
+export interface MaintenanceHistory {
+  ok: boolean;
+  reason?: string;
+  events: MaintenanceEvent[];
+  health: HealthDay[];
+  limits?: { maxEvents: number; maxHealthDays: number };
+}
+
+/* Segundo plano: bandeja e alertas (electron/background.cjs + alerts.cjs). */
+
+export type AlertType = "disk" | "temperature" | "defender" | "windowsUpdate";
+
+export interface ActiveAlert {
+  type: AlertType;
+  title: string;
+  body: string;
+  /** Texto curto (menu da bandeja). */
+  short: string;
+  since: number;
+  route: string;
+}
+
+export interface BackgroundState {
+  ok: boolean;
+  reason?: string;
+  supported: { tray: boolean; notifications: boolean; openAtLogin: boolean };
+  closeToTray: boolean;
+  openAtLogin: { supported: boolean; enabled: boolean; blockedByWindows?: boolean };
+  /** O app abriu com o Windows (sem janela). */
+  launchedHidden: boolean;
+  monitor: {
+    enabled: boolean;
+    types: Record<AlertType, boolean>;
+    /** Alertas silenciados até (0 = não). */
+    snoozeUntil: number;
+    lastCheckAt: number;
+    /** Última leitura de cada verificação (null = ainda não rodou). */
+    checks: Record<AlertType, { at: number; summary: string; ok: boolean } | null>;
+    active: ActiveAlert[];
+  };
+}
+
+export interface BackgroundSettingsPatch {
+  closeToTray?: boolean;
+  openAtLogin?: boolean;
+  monitorEnabled?: boolean;
+  types?: Partial<Record<AlertType, boolean>>;
+}
+
+/** Pedido vindo da bandeja ou do clique numa notificação. */
+export type TrayCommand = { type: "navigate"; to: string } | { type: "quick-checkup" };
+
+/* Bateria (powercfg /batteryreport). Capacidades em mWh. */
+
+export interface BatteryUnit {
+  name: string;
+  manufacturer: string;
+  chemistry: string;
+  designMwh: number;
+  fullChargeMwh: number;
+  /** Ciclos de carga; null quando o firmware não informa. */
+  cycleCount: number | null;
+}
+
+/** Capacidade de carga total medida no fim de um período (um ponto por mês). */
+export interface BatteryCapacityPoint {
+  /** AAAA-MM-DD */
+  date: string;
+  fullChargeMwh: number;
+  designMwh: number;
+}
+
+export interface BatteryReport {
+  ok: boolean;
+  reason?: string;
+  hasBattery: boolean;
+  scannedAt?: string;
+  platformRole?: string | null;
+  batteries: BatteryUnit[];
+  history: BatteryCapacityPoint[];
+  runtime?: { fullChargeSec: number | null; designSec: number | null };
+  /** Parte do tempo ativo recente passado na tomada (0–1). */
+  acShare?: number | null;
+  onBattery?: boolean;
+  activePlan?: { guid: string; name: string } | null;
+}

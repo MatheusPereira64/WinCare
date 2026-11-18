@@ -13,6 +13,7 @@ const {
   isWindowsAdmin,
 } = require("./powershell.cjs");
 const { createRestorePoint } = require("./restore-point.cjs");
+const history = require("./maintenance-history.cjs");
 
 const JOB_ARG = "--wincare-job=";
 const REPAIR_STEP_TIMEOUT_MS = 30 * 60 * 1000;
@@ -405,6 +406,21 @@ async function runScheduledJob(job) {
     };
   }
 
+  // Antes do schedule-history.json: na primeira vez o histórico novo importa
+  // as rotinas antigas de lá, e esta não pode entrar duas vezes.
+  // Teste (dry run) não mexeu em nada: não conta como manutenção.
+  if (!dryRun) {
+    history.recordEvent({
+      kind: job === "cleanup" ? "cleanup" : "repair",
+      action: job === "cleanup" ? "scheduled-cleanup" : "scheduled-full-check",
+      title: def.label,
+      detail: outcome.summary,
+      ok: outcome.ok,
+      source: "scheduled",
+      freedBytes: outcome.freedBytes,
+      durationMs: Date.now() - Date.parse(startedAt),
+    });
+  }
   appendHistory({
     id: `${job}-${Date.now()}`,
     job,

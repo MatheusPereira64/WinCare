@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DiscoRouteImport } from './routes/disco'
+import { Route as HistoricoRouteImport } from './routes/historico'
 import { Route as InicializacaoRouteImport } from './routes/inicializacao'
 import { Route as InteligenciaRouteImport } from './routes/inteligencia'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
@@ -42,6 +43,11 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
 const DiscoRoute = DiscoRouteImport.update({
   id: '/disco',
   path: '/disco',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoricoRoute = HistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InicializacaoRoute = InicializacaoRouteImport.update({
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
+  '/historico': typeof HistoricoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
+  '/historico': typeof HistoricoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/agendamento': typeof AgendamentoRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/disco': typeof DiscoRoute
+  '/historico': typeof HistoricoRoute
   '/inicializacao': typeof InicializacaoRoute
   '/inteligencia': typeof InteligenciaRoute
   '/limpeza': typeof LimpezaRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/agendamento'
     | '/configuracoes'
     | '/disco'
+    | '/historico'
     | '/inicializacao'
     | '/inteligencia'
     | '/limpeza'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/agendamento'
     | '/configuracoes'
     | '/disco'
+    | '/historico'
     | '/inicializacao'
     | '/inteligencia'
     | '/limpeza'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/agendamento'
     | '/configuracoes'
     | '/disco'
+    | '/historico'
     | '/inicializacao'
     | '/inteligencia'
     | '/limpeza'
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   AgendamentoRoute: typeof AgendamentoRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DiscoRoute: typeof DiscoRoute
+  HistoricoRoute: typeof HistoricoRoute
   InicializacaoRoute: typeof InicializacaoRoute
   InteligenciaRoute: typeof InteligenciaRoute
   LimpezaRoute: typeof LimpezaRoute
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/disco'
       fullPath: '/disco'
       preLoaderRoute: typeof DiscoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/historico': {
+      id: '/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof HistoricoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inicializacao': {
@@ -320,6 +340,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgendamentoRoute: AgendamentoRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   DiscoRoute: DiscoRoute,
+  HistoricoRoute: HistoricoRoute,
   InicializacaoRoute: InicializacaoRoute,
   InteligenciaRoute: InteligenciaRoute,
   LimpezaRoute: LimpezaRoute,

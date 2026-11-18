@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, CircleAlert, Loader2, Radio } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { interpretCommandFeed } from "@/lib/wincare/commandFeed";
 import type { LogLine } from "@/lib/wincare/types";
+import { TONE_SOFT, type Tone } from "@/lib/wincare/tone";
 import { LogView } from "./LogView";
 
 interface Props {
@@ -23,15 +24,22 @@ const toneIcon = {
   info: Radio,
 };
 
+const FEED_TONE: Record<keyof typeof toneIcon, Tone> = {
+  running: "primary",
+  success: "success",
+  error: "danger",
+  info: "neutral",
+};
 const toneChip = {
-  running: "bg-primary/15 text-primary",
-  success: "bg-success/15 text-success",
-  error: "bg-destructive/15 text-destructive",
-  info: "bg-muted text-muted-foreground",
+  running: TONE_SOFT[FEED_TONE.running],
+  success: TONE_SOFT[FEED_TONE.success],
+  error: TONE_SOFT[FEED_TONE.error],
+  info: TONE_SOFT[FEED_TONE.info],
 };
 
 export function CommandFeed({ lines, running, status, result, toolName, className }: Props) {
   const [open, setOpen] = useState(false);
+  const detailsId = useId();
   const insight = useMemo(
     () => interpretCommandFeed(lines, { running, status, result, toolName }),
     [lines, running, status, result, toolName],
@@ -44,10 +52,16 @@ export function CommandFeed({ lines, running, status, result, toolName, classNam
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-border/50 bg-background/70 ${className ?? ""}`}
+      className={`overflow-hidden rounded-xl border border-border/60 bg-background/70 ${className ?? ""}`}
     >
+      {/* Anuncia só a mudança de estado (início, conclusão, falha), não cada %. */}
+      <p role="status" className="sr-only">
+        {toolName ? `${toolName}: ` : ""}
+        {insight.label}
+      </p>
       <div className="flex items-start gap-3 p-4">
         <span
+          aria-hidden
           className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${toneChip[insight.tone]}`}
         >
           <Icon className={`size-4 ${insight.tone === "running" ? "animate-spin" : ""}`} />
@@ -78,17 +92,23 @@ export function CommandFeed({ lines, running, status, result, toolName, classNam
           )}
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{insight.message}</p>
           {typeof insight.progress === "number" && running && (
-            <Progress value={insight.progress} className="mt-3 h-1.5" />
+            <Progress
+              value={insight.progress}
+              className="mt-3 h-1.5"
+              aria-label={`Progresso: ${toolName ?? insight.title}`}
+            />
           )}
         </div>
       </div>
 
-      <div className="border-t border-border/40 px-3 py-1.5">
+      <div className="border-t border-border/60 px-3 py-1.5">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="h-8 w-full justify-between px-1 text-xs text-muted-foreground hover:text-foreground"
+          aria-expanded={open}
+          aria-controls={detailsId}
           onClick={() => setOpen((v) => !v)}
         >
           Detalhes técnicos
@@ -97,7 +117,7 @@ export function CommandFeed({ lines, running, status, result, toolName, classNam
       </div>
 
       {open && (
-        <div className="border-t border-border/40">
+        <div id={detailsId} className="border-t border-border/60">
           <LogView lines={lines} className="h-44 rounded-none border-0" plain />
         </div>
       )}

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Search, SearchX } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TOOL_GROUPS, TOOLS, getCommandPreview } from "@/lib/wincare/tools";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import type { Tool, ToolCategory } from "@/lib/wincare/types";
-import { EmptyState } from "./EmptyState";
+import { EmptyState } from "./States";
+import { StatusBadge } from "./StatusBadge";
 import { PageHeader } from "./PageHeader";
 import { ToolCard, ToolTile } from "./ToolCard";
 
@@ -94,16 +94,16 @@ export function ToolSection({
   );
 
   const countBadge = (
-    <Badge variant="outline" className="rounded-full border-border/60 px-2.5 text-muted-foreground">
+    <StatusBadge>
       {tools.length} {tools.length === 1 ? "ferramenta" : "ferramentas"}
-    </Badge>
+    </StatusBadge>
   );
 
   return (
     <div className="space-y-6">
       {embedded ? (
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold">{title}</h2>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
@@ -118,13 +118,12 @@ export function ToolSection({
             <>
               {countBadge}
               {developmentBadge && (
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-warning/30 bg-warning/10 text-warning"
+                <StatusBadge
+                  tone="warning"
                   title="Funcionalidade instável — correções em andamento"
                 >
                   {developmentBadge}
-                </Badge>
+                </StatusBadge>
               )}
             </>
           }
@@ -143,13 +142,13 @@ export function ToolSection({
             </div>
           )}
           {group.compact ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 @lg/main:grid-cols-2 @4xl/main:grid-cols-3 @6xl/main:grid-cols-4">
               {group.tools.map((tool) => (
                 <ToolTile key={tool.id} tool={tool} />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-4 @4xl/main:grid-cols-2">
               {group.tools.map((tool) => (
                 <ToolCard key={tool.id} tool={tool} />
               ))}

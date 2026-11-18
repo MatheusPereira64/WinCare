@@ -37,19 +37,21 @@ Visão geral do PC, atualizada a cada poucos segundos.
 - Anel de **saúde geral (0–100%)**
 - CPU, memória, disco C:, tempo ligado (uptime)
 - Status do **Windows Defender**
+- **Bateria** (só em notebooks): saúde em % e nível, com atalho para os detalhes em Sistema
 - Última atualização do Windows
 - Hostname, sistema e build
 - Ferramentas **favoritas**
 - **Verificação completa:** SFC → DISM CheckHealth → DISM ScanHealth → DISM RestoreHealth → chkdsk (somente leitura), em sequência
 - **Relatório de diagnóstico** em `.txt` (sistema, discos, pastas, inicialização com recomendações e histórico)
-- Mini linha do tempo de saúde e **recomendações** geradas com dados reais (link para Inteligência)
+- Mini linha do tempo de saúde e **recomendações** (as 4 mais importantes, com ação direta e “Adiar”; “Ver todas” leva à Inteligência)
+- **O que o WinCare já fez:** resumo dos últimos 30 dias (espaço liberado, programas removidos, reparos e a saúde antes → agora), com atalho para o Histórico
 
 ### 2. Inteligência (`/inteligencia`)
 
 Camada analítica do WinCare — usa métricas, boot e disco do próprio PC.
 
 - **Linha do tempo da saúde:** amostras de saúde, CPU e RAM (~10 min) enquanto o app está aberto
-- **Recomendações inteligentes:** RAM cheia, disco no limite, boot pesado, temperatura, programas novos no boot, queda de saúde
+- **Recomendações:** motor único para o app todo — espaço por unidade, SMART, Defender, temperatura, memória, inicialização pesada ou com programas novos, Windows Update atrasado, temporários, CPU, queda de saúde, PC sem reiniciar e manutenção sem agendamento. Cada uma pode ser **adiada por 1 ou 7 dias** ou **ignorada** (com “Desfazer”); as escondidas ficam em “Adiadas e ignoradas”, com “Restaurar”. Regras completas em [design-system.md](design-system.md#5-recomendações)
 - **Diagnóstico por sintoma:** “PC lento”, “jogo travando”, “esquenta”, “sem espaço”, “demora para ligar”, “internet ruim”
 - **Snapshots antes/depois:** capture o estado e compare saúde, RAM, disco e itens no boot
 - **Perfis:** Equilibrado, Jogos, Trabalho e Bateria — mudam o plano de energia do Windows
@@ -120,7 +122,16 @@ Programas que abrem com o Windows.
 
 ### 8. Sistema (`/sistema`)
 
-Atalhos das consoles do Windows e energia.
+Bateria, atalhos das consoles do Windows e energia.
+
+**Bateria** (só aparece em notebooks — o WinCare consulta `Win32_Battery` e, havendo bateria, lê `powercfg /batteryreport /xml` num arquivo temporário que é apagado em seguida):
+
+- **Saúde** = carga total atual ÷ capacidade de projeto, com a faixa: Ótima (≥ 90%), Boa (≥ 80%), Desgastada (≥ 60%), Fraca (< 60%). O texto deixa claro que desgaste é normal com o tempo.
+- Desgaste, ciclos de carga (quando o fabricante informa), capacidade atual e de projeto, autonomia estimada com carga completa.
+- **Capacidade ao longo do tempo:** gráfico mês a mês (até 24 meses, recomeçando quando a bateria foi trocada), com dica ao passar o mouse e versão em tabela.
+- **Relatório completo:** gera o relatório HTML do Windows na pasta de dados do app e abre no navegador.
+- **Dicas de energia**, só quando se aplicam: bateria fraca (sugere conferir o relatório), desgaste acima de 10 pontos por ano, muitos ciclos, quase sempre na tomada (limite de carga do fabricante), plano de alto desempenho ligado na bateria e autonomia curta. Os botões das dicas só abrem páginas do Windows (`ms-settings:powersleep`, `ms-settings:batterysaver-usagedetails`) — nada muda sozinho.
+- Bateria abaixo de 60% também vira recomendação ("Bateria muito desgastada") no Dashboard e na Inteligência.
 
 | Ferramenta | O que faz | Risco |
 | --- | --- | --- |
@@ -158,20 +169,36 @@ Teste de conectividade e reparo da pilha de rede.
 | Perfis Wi‑Fi salvos | `netsh wlan show profiles` | Seguro | Não |
 | Interfaces Wi‑Fi | Estado, sinal e canal (`netsh wlan show interfaces`) | Seguro | Não |
 
-### 10. Logs (`/logs`)
+### 10. Histórico (`/historico`)
+
+O “antes e depois”: quanto o WinCare já ajudou este PC.
+
+- **Totais de 7, 30 ou 90 dias:** espaço liberado (com quantas limpezas; o tamanho dos programas removidos é estimativa e aparece como tal), programas removidos, reparos feitos (mais verificações e ações que falharam) e **saúde do PC** — a média de hoje comparada com o primeiro dia do período, com a curva diária
+- Uma linha com o total desde o primeiro registro (“Desde 22 de ago. de 2026: 31,0 GB liberados em 32 manutenções”)
+- **Gráfico semana a semana** (segunda a domingo): espaço liberado, número de manutenções ou saúde média; 4 semanas no período de 7 dias, 5 no de 30 e 13 no de 90. **Ver como tabela** mostra os mesmos números em uma tabela
+- **Linha do tempo** agrupada por dia (Hoje, Ontem, data), com filtros (Limpezas, Programas, Reparos, Outros), selos **Agendada** e **Falhou**, espaço liberado, horário e duração
+- **Exportar** o período em **CSV** (Excel em português: ponto e vírgula, vírgula decimal, acentos corretos) ou **JSON** (totais, eventos e saúde diária); **Apagar** o histórico com confirmação
+- Também no Dashboard: card “O que o WinCare já fez” com o resumo dos últimos 30 dias
+
+O que entra no histórico (gravado pelo processo principal com o resultado real): limpeza de navegadores/apps, temporários, Prefetch, pastas do Disco e Lixeira; programas desinstalados e sobras removidas; SFC, DISM, CHKDSK, cache do Windows Update, cache de ícones e reparos de rede; rotinas agendadas; itens tirados da inicialização; otimização de memória; pontos de restauração. Consultas (ping, ipconfig /all…) e UAC recusado não entram. A saúde é registrada enquanto o app está aberto (no máximo uma leitura a cada 5 minutos, guardada como média do dia).
+
+Fica em `%APPDATA%\WinCare\maintenance-history.json`, separado dos logs, com limite de 1.500 registros, 400 dias de saúde e 512 KB — os mais antigos saem primeiro. Na primeira vez, as rotinas agendadas que já tinham rodado entram no histórico.
+
+### 11. Logs (`/logs`)
 
 Histórico das execuções feitas no WinCare.
 
 - Data, ferramenta, comando, status (sucesso / erro / em execução) e log
 - Exportar TXT, exportar PDF (impressão), copiar log completo, limpar histórico
 
-### 11. Configurações (`/configuracoes`)
+### 12. Configurações (`/configuracoes`)
 
 Preferências neste computador (localStorage).
 
-- Tema claro / escuro
+- **Aparência:** tema claro / escuro e **tamanho da interface** (zoom de 80% a 200%, salvo neste computador; também por Ctrl +, Ctrl −, Ctrl 0 e Ctrl + roda do mouse)
 - Confirmar comandos críticos
 - Verificação automática ao abrir o app e a cada 2 horas (não ao entrar no Dashboard)
+- **Bandeja e alertas** (app desktop): manter na bandeja ao fechar a janela, abrir com o Windows minimizado na bandeja, avisar sobre problemas importantes (escolha quais), última leitura de cada verificação, **Verificar agora**, **Testar notificação** e silenciar por 24 horas — detalhes em [Bandeja e alertas](#bandeja-e-alertas-desktop)
 - **Atualizações:** consultar tags/releases no GitHub, popup ao abrir se houver versão nova, download automático no ZIP instalado, abrir página de releases
 - Atalhos de teclado
 - Executar o WinCare como administrador
@@ -185,11 +212,35 @@ Preferências neste computador (localStorage).
 ### Barra superior e lateral
 
 - Navegação por grupos: Visão geral, Manutenção, Sistema, Registro
+- Barra lateral adaptável à largura útil da janela (já considerando zoom e escala do Windows): expandida a partir de 1200 px; abaixo disso recolhe sozinha para ícones e, ao abrir, fica por cima do conteúdo; abaixo de 640 px vira gaveta. Recolher manualmente em janela larga fica salvo
+- Telas se reorganizam pela largura real do conteúdo (container queries), de 1024×640 a monitores grandes, em 125%/150% de escala e com zoom
 - Badge **Nativo** ou **Demonstração**
 - Badge de privilégio (Admin / Usuário padrão) e botão **Executar como admin**
 - Alternar tema
+- Indicador de zoom quando diferente de 100% (clique volta ao padrão)
 - Indicador de carregamento na abertura e na troca de telas (e nas listas de inicialização/disco)
-- Menu nativo (só no desktop): limpar histórico, abrir logs, verificar atualizações, releases, DevTools (F12), sair
+- Menu nativo (só no desktop): limpar histórico, abrir logs, verificar atualizações, releases, DevTools (F12), aumentar / diminuir / redefinir zoom, sair
+- A janela abre no tamanho que cabe no monitor (maximizada em telas pequenas, como 1920×1080 a 150%)
+
+### Bandeja e alertas (desktop)
+
+Avisa sobre problemas importantes mesmo com a janela fechada, sem incomodar.
+
+- **Ícone na bandeja** sempre que o app está aberto. Clique abre a janela; o menu (botão direito) tem: alertas ativos (clique leva à página que resolve), **Checkup rápido**, **Liberar espaço**, **Histórico**, **Configurações**, ligar/desligar os avisos, **Silenciar por 24 horas** e **Sair do WinCare**. Com alerta ativo, o ícone ganha um ponto âmbar e a dica (passar o mouse) diz qual é
+- **Manter na bandeja ao fechar** (desligado por padrão): o X esconde a janela. Na primeira vez, uma notificação explica onde o app ficou. Para sair: **Sair** na bandeja ou no menu WinCare
+- **Abrir com o Windows, minimizado na bandeja** (desligado por padrão): entrada em *Aplicativos de inicialização* que abre só o ícone, sem a janela (o renderer nem é criado até você abrir). Aberto assim, fechar a janela também volta para a bandeja. Se o Windows bloquear a entrada, a tela avisa e tem o atalho para reativar. Na página Inicialização o próprio WinCare aparece como “manter”
+- **Avisos** (ligados por padrão, cada um pode ser desligado):
+
+| Alerta | Avisa quando | Para de avisar quando | Verifica a cada | Lembra de novo depois de |
+| --- | --- | --- | --- | --- |
+| Disco do sistema quase cheio | menos de 10 GB livres ou 95% usado | 12 GB livres e abaixo de 93% | 5 min (sem processo externo) | 1 dia |
+| Temperatura alta | CPU ou GPU ≥ 90 °C em duas leituras seguidas | abaixo de 80 °C | 3 min (aproveita a leitura do Dashboard com a janela aberta) | 2 horas |
+| Antivírus desligado | proteção em tempo real do Defender desligada **e** nenhum outro antivírus ativo | proteção ligada ou outro antivírus ativo | 30 min | 1 dia |
+| Windows Update atrasado | 45 dias ou mais sem instalar atualizações | atualização recente | 6 h | 7 dias |
+
+- **Sem ser chato:** um aviso por problema (problema que some e volta cedo não avisa de novo), no máximo uma notificação a cada 10 minutos (vários problemas viram uma só), nada nos primeiros 2 minutos do app (5 quando abre com o Windows), nada enquanto a janela do WinCare está em foco (o painel de recomendações já mostra) e nada com os avisos silenciados. O estado fica salvo: reiniciar o PC não repete o aviso. Os limites de disco e temperatura são mais altos que os das recomendações porque a notificação interrompe
+- Clicar na notificação abre o WinCare na página que resolve (Limpeza, Monitoramento ou Dashboard)
+- Com a janela escondida ou minimizada, o app para as leituras da interface (Dashboard, processos, jogos); em segundo plano só o monitor leve do processo principal roda
 
 ### Atualizações (desktop)
 
@@ -214,15 +265,43 @@ Detalhes: [electron/README.md](../electron/README.md#ui-no-electron--o-que-trava
 ### Dados locais
 
 - Histórico, favoritos e preferências no `localStorage`
+- Histórico de manutenção (tela Histórico): `%APPDATA%\WinCare\maintenance-history.json`
+- Bandeja e alertas (opções e estado de cada aviso): `%APPDATA%\WinCare\background.json`
 - Log do processo principal: `%APPDATA%\WinCare\logs\wincare.log`
 
 ### Atalhos
 
 | Atalho | Ação |
 | --- | --- |
+| **Alt + 1 … 9** | Abre as páginas na ordem da barra lateral (Dashboard … Agendamento) |
+| **Alt + 0** | Abre as Configurações |
+| **?** ou **F1** | Mostra a lista de atalhos (também no botão de teclado da barra superior e em Exibir → Atalhos de teclado) |
 | **Ctrl + K** | Foca a busca de ferramentas na página atual |
-| **Ctrl + B** | Recolhe / expande a barra lateral |
+| **Ctrl + B** | Recolhe / expande a barra lateral (em janela estreita, abre por cima do conteúdo) |
+| **Ctrl + +** / **Ctrl + −** | Aumenta / diminui o zoom da interface (app desktop; também Ctrl + roda do mouse) |
+| **Ctrl + 0** | Volta o zoom para 100% |
+| **Alt + T** | Vai para as notificações |
+| **Esc** | Fecha diálogos e a barra lateral aberta por cima |
+| **Setas / Home / End** | Trocam a opção em grupos de escolha (filtros, agendamento, zoom) e nas abas |
 | **F12** | DevTools (app desktop) |
+
+### Introdução e checkup rápido
+
+- Na primeira vez que o WinCare abre, uma **introdução em 4 passos**: o que o app faz e o que nunca faz, as preferências principais (interruptores), a sugestão de agendar a limpeza semanal e o que é o modo administrador. Dá para pular e rever em **Configurações → Introdução**
+- **Checkup rápido** (card de Recomendações e fim da introdução): relê sistema, discos, inicialização, pastas e agendamentos em poucos segundos, sem alterar nada, e atualiza as recomendações com um resumo
+
+### Estados e padrões visuais
+
+- Toda lista carregada mostra **carregando** (esqueleto + o que está sendo feito), **erro** com “Tentar novamente” ou **vazio** explicando o porquê — regras em [design-system.md](design-system.md#4-estados)
+- Só a abertura do app tem carregamento de tela inteira; trocar de página é imediato
+
+### Acessibilidade
+
+- Tudo funciona só com o teclado: link “Pular para o conteúdo” no primeiro Tab, foco sempre visível (também nos temas de contraste do Windows), ordem de Tab seguindo a tela
+- Ao trocar de página o foco vai para o título (o Narrador anuncia a página) e o título da janela muda
+- Diálogos prendem o foco, deixam o resto do app inerte para o Narrador, fecham com Esc e devolvem o foco ao botão que os abriu; o mesmo vale para a barra lateral aberta por cima
+- Grupos de escolha são `radiogroup` e as seções da Inteligência são abas (`tablist`); barras de progresso têm nome e valor; gráficos têm resumo em texto; operações longas anunciam início e fim
+- Contraste AA (4,5:1 em texto, 3:1 em contornos de controles e foco) nos temas escuro e claro
 
 ---
 
@@ -239,5 +318,6 @@ Detalhes: [electron/README.md](../electron/README.md#ui-no-electron--o-que-trava
 | `/inicializacao` | Inicialização |
 | `/sistema` | Sistema |
 | `/redes` | Redes |
+| `/historico` | Histórico de manutenção (antes e depois) |
 | `/logs` | Logs |
 | `/configuracoes` | Configurações |

@@ -3,15 +3,8 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 import appLogo from "@/assets/wincare-icon.png";
 
-export function PageLoading({
-  label = "Carregando…",
-  compact = false,
-  className,
-}: {
-  label?: string;
-  compact?: boolean;
-  className?: string;
-}) {
+/** Marca animada usada só na abertura do app. */
+function BrandLoader({ label }: { label: string }) {
   const gradientId = useId().replace(/:/g, "");
 
   return (
@@ -19,11 +12,7 @@ export function PageLoading({
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className={cn(
-        "flex flex-col items-center justify-center text-center",
-        compact ? "py-2" : "min-h-[40vh] py-12",
-        className,
-      )}
+      className="flex flex-col items-center justify-center py-2 text-center"
     >
       <div
         className={cn(
@@ -99,8 +88,9 @@ export function PageLoading({
 }
 
 /**
- * Cobre só o &lt;main&gt; (que não rola). O scroll fica no filho — assim o loader
- * permanece no centro da área visível. Sem portal e sem position:fixed.
+ * Carregamento da abertura do app (único de tela inteira — ver docs/design-system.md).
+ * Cobre só o <main> (que não rola); o scroll fica no filho, então o loader fica
+ * no centro da área visível. Sem portal e sem position:fixed.
  */
 export function PageLoadingOverlay({
   visible,
@@ -116,7 +106,7 @@ export function PageLoadingOverlay({
       className="absolute inset-0 z-30 flex items-center justify-center bg-background/70 backdrop-blur-md"
       style={{ pointerEvents: "none" }}
     >
-      <PageLoading compact label={label} />
+      <BrandLoader label={label} />
     </div>
   );
 }

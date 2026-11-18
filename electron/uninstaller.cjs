@@ -272,6 +272,8 @@ function isUsedByOtherProgram(folder, program, others) {
 
 let programsById = new Map();
 let leftoversById = new Map();
+/** Programa da última varredura de sobras (para o histórico dizer de quem eram). */
+let leftoversProgramName = "";
 
 const LIST_SCRIPT = String.raw`
 $ErrorActionPreference = 'SilentlyContinue'
@@ -420,7 +422,12 @@ try {
     reason: "failed",
     message: error instanceof Error ? error.message : "Falha ao abrir o desinstalador.",
   }));
-  return { ...out, stillInstalled: await registryKeyExists(program.registryKey) };
+  return {
+    ...out,
+    stillInstalled: await registryKeyExists(program.registryKey),
+    programName: program.name,
+    sizeBytes: program.sizeBytes,
+  };
 }
 
 /** Só procura resíduos depois que o programa saiu do registro (ou o desinstalador sumiu). */
@@ -478,6 +485,7 @@ async function scanLeftovers(id, env = process.env) {
   }
 
   leftoversById = next;
+  leftoversProgramName = program.name;
   return { ok: true, items };
 }
 
@@ -488,7 +496,14 @@ async function removeLeftovers(ids, env = process.env) {
   const selected = (Array.isArray(ids) ? ids : [])
     .map((id) => leftoversById.get(String(id)))
     .filter(Boolean);
-  const result = { ok: true, removed: 0, freedBytes: 0, failed: [], backupDir: null };
+  const result = {
+    ok: true,
+    removed: 0,
+    freedBytes: 0,
+    failed: [],
+    backupDir: null,
+    programName: leftoversProgramName,
+  };
   const admin = await isWindowsAdmin();
   const elevatedScript = [];
 

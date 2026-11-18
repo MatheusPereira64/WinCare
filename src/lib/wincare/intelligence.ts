@@ -77,21 +77,13 @@ export type AppPath =
   | "/inicializacao"
   | "/sistema"
   | "/redes"
-  | "/inteligencia";
+  | "/inteligencia"
+  | "/agendamento";
 
 export interface SymptomDef {
   id: string;
   title: string;
   hint: string;
-}
-
-export interface Recommendation {
-  id: string;
-  title: string;
-  detail: string;
-  severity: "high" | "medium" | "low";
-  href: AppPath;
-  action: string;
 }
 
 export interface PowerPlanInfo {
@@ -207,160 +199,6 @@ export function sessionNote(session: GamingSession) {
   return "Amostra curta — jogue uns minutos com o WinCare aberto para um relatório melhor.";
 }
 
-export function buildRecommendations(input: {
-  info: SystemInfo;
-  startup: StartupItem[];
-  folders?: DiskUsageFolder[];
-  newcomers?: StartupWatchItem[];
-  trend?: HealthSample[];
-}): Recommendation[] {
-  const recs: Recommendation[] = [];
-  const { info, startup, folders = [], newcomers = [], trend = [] } = input;
-  const diagnosis = diagnoseStartup(startup);
-  const enabled = startup.filter((s) => s.enabled);
-
-  if (info.memoryUsage >= 85) {
-    recs.push({
-      id: "ram-high",
-      title: "Memória quase no limite",
-      detail: `${info.memoryUsage}% da RAM em uso. Otimize a memória ou feche programas pesados.`,
-      severity: "high",
-      href: "/monitoramento",
-      action: "Otimizar memória",
-    });
-  }
-
-  if (info.diskUsage >= 90) {
-    recs.push({
-      id: "disk-full",
-      title: "Disco C: está cheio",
-      detail: `${info.diskUsage}% ocupado. PCs lentos e atualizações falham com pouco espaço livre.`,
-      severity: "high",
-      href: "/disco",
-      action: "Analisar disco",
-    });
-  } else if (info.diskUsage >= 80) {
-    recs.push({
-      id: "disk-tight",
-      title: "Pouco espaço livre",
-      detail: `${info.diskUsage}% do C: em uso. Vale limpar temporários e revisar arquivos grandes.`,
-      severity: "medium",
-      href: "/disco",
-      action: "Ver armazenamento",
-    });
-  }
-
-  if (diagnosis.load === "heavy") {
-    recs.push({
-      id: "boot-heavy",
-      title: "Inicialização pesada",
-      detail: diagnosis.summary,
-      severity: "high",
-      href: "/inicializacao",
-      action: "Otimizar boot",
-    });
-  } else if (diagnosis.recommendations.some((r) => r.advice === "disable")) {
-    recs.push({
-      id: "boot-apps",
-      title: "Há programas no boot que podem sair",
-      detail: `${diagnosis.recommendations.filter((r) => r.advice === "disable").length} item(ns) sugeridos para desativar.`,
-      severity: "medium",
-      href: "/inicializacao",
-      action: "Revisar lista",
-    });
-  }
-
-  const tempFolder = folders.find((f) => f.id === "temp-user" || f.id === "temp-win");
-  if (tempFolder && tempFolder.sizeBytes >= 1_500_000_000) {
-    recs.push({
-      id: "temp-files",
-      title: "Temporários ocupando espaço",
-      detail: "Há mais de 1,5 GB em pastas Temp. Limpeza segura e rápida.",
-      severity: "medium",
-      href: "/limpeza",
-      action: "Limpar agora",
-    });
-  }
-
-  if ((info.cpuTemperature ?? 0) >= 85 || (info.gpuTemperature ?? 0) >= 85) {
-    recs.push({
-      id: "thermals",
-      title: "Temperatura elevada",
-      detail: "CPU ou GPU acima de 85 °C. Verifique poeira, notebook na cama e plano de energia.",
-      severity: "high",
-      href: "/monitoramento",
-      action: "Ver sensores",
-    });
-  }
-
-  if (info.cpuUsage >= 88) {
-    recs.push({
-      id: "cpu-load",
-      title: "CPU sustentada alta",
-      detail: `${info.cpuUsage}% de uso. Veja os processos no monitoramento.`,
-      severity: "medium",
-      href: "/monitoramento",
-      action: "Ver processos",
-    });
-  }
-
-  const def = (info.defenderStatus || "").toLowerCase();
-  if (def.includes("desativ") || def.includes("off") || def === "false") {
-    recs.push({
-      id: "defender",
-      title: "Proteção em tempo real aparentemente off",
-      detail: "O Windows Defender não parece ativo. Confira em Segurança do Windows.",
-      severity: "high",
-      href: "/sistema",
-      action: "Abrir sistema",
-    });
-  }
-
-  if (newcomers.length > 0) {
-    recs.push({
-      id: "startup-new",
-      title: `${newcomers.length} programa(s) novo(s) no boot`,
-      detail: newcomers.map((n) => n.name).join(", "),
-      severity: "medium",
-      href: "/inicializacao",
-      action: "Revisar novos",
-    });
-  }
-
-  if (trend.length >= 6) {
-    const recent = trend.slice(-6);
-    const older = trend.slice(0, Math.min(6, trend.length - 6));
-    if (older.length >= 3) {
-      const avg = (rows: HealthSample[]) => rows.reduce((s, r) => s + r.health, 0) / rows.length;
-      if (avg(recent) <= avg(older) - 8) {
-        recs.push({
-          id: "health-drop",
-          title: "Saúde em queda nesta sessão",
-          detail:
-            "O índice de saúde caiu em relação às amostras anteriores. Veja a linha do tempo.",
-          severity: "medium",
-          href: "/inteligencia",
-          action: "Ver histórico",
-        });
-      }
-    }
-  }
-
-  if (enabled.length === 0 && recs.length === 0 && info.health >= 80) {
-    recs.push({
-      id: "healthy",
-      title: "Nada urgente agora",
-      detail: "Métricas dentro do esperado. Continue acompanhando a linha do tempo.",
-      severity: "low",
-      href: "/inteligencia",
-      action: "Ver saúde",
-    });
-  }
-
-  const rank = { high: 0, medium: 1, low: 2 };
-  return recs.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 8);
-}
-
 export function diagnoseSymptom(
   id: string,
   ctx: {
@@ -378,7 +216,7 @@ export function diagnoseSymptom(
     findings.push({
       id: "ram",
       tone: info.memoryUsage >= 85 ? "bad" : info.memoryUsage >= 72 ? "warn" : "ok",
-      title: `RAM em ${info.memoryUsage}%`,
+      title: `Memória em ${info.memoryUsage}%`,
       detail:
         info.memoryUsage >= 85
           ? "Memória saturada — o Windows começa a usar disco (swap) e tudo fica lento."
@@ -406,7 +244,7 @@ export function diagnoseSymptom(
       title: `Inicialização ${diagnosis.load === "heavy" ? "pesada" : diagnosis.load === "moderate" ? "moderada" : "leve"}`,
       detail: diagnosis.summary,
       href: "/inicializacao",
-      action: "Otimizar boot",
+      action: "Revisar inicialização",
     });
     findings.push({
       id: "disk",
@@ -444,16 +282,18 @@ export function diagnoseSymptom(
     findings.push({
       id: "overlay",
       tone: overlay ? "warn" : "ok",
-      title: overlay ? `Overlay ativo: ${overlay.name}` : "Sem overlay pesado na amostra",
+      title: overlay
+        ? `Sobreposição (overlay) ativa: ${overlay.name}`
+        : "Nenhuma sobreposição pesada agora",
       detail: overlay
-        ? "Discord, Afterburner e overlays da NVIDIA podem causar stutter. Teste desligando."
-        : "Nenhum overlay óbvio nos processos do topo.",
+        ? "Discord, Afterburner e as sobreposições da NVIDIA podem causar travadas. Teste desligando."
+        : "Nenhuma sobreposição conhecida entre os processos que mais usam recursos.",
     });
     findings.push({
       id: "disk-game",
       tone: info.diskUsage >= 92 ? "bad" : "ok",
-      title: `Disco ${info.diskUsage}%`,
-      detail: "Disco cheio aumenta stutter em texturas e shaders.",
+      title: `Disco ${info.diskUsage}% usado`,
+      detail: "Disco cheio aumenta as travadas ao carregar texturas e shaders.",
       href: "/disco",
     });
   }
@@ -526,7 +366,7 @@ export function diagnoseSymptom(
       title: `${diagnosis.enabledCount} programas abrem com o Windows`,
       detail: diagnosis.summary,
       href: "/inicializacao",
-      action: "Gerenciar boot",
+      action: "Revisar inicialização",
     });
     const disable = diagnosis.recommendations.filter((r) => r.advice === "disable");
     findings.push({
@@ -534,7 +374,7 @@ export function diagnoseSymptom(
       tone: disable.length ? "warn" : "ok",
       title: disable.length
         ? `${disable.length} sugeridos para desativar`
-        : "Nenhum vilão óbvio no boot",
+        : "Nenhum programa pesado na inicialização",
       detail: disable.length
         ? disable.map((d) => d.name).join(", ")
         : "Os itens ativos parecem essenciais ou leves.",
@@ -593,11 +433,11 @@ export function diffSnapshots(a: SystemSnapshot, b: SystemSnapshot) {
   return [
     row("Saúde", a.health, b.health, "up"),
     row("CPU %", a.cpu, b.cpu, "down"),
-    row("RAM %", a.ram, b.ram, "down"),
+    row("Memória %", a.ram, b.ram, "down"),
     row("Disco %", a.disk, b.disk, "down"),
     row("GPU %", a.gpu ?? "—", b.gpu ?? "—", "down"),
-    row("Itens no boot", a.startupEnabled, b.startupEnabled, "down"),
-    row("RAM do boot (MB)", a.startupMemMb, b.startupMemMb, "down"),
+    row("Programas na inicialização", a.startupEnabled, b.startupEnabled, "down"),
+    row("Memória da inicialização (MB)", a.startupMemMb, b.startupMemMb, "down"),
   ];
 }
 

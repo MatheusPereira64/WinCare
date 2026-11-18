@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
-import { Battery, Briefcase, Gamepad2, Loader2, Scale } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Battery, Briefcase, Gamepad2, Gauge, Loader2, Scale } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { getNative, isNative } from "@/lib/wincare/bridge";
 import { PROFILE_META, sessionNote, type ProfileId } from "@/lib/wincare/intelligence";
 import { intelActions, useIntel } from "@/lib/wincare/intelligenceStore";
 import { unlockUi } from "@/lib/wincare/unlockUi";
+import { Panel, PanelHeader } from "./Panel";
+import { EmptyState } from "./States";
+import { StatusBadge } from "./StatusBadge";
 
 const ICONS: Record<ProfileId, typeof Gamepad2> = {
   balanced: Scale,
@@ -29,6 +31,20 @@ export function SystemProfilesCard() {
   const [busy, setBusy] = useState<ProfileId | null>(null);
   const [pending, setPending] = useState<ProfileId | null>(null);
   const [armed, setArmed] = useState(false);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const questionId = useId();
+  const baseId = useId();
+
+  // A confirmação aparece abaixo dos botões: leva o foco até ela (teclado/Narrador).
+  useEffect(() => {
+    if (pending) confirmRef.current?.focus();
+  }, [pending]);
+
+  const cancel = () => {
+    setPending(null);
+    triggerRef.current?.focus();
+  };
 
   useEffect(() => {
     unlockUi();
@@ -48,7 +64,7 @@ export function SystemProfilesCard() {
       if (native?.powerPlan) {
         const out = await native.powerPlan({ action: "set", profile: id });
         if (!out.ok) {
-          toast.error(out.reason || "Não foi possível mudar o plano de energia.");
+          toast.error("Não foi possível mudar o plano de energia.", { description: out.reason });
           return;
         }
         toast.success(`${PROFILE_META[id].title} ativado`, {
@@ -59,7 +75,9 @@ export function SystemProfilesCard() {
       }
       intelActions.setProfile(id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao aplicar perfil.");
+      toast.error("Não foi possível aplicar o perfil.", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setBusy(null);
       unlockUi();
@@ -67,15 +85,13 @@ export function SystemProfilesCard() {
   };
 
   return (
-    <Card className="surface-panel flex flex-col gap-4 border-border/60 p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Perfis</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ajusta o plano de energia do Windows. Jogos, trabalho e bateria — sem mexer em serviços
-          escondidos.
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <Panel className="@container">
+      <PanelHeader
+        icon={Gauge}
+        title="Perfis"
+        description="Ajusta o plano de energia do Windows para jogos, trabalho ou bateria — sem mexer em serviços escondidos."
+      />
+      <div className="grid gap-3 @lg:grid-cols-2">
         {(Object.keys(PROFILE_META) as ProfileId[]).map((id) => {
           const meta = PROFILE_META[id];
           const Icon = ICONS[id];
@@ -86,47 +102,60 @@ export function SystemProfilesCard() {
               type="button"
               variant={active ? "default" : "outline"}
               disabled={!!busy || !armed}
-              onClick={() => {
+              aria-pressed={active}
+              aria-labelledby={`${baseId}-${id}-title`}
+              aria-describedby={`${baseId}-${id}-detail`}
+              onClick={(event) => {
                 if (!armed) return;
+                triggerRef.current = event.currentTarget;
                 setPending(id);
               }}
               className="h-auto w-full flex-col items-start gap-1.5 whitespace-normal rounded-xl p-4 text-left"
             >
               <span className="flex w-full items-center gap-2">
                 <Icon className="size-4 shrink-0" />
-                <span className="font-medium">{meta.title}</span>
-                {active && (
-                  <span className="ml-auto text-[10px] font-medium opacity-90">Ativo</span>
-                )}
+                <span id={`${baseId}-${id}-title`} className="min-w-0 font-medium">
+                  {meta.title}
+                </span>
+                {active && <span className="ml-auto text-[10px] font-semibold">Ativo</span>}
               </span>
-              <span className="text-xs font-normal leading-relaxed opacity-80">{meta.detail}</span>
-              <span className="text-[11px] font-normal opacity-70">{meta.planHint}</span>
+              <span id={`${baseId}-${id}-detail`} className="flex flex-col gap-1">
+                <span className="text-xs font-normal leading-relaxed">{meta.detail}</span>
+                <span className="text-[11px] font-normal">{meta.planHint}</span>
+              </span>
             </Button>
           );
         })}
       </div>
       {pending && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2.5">
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+        <div
+          role="group"
+          aria-labelledby={questionId}
+          className="surface-inset flex flex-wrap items-center gap-2 px-3 py-2.5"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") cancel();
+          }}
+        >
+          <p id={questionId} className="min-w-0 flex-1 text-sm text-muted-foreground">
             Ativar{" "}
             <span className="font-medium text-foreground">{PROFILE_META[pending].title}</span>? O
             Windows muda o plano para {PROFILE_META[pending].planHint}.
             {!isNative() ? " No navegador só fica registrado localmente." : ""}
           </p>
-          <Button type="button" size="sm" variant="outline" onClick={() => setPending(null)}>
+          <Button type="button" size="sm" variant="outline" onClick={cancel}>
             Cancelar
           </Button>
-          <Button type="button" size="sm" onClick={() => void apply(pending)}>
+          <Button ref={confirmRef} type="button" size="sm" onClick={() => void apply(pending)}>
             Ativar
           </Button>
         </div>
       )}
       {busy && (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" /> Aplicando plano de energia…
         </p>
       )}
-    </Card>
+    </Panel>
   );
 }
 
@@ -141,20 +170,21 @@ export function GamingSessionCard() {
   }, []);
 
   return (
-    <Card className="surface-panel flex flex-col gap-4 border-border/60 p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Sessões de jogo</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quando um jogo conhecido (ou GPU alta) aparece, o WinCare registra CPU, RAM e GPU.
-        </p>
-      </div>
+    <Panel>
+      <PanelHeader
+        icon={Gamepad2}
+        title="Sessões de jogo"
+        description="Quando um jogo conhecido (ou uso alto de GPU) aparece, o WinCare registra CPU, memória e GPU."
+      />
 
       {active && (
         <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-primary">Em andamento</p>
+          <StatusBadge tone="primary" dot>
+            Em andamento
+          </StatusBadge>
           <p className="mt-1 font-semibold">{active.game}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            CPU {Math.round(active.avgCpu)}% · RAM {Math.round(active.avgRam)}%
+            CPU {Math.round(active.avgCpu)}% · memória {Math.round(active.avgRam)}%
             {typeof active.avgGpu === "number" ? ` · GPU ${Math.round(active.avgGpu)}%` : ""} ·{" "}
             {durationLabel(Date.now() - active.startedAt)}
           </p>
@@ -162,14 +192,17 @@ export function GamingSessionCard() {
       )}
 
       {sessions.length === 0 && !active && (
-        <p className="text-sm text-muted-foreground">
-          Nenhuma sessão ainda. Deixe o app aberto enquanto joga.
-        </p>
+        <EmptyState
+          size="sm"
+          icon={Gamepad2}
+          title="Nenhuma sessão ainda"
+          description="Deixe o WinCare aberto enquanto joga para registrar a sessão."
+        />
       )}
 
       <ul className="space-y-2">
         {sessions.slice(0, 8).map((s) => (
-          <li key={s.id} className="rounded-xl border border-border/50 px-3 py-2.5">
+          <li key={s.id} className="surface-inset px-3 py-2.5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="font-medium">{s.game}</p>
               <p className="text-xs text-muted-foreground">
@@ -178,7 +211,7 @@ export function GamingSessionCard() {
               </p>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Média CPU {Math.round(s.avgCpu)}% · RAM {Math.round(s.avgRam)}%
+              Média: CPU {Math.round(s.avgCpu)}% · memória {Math.round(s.avgRam)}%
               {typeof s.avgGpu === "number" ? ` · GPU ${Math.round(s.avgGpu)}%` : ""} · pico CPU{" "}
               {Math.round(s.maxCpu)}%
             </p>
@@ -186,6 +219,6 @@ export function GamingSessionCard() {
           </li>
         ))}
       </ul>
-    </Card>
+    </Panel>
   );
 }

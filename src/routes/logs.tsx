@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ChoiceChips } from "@/components/wincare/ChoiceChips";
 import { CommandFeed } from "@/components/wincare/CommandFeed";
-import { EmptyState } from "@/components/wincare/EmptyState";
+import { ListPanel } from "@/components/wincare/Panel";
+import { EmptyState } from "@/components/wincare/States";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { cn } from "@/lib/utils";
 import { actions, useStore } from "@/lib/wincare/store";
@@ -108,7 +109,7 @@ function LogsPage() {
               disabled={!runs.length}
               onClick={async () => {
                 await navigator.clipboard.writeText(fullText);
-                toast.success("Log completo copiado");
+                toast.success("Log completo copiado para a área de transferência");
               }}
             >
               <Copy /> Copiar
@@ -119,7 +120,7 @@ function LogsPage() {
               disabled={!runs.length}
               onClick={() => {
                 actions.clearRuns();
-                toast.success("Histórico limpo");
+                toast.success("Histórico apagado");
               }}
             >
               <Trash2 /> Limpar
@@ -149,63 +150,62 @@ function LogsPage() {
           {visible.length === 0 ? (
             <EmptyState icon={CheckCircle2} title="Nenhuma execução neste filtro" />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
-              <ul className="divide-y divide-border/40">
-                {visible.map((run) => {
-                  const open = expanded === run.id;
-                  const duration = formatDuration(run);
-                  return (
-                    <li key={run.id}>
-                      <button
-                        type="button"
-                        aria-expanded={open}
-                        onClick={() => setExpanded(open ? null : run.id)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
-                      >
-                        {run.status === "error" ? (
-                          <XCircle className="size-4 shrink-0 text-destructive" />
-                        ) : (
-                          <CheckCircle2 className="size-4 shrink-0 text-success" />
-                        )}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{run.toolName}</span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {run.result ?? run.command}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                          {new Date(run.startedAt).toLocaleString("pt-BR", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })}
-                          {duration && <span className="block">{duration}</span>}
-                        </span>
-                        <ChevronDown
-                          className={cn(
-                            "size-4 shrink-0 text-muted-foreground transition-transform",
-                            open && "rotate-180",
-                          )}
-                        />
-                      </button>
-                      {open && (
-                        <div className="animate-fade-in space-y-2 px-4 pb-4">
-                          <code className="block font-mono text-xs break-all text-muted-foreground">
-                            {run.command}
-                          </code>
-                          <CommandFeed
-                            lines={run.lines}
-                            running={run.status === "running"}
-                            status={run.status}
-                            result={run.result}
-                            toolName={run.toolName}
-                          />
-                        </div>
+            <ListPanel label="Execuções registradas">
+              {visible.map((run) => {
+                const open = expanded === run.id;
+                const duration = formatDuration(run);
+                return (
+                  <li key={run.id}>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={`log-${run.id}`}
+                      onClick={() => setExpanded(open ? null : run.id)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden focus-visible:ring-inset"
+                    >
+                      {run.status === "error" ? (
+                        <XCircle className="size-4 shrink-0 text-destructive" />
+                      ) : (
+                        <CheckCircle2 className="size-4 shrink-0 text-success" />
                       )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{run.toolName}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {run.result ?? run.command}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {new Date(run.startedAt).toLocaleString("pt-BR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                        {duration && <span className="block">{duration}</span>}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground transition-transform",
+                          open && "rotate-180",
+                        )}
+                      />
+                    </button>
+                    {open && (
+                      <div id={`log-${run.id}`} className="animate-fade-in space-y-2 px-4 pb-4">
+                        <code className="block font-mono text-xs break-all text-muted-foreground">
+                          {run.command}
+                        </code>
+                        <CommandFeed
+                          lines={run.lines}
+                          running={run.status === "running"}
+                          status={run.status}
+                          result={run.result}
+                          toolName={run.toolName}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ListPanel>
           )}
         </>
       )}

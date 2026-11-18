@@ -3,12 +3,13 @@ import { Files, Loader2, ScanSearch } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { getNative, isNative } from "@/lib/wincare/bridge";
 import { SIM_DUPLICATES, SIM_LARGE_FILES } from "@/lib/wincare/intelligence";
 import { getIntelState, intelActions, useIntel } from "@/lib/wincare/intelligenceStore";
 import { formatBytes } from "@/lib/wincare/report";
+import { plural } from "@/lib/wincare/format";
 import type { DiskUsageFolder } from "@/lib/wincare/types";
+import { Panel, PanelHeader } from "./Panel";
 
 export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
   const scan = useIntel((s) => s.lastStorageScan);
@@ -45,9 +46,11 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
         .filter((row): row is { id: string; label: string; delta: number } => !!row);
       setGrowth(nextGrowth);
       intelActions.setStorageScan(result, folderBytes);
-      toast.success("Análise de arquivos concluída");
+      toast.success("Busca de arquivos concluída");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao varrer arquivos.");
+      toast.error("Não foi possível procurar os arquivos.", {
+        description: err instanceof Error ? err.message : undefined,
+      });
       if (!isNative()) {
         intelActions.setStorageScan({
           at: Date.now(),
@@ -62,30 +65,23 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
   }, [folders]);
 
   return (
-    <Card className="surface-panel gap-4 border-border/60 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-            <ScanSearch className="size-5" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold">Inteligência de armazenamento</h2>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Arquivos grandes e duplicados em Documentos, Downloads, Desktop e mídia — sem varrer o
-              Windows inteiro.
-            </p>
-          </div>
-        </div>
-        <Button
-          type="button"
-          className="rounded-full"
-          disabled={busy}
-          onClick={() => void runScan()}
-        >
-          {busy ? <Loader2 className="animate-spin" /> : <Files />}
-          {busy ? "Varrendo…" : scan ? "Atualizar varredura" : "Varrer arquivos"}
-        </Button>
-      </div>
+    <Panel className="@container">
+      <PanelHeader
+        icon={ScanSearch}
+        title="Arquivos grandes e duplicados"
+        description="Procura em Documentos, Downloads, Área de Trabalho e pastas de mídia — sem varrer o Windows inteiro."
+        actions={
+          <Button
+            type="button"
+            className="rounded-full"
+            disabled={busy}
+            onClick={() => void runScan()}
+          >
+            {busy ? <Loader2 className="animate-spin" /> : <Files />}
+            {busy ? "Procurando…" : scan ? "Procurar de novo" : "Procurar arquivos"}
+          </Button>
+        }
+      />
 
       {growth.length > 0 && (
         <div>
@@ -95,8 +91,10 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
           <ul className="mt-2 space-y-1 text-sm">
             {growth.map((g) => (
               <li key={g.id} className="flex justify-between gap-2">
-                <span>{g.label}</span>
-                <span className={g.delta > 0 ? "text-warning" : "text-success"}>
+                <span className="min-w-0 truncate">{g.label}</span>
+                <span
+                  className={`shrink-0 tabular-nums ${g.delta > 0 ? "text-warning" : "text-success"}`}
+                >
                   {g.delta > 0 ? "+" : ""}
                   {formatBytes(Math.abs(g.delta))}
                 </span>
@@ -107,16 +105,19 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
       )}
 
       {scan && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
+        <div className="grid gap-4 @2xl:grid-cols-2">
+          <div className="min-w-0">
             <p className="text-sm font-medium">Maiores arquivos</p>
             <p className="text-[11px] text-muted-foreground">
-              {scan.visited} itens visitados · {new Date(scan.at).toLocaleString("pt-BR")}
+              {plural(scan.visited, "item verificado", "itens verificados")} ·{" "}
+              {new Date(scan.at).toLocaleString("pt-BR")}
             </p>
-            <ul className="mt-2 divide-y divide-border/40">
+            <ul className="mt-2 divide-y divide-border/60">
               {scan.largeFiles.slice(0, 10).map((f) => (
                 <li key={f.path} className="py-1.5">
-                  <p className="truncate text-sm">{f.name}</p>
+                  <p className="truncate text-sm" title={f.name}>
+                    {f.name}
+                  </p>
                   <p className="truncate text-[11px] text-muted-foreground" title={f.path}>
                     {formatBytes(f.sizeBytes)} · {f.path}
                   </p>
@@ -124,23 +125,20 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
               ))}
               {scan.largeFiles.length === 0 && (
                 <li className="py-2 text-sm text-muted-foreground">
-                  Nenhum arquivo acima de 8 MB.
+                  Nenhum arquivo acima de 8 MB nessas pastas.
                 </li>
               )}
             </ul>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium">Possíveis duplicados</p>
             <p className="text-[11px] text-muted-foreground">
               Mesmo nome e tamanho — revise antes de apagar.
             </p>
             <ul className="mt-2 space-y-2">
               {scan.duplicates.map((g) => (
-                <li
-                  key={`${g.name}-${g.sizeBytes}`}
-                  className="rounded-lg border border-border/40 px-3 py-2"
-                >
-                  <p className="text-sm font-medium">
+                <li key={`${g.name}-${g.sizeBytes}`} className="surface-inset px-3 py-2">
+                  <p className="text-sm font-medium break-words">
                     {g.name} · {formatBytes(g.sizeBytes)}
                   </p>
                   {g.paths.map((p) => (
@@ -152,13 +150,13 @@ export function StorageIntelCard({ folders }: { folders?: DiskUsageFolder[] }) {
               ))}
               {scan.duplicates.length === 0 && (
                 <li className="text-sm text-muted-foreground">
-                  Nenhum duplicado óbvio nesta varredura.
+                  Nenhum duplicado encontrado nesta busca.
                 </li>
               )}
             </ul>
           </div>
         </div>
       )}
-    </Card>
+    </Panel>
   );
 }

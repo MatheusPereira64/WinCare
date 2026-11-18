@@ -17,8 +17,13 @@ export function HealthRing({
   const gradientId = "wincare-health-gradient";
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90 overflow-visible">
+    <div
+      className="relative"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={loading ? "Saúde geral: carregando" : `Saúde geral: ${Math.round(clamped)}%`}
+    >
+      <svg width={size} height={size} className="-rotate-90 overflow-visible" aria-hidden>
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={tone} />
@@ -50,7 +55,7 @@ export function HealthRing({
           }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden>
         {loading ? (
           <span className="text-4xl font-semibold text-muted-foreground">—</span>
         ) : (

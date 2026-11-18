@@ -29,8 +29,9 @@ export function normalizeCmdText(raw: string) {
       .filter(Boolean);
     text = parts[parts.length - 1] || text;
   }
-  const parts = text.split(" ");
-  const singles = parts.filter((p) => p.length <= 1).length;
+  // Só partes não vazias: espaços repetidos (colunas do wmic/tabelas) não são "letras soltas".
+  const parts = text.split(" ").filter(Boolean);
+  const singles = parts.filter((p) => p.length === 1).length;
   if (parts.length >= 8 && singles / parts.length > 0.65) {
     text = parts.join("");
   }
