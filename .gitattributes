@@ -1,0 +1,20 @@
+# Fim de linha LF em todos os sistemas (Prettier usa "endOfLine": "lf").
+# Sem isto, o Git no Windows (core.autocrlf=true) entrega os arquivos com CRLF
+# e `npm run lint` falha com milhares de "Delete ␍".
+* text=auto eol=lf
+
+# Scripts do Windows precisam de CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Amostras do `powercfg /batteryreport /xml` ficam byte a byte como o Windows grava (CRLF).
+electron/tests/fixtures/*.xml -text
+
+# Binários.
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.zip binary
+*.woff2 binary
