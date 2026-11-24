@@ -1,20 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw } from "lucide-react";
+import { Activity, Cpu, HardDrive, MemoryStick } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
-import { Button } from "@/components/ui/button";
 import { AppScrollArea } from "@/components/wincare/AppScrollArea";
 import { PageHeader } from "@/components/wincare/PageHeader";
+import { ProcessList } from "@/components/wincare/ProcessList";
 import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import { Panel } from "@/components/wincare/Panel";
 import { EmptyState } from "@/components/wincare/States";
 import { StatCard } from "@/components/wincare/StatCard";
-import { getNative } from "@/lib/wincare/bridge";
 import { formatGb } from "@/lib/wincare/format";
-import { pageHidden } from "@/lib/wincare/pageVisibility";
-import type { TopProcess } from "@/lib/wincare/types";
 import { useStore } from "@/lib/wincare/store";
 import { useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
@@ -41,13 +38,6 @@ interface Point {
   cpu: number;
   mem: number;
 }
-
-const SIM_PROCESSES: TopProcess[] = [
-  { name: "chrome", pid: 1204, cpu: 42.1, memMb: 890 },
-  { name: "Code", pid: 3301, cpu: 18.4, memMb: 612 },
-  { name: "explorer", pid: 980, cpu: 3.2, memMb: 210 },
-  { name: "WinCare", pid: 4412, cpu: 2.1, memMb: 168 },
-];
 
 /*
  * Cores dos textos dos gráficos por tema (ApexCharts precisa de cor literal):
@@ -110,8 +100,6 @@ function MonitorPage() {
   const info = useSystemInfo(2000);
   const disks = useDisks();
   const [data, setData] = useState<Point[]>([]);
-  const [processes, setProcesses] = useState<TopProcess[]>(SIM_PROCESSES);
-  const [procLoading, setProcLoading] = useState(false);
 
   useEffect(() => {
     setData((prev) =>
@@ -125,31 +113,6 @@ function MonitorPage() {
       ].slice(-40),
     );
   }, [info]);
-
-  const refreshProcesses = async () => {
-    setProcLoading(true);
-    try {
-      const native = getNative();
-      if (native?.topProcesses) {
-        const list = await native.topProcesses();
-        setProcesses(Array.isArray(list) && list.length ? list : SIM_PROCESSES);
-      } else {
-        setProcesses(SIM_PROCESSES);
-      }
-    } catch {
-      setProcesses(SIM_PROCESSES);
-    } finally {
-      setProcLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void refreshProcesses();
-    const id = setInterval(() => {
-      if (!pageHidden()) void refreshProcesses();
-    }, 8000);
-    return () => clearInterval(id);
-  }, []);
 
   const categories = useMemo(() => data.map((d) => d.t), [data]);
   const cpuSeries = useMemo(() => [{ name: "CPU %", data: data.map((d) => d.cpu) }], [data]);
@@ -273,8 +236,6 @@ function MonitorPage() {
       { name: "Livre %", data: free },
     ];
   }, [disks]);
-
-  const maxProcessMem = useMemo(() => Math.max(1, ...processes.map((p) => p.memMb)), [processes]);
 
   return (
     <div className="space-y-6">
@@ -408,88 +369,18 @@ function MonitorPage() {
           )}
         </Panel>
 
-        <Panel padding="sm" className="min-h-0 min-w-0 gap-0">
-          <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-sm font-medium">Processos (memória)</h2>
-              <p className="text-xs text-muted-foreground">
-                {processes.length} processo{processes.length === 1 ? "" : "s"}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0 rounded-full"
-              aria-label="Atualizar lista de processos"
-              onClick={() => void refreshProcesses()}
-              disabled={procLoading}
-            >
-              <RefreshCw className={procLoading ? "size-3.5 animate-spin" : "size-3.5"} />
-              Atualizar
-            </Button>
+        <Panel padding="sm" className="min-h-0 min-w-0 gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium">Quem está usando o PC</h2>
+            <p className="text-xs text-muted-foreground">
+              Processos por CPU ou memória. Encerre um app travado.
+            </p>
           </div>
-
-          <div
-            aria-hidden
-            className="mb-2 grid shrink-0 grid-cols-[minmax(5.5rem,8rem)_1fr_auto] gap-3 px-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-          >
-            <span>Processo</span>
-            <span>Memória</span>
-            <span className="text-right">CPU · MB</span>
-          </div>
-
           <AppScrollArea
-            viewportLabel="Processos por uso de memória"
-            className="h-[min(20rem,48vh)] w-full sm:h-[min(22rem,52vh)] lg:h-[min(24rem,56vh)]"
+            viewportLabel="Processos"
+            className="h-[min(22rem,52vh)] w-full lg:h-[min(26rem,58vh)]"
           >
-            <ul className="space-y-2.5 pr-3" aria-label="Processos por uso de memória">
-              {processes.map((p) => {
-                const pct = Math.max(4, Math.round((p.memMb / maxProcessMem) * 100));
-                return (
-                  <li
-                    key={`${p.pid}-${p.name}`}
-                    className="grid grid-cols-[minmax(5.5rem,8rem)_1fr_auto] items-center gap-3 rounded-lg px-1 py-1 hover:bg-muted/30"
-                  >
-                    {/* Uma frase por processo para o Narrador; as colunas visuais ficam ocultas. */}
-                    <span className="sr-only">
-                      {p.name}, PID {p.pid}: {p.memMb} MB de memória, {p.cpu} segundos de CPU
-                    </span>
-                    <div className="min-w-0" aria-hidden>
-                      <p
-                        className="truncate text-sm font-semibold tracking-tight text-foreground"
-                        title={p.name}
-                      >
-                        {p.name}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">#{p.pid}</p>
-                    </div>
-                    <div
-                      aria-hidden
-                      className="h-2.5 min-w-0 overflow-hidden rounded-full bg-muted/55 forced-colors:border forced-colors:border-[CanvasText]"
-                    >
-                      <div
-                        className="h-full rounded-full bg-[oklch(0.72_0.14_300)] transition-[width] duration-500 forced-colors:forced-color-adjust-none forced-colors:bg-[Highlight]"
-                        style={{ width: `${pct}%` }}
-                        title={`${p.memMb} MB`}
-                      />
-                    </div>
-                    <div
-                      aria-hidden
-                      className="shrink-0 text-right text-xs whitespace-nowrap tabular-nums text-muted-foreground"
-                    >
-                      <span className="text-foreground">{p.cpu}s</span>
-                      <span className="mx-1">·</span>
-                      <span className="font-medium text-foreground">{p.memMb} MB</span>
-                    </div>
-                  </li>
-                );
-              })}
-              {processes.length === 0 && (
-                <li>
-                  <EmptyState size="sm" icon={Activity} title="Nenhum processo listado" />
-                </li>
-              )}
-            </ul>
+            <ProcessList className="pr-3" />
           </AppScrollArea>
         </Panel>
       </div>

@@ -19,6 +19,7 @@ import { Route as InteligenciaRouteImport } from './routes/inteligencia'
 import { Route as LimpezaRouteImport } from './routes/limpeza'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as MonitoramentoRouteImport } from './routes/monitoramento'
+import { Route as PainelRouteImport } from './routes/painel'
 import { Route as ProgramasRouteImport } from './routes/programas'
 import { Route as RedesRouteImport } from './routes/redes'
 import { Route as ReparoRouteImport } from './routes/reparo'
@@ -75,6 +76,11 @@ const MonitoramentoRoute = MonitoramentoRouteImport.update({
   path: '/monitoramento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PainelRoute = PainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgramasRoute = ProgramasRouteImport.update({
   id: '/programas',
   path: '/programas',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/painel': typeof PainelRoute
   '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/painel': typeof PainelRoute
   '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/limpeza': typeof LimpezaRoute
   '/logs': typeof LogsRoute
   '/monitoramento': typeof MonitoramentoRoute
+  '/painel': typeof PainelRoute
   '/programas': typeof ProgramasRoute
   '/redes': typeof RedesRoute
   '/reparo': typeof ReparoRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/painel'
     | '/programas'
     | '/redes'
     | '/reparo'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/painel'
     | '/programas'
     | '/redes'
     | '/reparo'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/limpeza'
     | '/logs'
     | '/monitoramento'
+    | '/painel'
     | '/programas'
     | '/redes'
     | '/reparo'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   LimpezaRoute: typeof LimpezaRoute
   LogsRoute: typeof LogsRoute
   MonitoramentoRoute: typeof MonitoramentoRoute
+  PainelRoute: typeof PainelRoute
   ProgramasRoute: typeof ProgramasRoute
   RedesRoute: typeof RedesRoute
   ReparoRoute: typeof ReparoRoute
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MonitoramentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/painel': {
+      id: '/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof PainelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/programas': {
       id: '/programas'
       path: '/programas'
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   LimpezaRoute: LimpezaRoute,
   LogsRoute: LogsRoute,
   MonitoramentoRoute: MonitoramentoRoute,
+  PainelRoute: PainelRoute,
   ProgramasRoute: ProgramasRoute,
   RedesRoute: RedesRoute,
   ReparoRoute: ReparoRoute,

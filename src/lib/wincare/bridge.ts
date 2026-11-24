@@ -278,6 +278,14 @@ const SIM_OUTPUT: Record<string, string[]> = {
     "C:       142857483264   511101108224",
     "D:       1204857483264  2000398934016",
   ],
+  "optimize-drives": [
+    "Invocando otimização em (C:)...",
+    "Tipo de mídia: Unidade de estado sólido — executando TRIM.",
+    "A operação foi concluída com êxito.",
+    "Invocando otimização em (D:)...",
+    "Tipo de mídia: Unidade de disco rígido — fragmentação 3%.",
+    "A operação foi concluída com êxito.",
+  ],
   "shutdown-1": ["Desligamento agendado para daqui a 60 segundos."],
   "shutdown-5": ["Desligamento agendado para daqui a 5 minutos."],
   "shutdown-15": ["Desligamento agendado para daqui a 15 minutos."],
@@ -369,6 +377,7 @@ const SIM_RESULT: Record<string, string> = {
   "icon-cache": "Cache de ícones recriado.",
   smart: "Todos os discos com status OK.",
   "disk-space": "2 unidades analisadas.",
+  "optimize-drives": "Unidades otimizadas.",
   "shutdown-1": "Desligamento agendado (1 min).",
   "shutdown-5": "Desligamento agendado (5 min).",
   "shutdown-15": "Desligamento agendado (15 min).",
@@ -766,10 +775,16 @@ const demoProgram = (
 const SIMULATED_PROGRAMS: InstalledProgram[] = [
   demoProgram("p1", "7-Zip 24.09 (x64)", "Igor Pavlov", "24.09", 0.005, "2026-02-11"),
   demoProgram("p2", "Adobe Acrobat Reader", "Adobe", "24.5", 1.1, "2026-05-02"),
-  demoProgram("p3", "Blender", "Blender Foundation", "4.2", 1.6, "2026-09-18"),
+  demoProgram("p3", "Blender", "Blender Foundation", "4.2", 1.6, "2026-09-18", {
+    lastUsedAt: Date.now() - 140 * 86_400_000,
+  }),
   demoProgram("p4", "Discord", "Discord Inc.", "1.0.9", 0.4, "2026-10-21", { scope: "user" }),
-  demoProgram("p5", "Google Chrome", "Google LLC", "130.0", 0.65, "2026-10-29"),
-  demoProgram("p6", "GIMP 2.10", "The GIMP Team", "2.10.38", 0.9, "2026-03-27"),
+  demoProgram("p5", "Google Chrome", "Google LLC", "130.0", 0.65, "2026-10-29", {
+    lastUsedAt: Date.now() - 2 * 3_600_000,
+  }),
+  demoProgram("p6", "GIMP 2.10", "The GIMP Team", "2.10.38", 0.9, "2026-03-27", {
+    lastUsedAt: Date.now() - 230 * 86_400_000,
+  }),
   demoProgram(
     "p7",
     "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
@@ -781,7 +796,9 @@ const SIMULATED_PROGRAMS: InstalledProgram[] = [
   ),
   demoProgram("p8", "Mozilla Firefox (x64 pt-BR)", "Mozilla", "131.0", 0.26, "2026-10-12"),
   demoProgram("p9", "Notepad++ (64-bit x64)", "Notepad++ Team", "8.6.9", 0.015, "2026-07-30"),
-  demoProgram("p10", "OBS Studio", "OBS Project", "30.2", 0.55, "2026-08-14"),
+  demoProgram("p10", "OBS Studio", "OBS Project", "30.2", 0.55, "2026-08-14", {
+    lastUsedAt: Date.now() - 98 * 86_400_000,
+  }),
   demoProgram("p11", "Spotify", "Spotify AB", "1.2.45", 0.42, "2026-10-25", { scope: "user" }),
   demoProgram("p12", "Steam", "Valve Corporation", "2.10", 2.8, "2025-12-03"),
   demoProgram("p13", "VLC media player", "VideoLAN", "3.0.21", 0.17, "2026-06-05"),

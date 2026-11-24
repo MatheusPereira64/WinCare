@@ -55,9 +55,26 @@ const ALERT_TEXT: Record<AlertType, { icon: typeof HardDrive; title: string; rul
     title: "Windows Update atrasado",
     rule: "45 dias ou mais sem instalar atualizações.",
   },
+  diskGrowth: {
+    icon: HardDrive,
+    title: "Disco crescendo rápido",
+    rule: "Qualquer unidade ganhou 1 GB ou mais em até 30 minutos.",
+  },
+  newProgram: {
+    icon: ShieldAlert,
+    title: "Programa novo instalado",
+    rule: "Um programa apareceu na lista de instalados desde a última verificação.",
+  },
 };
 
-const ALERT_ORDER: AlertType[] = ["disk", "temperature", "defender", "windowsUpdate"];
+const ALERT_ORDER: AlertType[] = [
+  "disk",
+  "diskGrowth",
+  "temperature",
+  "defender",
+  "windowsUpdate",
+  "newProgram",
+];
 
 const time = (ts: number) =>
   new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });

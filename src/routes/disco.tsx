@@ -8,7 +8,7 @@ import { Panel } from "@/components/wincare/Panel";
 import { EmptyState, LoadingState } from "@/components/wincare/States";
 import { StatusBadge } from "@/components/wincare/StatusBadge";
 import { PageHeader } from "@/components/wincare/PageHeader";
-import { StorageIntelCard } from "@/components/wincare/StorageIntelCard";
+import { StorageExplorer } from "@/components/wincare/StorageExplorer";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import { useDiskList } from "@/lib/wincare/useSystem";
 
@@ -18,7 +18,8 @@ export const Route = createFileRoute("/disco")({
       { title: "Integridade e saúde dos discos | WinCare" },
       {
         name: "description",
-        content: "Status SMART, espaço livre, análise de pastas grandes e limpeza direcionada.",
+        content:
+          "Status SMART, mapa do disco, busca de arquivos grandes, duplicados e comparação ao longo do tempo.",
       },
       { property: "og:title", content: "Integridade e saúde dos discos | WinCare" },
       {
@@ -101,9 +102,9 @@ function DiskPage() {
         )}
       </section>
 
-      <DiskSpaceAnalyzer />
+      <StorageExplorer />
 
-      <StorageIntelCard />
+      <DiskSpaceAnalyzer />
 
       <ToolSection
         embedded

@@ -31,13 +31,31 @@ const FIRST_CHECK_HIDDEN_MS = 60_000;
 const RECENT_INFO_MS = 2 * 60_000;
 
 /** Rotas que a bandeja/notificação podem abrir (nada vindo de fora). */
-const ROUTES = new Set(["/", "/limpeza", "/historico", "/configuracoes", "/monitoramento"]);
+const ROUTES = new Set([
+  "/",
+  "/limpeza",
+  "/historico",
+  "/configuracoes",
+  "/monitoramento",
+  "/disco",
+  "/programas",
+  "/sistema",
+  "/redes",
+  "/inteligencia",
+]);
 
 const DEFAULT_SETTINGS = {
   closeToTray: false,
   monitor: {
     enabled: true,
-    types: { disk: true, temperature: true, defender: true, windowsUpdate: true },
+    types: {
+      disk: true,
+      temperature: true,
+      defender: true,
+      windowsUpdate: true,
+      diskGrowth: true,
+      newProgram: true,
+    },
   },
   snoozeUntil: 0,
   trayHintShown: false,
@@ -247,8 +265,54 @@ async function readWindowsUpdate() {
   return out && typeof out.lastInstalled === "string" ? { lastInstalled: out.lastInstalled } : null;
 }
 
+/** Uso de cada unidade fixa (statfs, sem processo externo). */
+function readDriveUsage() {
+  const drives = [];
+  for (let code = 67; code <= 90; code++) {
+    const drive = `${String.fromCharCode(code)}:`;
+    try {
+      if (!fs.existsSync(`${drive}\\`)) continue;
+      const s = fs.statfsSync(`${drive}\\`);
+      const total = Number(s.blocks) * Number(s.bsize);
+      if (!(total > 0)) continue;
+      drives.push({ drive, usedBytes: total - Number(s.bavail ?? s.bfree) * Number(s.bsize) });
+    } catch {
+      /* unidade sem mídia */
+    }
+  }
+  return { drives };
+}
+
+const PROGRAMS_SCRIPT = `
+$ErrorActionPreference = 'SilentlyContinue'
+$roots = @(
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+)
+$out = foreach ($r in $roots) {
+  Get-ChildItem -LiteralPath $r | ForEach-Object {
+    $p = Get-ItemProperty -LiteralPath $_.PSPath
+    if ($p.DisplayName -and -not $p.SystemComponent -and -not $p.ParentKeyName) {
+      @{ key = [string]$_.Name; name = [string]$p.DisplayName }
+    }
+  }
+}
+ConvertTo-Json -Compress -InputObject @($out)
+`;
+
+async function readPrograms() {
+  if (process.platform !== "win32") return null;
+  const rows = await psFileJson(PROGRAMS_SCRIPT, 60000);
+  const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+  const programs = list.filter((p) => p && p.key && p.name);
+  return programs.length ? { programs } : null;
+}
+
 const READERS = {
   disk: async () => readSystemDrive(),
+  diskGrowth: async () => readDriveUsage(),
+  newProgram: readPrograms,
   temperature: readTemperature,
   defender: readDefender,
   windowsUpdate: readWindowsUpdate,
@@ -264,6 +328,10 @@ function evaluate(type, reading, prev, now) {
       return alerts.evaluateDefender(reading);
     case "windowsUpdate":
       return alerts.evaluateWindowsUpdate(reading, now);
+    case "diskGrowth":
+      return alerts.evaluateDiskGrowth(reading, prev, now);
+    case "newProgram":
+      return alerts.evaluateNewProgram(reading, prev, now);
     default:
       return null;
   }
@@ -294,6 +362,10 @@ function summarize(type, reading, result) {
       return result
         ? `Última atualização há ${result.detail.days} ${result.detail.days === 1 ? "dia" : "dias"}`
         : "Não foi possível ler o Windows Update";
+    case "diskGrowth":
+      return `${reading.drives.length} ${reading.drives.length === 1 ? "unidade vigiada" : "unidades vigiadas"} (aviso com +1 GB em 30 min)`;
+    case "newProgram":
+      return `${reading.programs.length.toLocaleString("pt-BR")} programas conhecidos`;
     default:
       return "";
   }
@@ -503,8 +575,13 @@ function createTray() {
   if (tray || !deps.iconPath) return;
   try {
     tray = new Tray(trayIcons().baseIcon);
-    tray.on("click", () => deps.openApp({}));
-    tray.on("double-click", () => deps.openApp({}));
+    // Clique: painel da bandeja (disco, CPU, memória, rede…); duplo clique: o app.
+    tray.on("click", (_event, bounds) =>
+      deps.onTrayClick ? deps.onTrayClick(bounds) : deps.openApp({}),
+    );
+    tray.on("double-click", () =>
+      deps.onTrayDoubleClick ? deps.onTrayDoubleClick() : deps.openApp({}),
+    );
     refreshTray();
   } catch (error) {
     tray = null;
@@ -616,6 +693,8 @@ function registerIpc() {
  * @param {boolean} options.launchedHidden
  * @param {string} [options.appId] AppUserModelID (nome e ícone das notificações)
  * @param {() => ({ at: number, info: object } | null)} [options.getRecentSystemInfo]
+ * @param {(bounds: Electron.Rectangle) => void} [options.onTrayClick]
+ * @param {() => void} [options.onTrayDoubleClick]
  */
 function initBackground(options) {
   deps = options;

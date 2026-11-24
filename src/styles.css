@@ -382,3 +382,17 @@
 @utility animate-wincare-loader-dot {
   animation: wincare-loader-dot 1.05s ease-in-out infinite;
 }
+
+/* Barra "trabalhando" sem porcentagem conhecida (análise de disco). */
+@keyframes wincare-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@utility animate-indeterminate {
+  animation: wincare-indeterminate 1.4s ease-in-out infinite;
+}

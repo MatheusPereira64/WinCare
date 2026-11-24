@@ -15,6 +15,7 @@
     "electron/maintenance-history.cjs",
     "electron/background.cjs",
     "electron/alerts.cjs",
+    "electron/disk-scan-worker.cjs",
     "electron/tests/*.cjs",
     "src/**/*.test.{ts,tsx}",
     "src/test/setup.ts",

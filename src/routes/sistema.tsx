@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Gauge } from "lucide-react";
 import { BatteryCard } from "@/components/wincare/BatteryCard";
+import { SecurityOverview } from "@/components/wincare/SecurityOverview";
 import { ToolSection } from "@/components/wincare/ToolSection";
 
 export const Route = createFileRoute("/sistema")({
@@ -23,9 +24,14 @@ export const Route = createFileRoute("/sistema")({
     <ToolSection
       title="Sistema"
       icon={Gauge}
-      subtitle="Energia do PC e acesso rápido às consoles administrativas do Windows."
+      subtitle="Proteção, energia do PC e acesso rápido às consoles administrativas do Windows."
       categories={["system"]}
-      leading={<BatteryCard />}
+      leading={
+        <>
+          <SecurityOverview />
+          <BatteryCard />
+        </>
+      }
     />
   ),
 });

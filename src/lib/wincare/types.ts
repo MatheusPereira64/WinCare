@@ -125,8 +125,14 @@ export interface StartupItem {
 export interface TopProcess {
   name: string;
   pid: number;
+  /** Segundos de CPU acumulados. */
   cpu: number;
+  /** % do processador agora (null na primeira leitura). */
+  cpuPct?: number | null;
   memMb: number;
+  hasWindow?: boolean;
+  /** Pode ser encerrado pela tela (não é processo do Windows). */
+  canEnd?: boolean;
 }
 
 export interface DiskUsageFolder {
@@ -189,6 +195,8 @@ export interface InstalledProgram {
   /** Componente do qual outros programas costumam depender. */
   critical: boolean;
   icon: string | null;
+  /** Última vez que foi aberto (UserAssist do Windows), em ms; null = sem registro. */
+  lastUsedAt?: number | null;
 }
 
 export interface UninstallResult {
@@ -307,7 +315,8 @@ export interface MaintenanceHistory {
 
 /* Segundo plano: bandeja e alertas (electron/background.cjs + alerts.cjs). */
 
-export type AlertType = "disk" | "temperature" | "defender" | "windowsUpdate";
+export type AlertType =
+  "disk" | "temperature" | "defender" | "windowsUpdate" | "diskGrowth" | "newProgram";
 
 export interface ActiveAlert {
   type: AlertType;

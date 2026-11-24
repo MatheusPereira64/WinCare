@@ -18,7 +18,14 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const ALERT_TYPES = ["disk", "temperature", "defender", "windowsUpdate"];
+const ALERT_TYPES = [
+  "disk",
+  "temperature",
+  "defender",
+  "windowsUpdate",
+  "diskGrowth",
+  "newProgram",
+];
 
 const THRESHOLDS = Object.freeze({
   /** Disco do sistema: liga com menos de 10 GB livres ou 95% usados… */
@@ -33,6 +40,11 @@ const THRESHOLDS = Object.freeze({
   tempClearC: 80,
   /** Última atualização instalada há 45 dias ou mais (mesmo limite da recomendação). */
   updateStaleDays: 45,
+  /** Disco que ganhou 1 GB ou mais em até 30 minutos (download, instalação, log fora de controle). */
+  diskGrowthBytes: GB,
+  diskGrowthWindowMs: 30 * MINUTE,
+  /** Avisos de "evento" (salto no disco, programa novo) ficam visíveis por 30 min. */
+  eventHoldMs: 30 * MINUTE,
 });
 
 /** De quanto em quanto tempo cada verificação roda (leve: quase tudo é raro). */
@@ -41,6 +53,8 @@ const CHECK_EVERY_MS = Object.freeze({
   temperature: 3 * MINUTE,
   defender: 30 * MINUTE,
   windowsUpdate: 6 * HOUR,
+  diskGrowth: 5 * MINUTE,
+  newProgram: 15 * MINUTE,
 });
 
 /** Com o problema ainda ativo, lembra depois de… */
@@ -49,6 +63,8 @@ const REMIND_MS = Object.freeze({
   temperature: 2 * HOUR,
   defender: DAY,
   windowsUpdate: 7 * DAY,
+  diskGrowth: DAY,
+  newProgram: DAY,
 });
 
 /** Problema que some e volta: novo aviso só depois de… (evita pisca-pisca). */
@@ -57,6 +73,8 @@ const REARM_MS = Object.freeze({
   temperature: HOUR,
   defender: HOUR,
   windowsUpdate: 7 * DAY,
+  diskGrowth: 0,
+  newProgram: 0,
 });
 
 const MIN_GAP_MS = 10 * MINUTE;
@@ -69,6 +87,8 @@ const ALERT_ROUTE = Object.freeze({
   temperature: "/monitoramento",
   defender: "/",
   windowsUpdate: "/",
+  diskGrowth: "/disco",
+  newProgram: "/programas",
 });
 
 const pct = (n) => `${Math.round(n)}%`;
@@ -124,6 +144,71 @@ function evaluateWindowsUpdate(reading, now) {
 }
 
 /**
+ * Salto no uso das unidades: compara cada unidade com a base guardada; base
+ * velha (mais de 30 min) é trocada pela leitura atual. `reading.drives`:
+ * [{ drive, usedBytes }]. `fresh` marca um salto novo (vira aviso na hora).
+ */
+function evaluateDiskGrowth(reading, prev = {}, now) {
+  if (!reading || !Array.isArray(reading.drives) || !reading.drives.length) return null;
+  const old = prev.detail || {};
+  const baselines = { ...(old.baselines || {}) };
+  const grown = [];
+  for (const { drive, usedBytes } of reading.drives) {
+    if (!drive || !(usedBytes >= 0)) continue;
+    const base = baselines[drive];
+    if (base && now - base.at <= THRESHOLDS.diskGrowthWindowMs) {
+      const delta = usedBytes - base.bytes;
+      if (delta >= THRESHOLDS.diskGrowthBytes) {
+        grown.push({ drive, bytes: delta });
+        baselines[drive] = { bytes: usedBytes, at: now };
+      } else if (delta < 0) {
+        // Espaço liberado: a nova base é a leitura menor.
+        baselines[drive] = { bytes: usedBytes, at: now };
+      }
+      continue;
+    }
+    baselines[drive] = { bytes: usedBytes, at: now };
+  }
+  const fresh = grown.length > 0;
+  const holding = !fresh && prev.active && now - (old.triggeredAt || 0) < THRESHOLDS.eventHoldMs;
+  return {
+    active: fresh || !!holding,
+    fresh,
+    detail: {
+      baselines,
+      grown: fresh ? grown : old.grown || [],
+      triggeredAt: fresh ? now : old.triggeredAt || 0,
+    },
+  };
+}
+
+/**
+ * Programa instalado desde a última leitura. `reading.programs`: [{ key, name }].
+ * A primeira leitura só aprende a lista (nada é "novo" no primeiro uso).
+ */
+function evaluateNewProgram(reading, prev = {}, now) {
+  if (!reading || !Array.isArray(reading.programs) || !reading.programs.length) return null;
+  const old = prev.detail || {};
+  const keys = reading.programs.map((p) => String(p.key).toLowerCase());
+  if (!Array.isArray(old.known)) {
+    return { active: false, detail: { known: keys, names: [], triggeredAt: 0 } };
+  }
+  const known = new Set(old.known);
+  const added = reading.programs.filter((p) => !known.has(String(p.key).toLowerCase()));
+  const fresh = added.length > 0;
+  const holding = !fresh && prev.active && now - (old.triggeredAt || 0) < THRESHOLDS.eventHoldMs;
+  return {
+    active: fresh || !!holding,
+    fresh,
+    detail: {
+      known: keys,
+      names: fresh ? added.map((p) => String(p.name)).slice(0, 5) : old.names || [],
+      triggeredAt: fresh ? now : old.triggeredAt || 0,
+    },
+  };
+}
+
+/**
  * Estado do alerta depois de uma leitura. Um problema que aparece abre um
  * "episódio" novo (ainda não avisado); leitura que falhou (null) não muda nada.
  */
@@ -134,7 +219,7 @@ function nextAlertState(prev = {}, result, now) {
     streak: result.streak ?? 0,
     detail: result.detail,
   };
-  if (result.active && !prev.active) {
+  if (result.active && (!prev.active || result.fresh)) {
     return { ...base, active: true, since: now, episodeNotified: false };
   }
   if (result.active) {
@@ -176,6 +261,26 @@ function describeAlert(type, detail = {}) {
         body: "Atualizações corrigem falhas de segurança. Abra o Windows Update para ficar em dia.",
         short: `Windows sem atualizar há ${detail.days} dias`,
       };
+    case "diskGrowth": {
+      const grown = Array.isArray(detail.grown) ? detail.grown : [];
+      const first = grown[0] || { drive: "C:", bytes: 0 };
+      const where = grown.map((g) => g.drive).join(", ") || first.drive;
+      return {
+        title: `Disco ${where} cresceu ${gbText(first.bytes)} em pouco tempo`,
+        body: "Pode ser um download ou uma instalação grande, ou algo enchendo o disco. Veja no mapa do disco o que cresceu.",
+        short: `Disco ${where} cresceu ${gbText(first.bytes)}`,
+      };
+    }
+    case "newProgram": {
+      const names = Array.isArray(detail.names) ? detail.names : [];
+      const label =
+        names.length > 1 ? `${names[0]} e mais ${names.length - 1}` : names[0] || "Um programa";
+      return {
+        title: names.length > 1 ? "Programas novos instalados" : "Programa novo instalado",
+        body: `${label} foi instalado neste PC. Se não foi você, revise em Programas.`,
+        short: `${label} instalado`,
+      };
+    }
     default:
       return { title: "WinCare", body: "", short: "" };
   }
@@ -327,6 +432,8 @@ module.exports = {
   dueNotifications,
   evaluateDefender,
   evaluateDisk,
+  evaluateDiskGrowth,
+  evaluateNewProgram,
   evaluateTemperature,
   evaluateWindowsUpdate,
   nextAlertState,

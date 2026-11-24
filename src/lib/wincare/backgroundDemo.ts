@@ -12,10 +12,14 @@ const demo = {
   closeToTray: false,
   openAtLogin: false,
   monitorEnabled: true,
-  types: { disk: true, temperature: true, defender: true, windowsUpdate: true } as Record<
-    AlertType,
-    boolean
-  >,
+  types: {
+    disk: true,
+    temperature: true,
+    defender: true,
+    windowsUpdate: true,
+    diskGrowth: true,
+    newProgram: true,
+  } as Record<AlertType, boolean>,
   snoozeUntil: 0,
   lastCheckAt: 0,
 };
@@ -68,6 +72,8 @@ export function demoBackgroundState(lastUpdate: string, now = Date.now()): Backg
             ? "Não foi possível ler o Windows Update"
             : `Última atualização há ${days} ${days === 1 ? "dia" : "dias"}`,
         ),
+        diskGrowth: check("2 unidades vigiadas (aviso com +1 GB em 30 min)"),
+        newProgram: check("142 programas conhecidos"),
       },
       active,
     },

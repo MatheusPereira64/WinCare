@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Brush } from "lucide-react";
 import { BrowserCleaner } from "@/components/wincare/BrowserCleaner";
+import { ForgottenFiles } from "@/components/wincare/ForgottenFiles";
 import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
 import { ToolSection } from "@/components/wincare/ToolSection";
 import type { ToolCategory } from "@/lib/wincare/types";
@@ -18,6 +19,7 @@ function LimpezaPage() {
         <>
           <MemoryOptimizerCard />
           <BrowserCleaner />
+          <ForgottenFiles />
         </>
       }
     />

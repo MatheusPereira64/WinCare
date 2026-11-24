@@ -24,6 +24,7 @@ import {
   scanLeftovers,
   uninstallProgram,
 } from "@/lib/wincare/bridge";
+import { formatAge, plural } from "@/lib/wincare/format";
 import { formatBytes } from "@/lib/wincare/report";
 import { useStore } from "@/lib/wincare/store";
 import type { InstalledProgram, LeftoverItem, LeftoverRemoval } from "@/lib/wincare/types";
@@ -37,20 +38,25 @@ import { EmptyState, LoadingState, ResourceView } from "./States";
 import { StatusBadge } from "./StatusBadge";
 import { PageHeader } from "./PageHeader";
 
-type SortKey = "name" | "size" | "date";
-type FilterKey = "all" | "large" | "recent" | "user";
+type SortKey = "name" | "size" | "date" | "lastUsed";
+type FilterKey = "all" | "idle" | "large" | "recent" | "user";
 
 const LARGE_BYTES = 500 * 1024 ** 2;
 const RECENT_DAYS = 30;
+/** Sem abrir há 3 meses ou mais (pelo registro de uso do Windows): "encostado". */
+const IDLE_DAYS = 90;
+const DAY_MS = 86_400_000;
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "name", label: "Nome" },
   { value: "size", label: "Tamanho" },
   { value: "date", label: "Mais recentes" },
+  { value: "lastUsed", label: "Menos usados" },
 ];
 
 const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
   { value: "all", label: "Todos" },
+  { value: "idle", label: "Encostados" },
   { value: "large", label: "Grandes" },
   { value: "recent", label: `Últimos ${RECENT_DAYS} dias` },
   { value: "user", label: "Só deste usuário" },
@@ -60,6 +66,20 @@ const firstLetter = (name: string) => {
   const letter = name.trim().charAt(0).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   return /[A-Z]/.test(letter) ? letter : "#";
 };
+
+/** Encostado: aberto pela última vez há 3 meses ou mais. Sem registro de uso não conta. */
+function isIdle(program: InstalledProgram, now: number) {
+  return (
+    !program.critical &&
+    typeof program.lastUsedAt === "number" &&
+    now - program.lastUsedAt >= IDLE_DAYS * DAY_MS
+  );
+}
+
+function lastUseLabel(program: InstalledProgram) {
+  if (typeof program.lastUsedAt !== "number") return null;
+  return `aberto ${formatAge(program.lastUsedAt)}`;
+}
 
 const formatDate = (iso: string | null) =>
   iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR") : "Data desconhecida";
@@ -96,7 +116,22 @@ export function ProgramUninstaller() {
   const [sort, setSort] = useState<SortKey>("name");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [letter, setLetter] = useState("Todas");
-  const [target, setTarget] = useState<InstalledProgram | null>(null);
+  const [queue, setQueue] = useState<InstalledProgram[]>([]);
+  const [queueSize, setQueueSize] = useState(0);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const target = queue[0] ?? null;
+  const startQueue = (list: InstalledProgram[]) => {
+    setQueue(list);
+    setQueueSize(list.length);
+  };
+  const togglePicked = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const pickedPrograms = programs.filter((p) => picked.has(p.id));
   const [openedAt] = useState(() => Date.now());
 
   const filtered = useMemo(() => {
@@ -104,6 +139,7 @@ export function ProgramUninstaller() {
     return programs.filter((p) => {
       if (filter === "large" && p.sizeBytes < LARGE_BYTES) return false;
       if (filter === "user" && p.scope !== "user") return false;
+      if (filter === "idle" && !isIdle(p, openedAt)) return false;
       if (filter === "recent" && (!p.installDate || new Date(p.installDate).getTime() < cutoff)) {
         return false;
       }
@@ -121,12 +157,14 @@ export function ProgramUninstaller() {
       letter === "Todas" ? filtered : filtered.filter((p) => firstLetter(p.name) === letter);
     const sorted = [...list];
     if (sort === "size") sorted.sort((a, b) => b.sizeBytes - a.sizeBytes);
+    if (sort === "lastUsed") sorted.sort((a, b) => (a.lastUsedAt ?? 0) - (b.lastUsedAt ?? 0));
     if (sort === "date")
       sorted.sort((a, b) => (b.installDate ?? "").localeCompare(a.installDate ?? ""));
     return sorted;
   }, [filtered, letter, sort]);
 
   const totalBytes = programs.reduce((sum, p) => sum + p.sizeBytes, 0);
+  const idleCount = programs.filter((p) => isIdle(p, openedAt)).length;
 
   return (
     <div className="space-y-6" data-wincare-programs>
@@ -136,9 +174,16 @@ export function ProgramUninstaller() {
         subtitle="Desinstale programas e remova o que eles deixaram para trás."
         badges={
           status === "ready" && (
-            <StatusBadge>
-              {programs.length} instalados · {formatBytes(totalBytes)}
-            </StatusBadge>
+            <>
+              <StatusBadge>
+                {programs.length} instalados · {formatBytes(totalBytes)}
+              </StatusBadge>
+              {idleCount > 0 && (
+                <StatusBadge tone="warning" title="Sem abrir há 3 meses ou mais">
+                  {plural(idleCount, "encostado", "encostados")}
+                </StatusBadge>
+              )}
+            </>
           )
         }
         actions={
@@ -192,6 +237,35 @@ export function ProgramUninstaller() {
             />
           </div>
         </div>
+        {filter === "idle" && (
+          <p className="text-xs text-muted-foreground">
+            Programas que você não abre há 3 meses ou mais, segundo o registro de uso do Windows.
+            Apps que só rodam em segundo plano podem não ter esse registro e não aparecem aqui.
+          </p>
+        )}
+        {picked.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
+            <span className="text-sm">
+              {plural(picked.size, "programa selecionado", "programas selecionados")} ·{" "}
+              {formatBytes(pickedPrograms.reduce((n, p) => n + p.sizeBytes, 0))}
+            </span>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setPicked(new Set())}>
+                Limpar seleção
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  startQueue(pickedPrograms);
+                  setPicked(new Set());
+                }}
+              >
+                <Trash2 /> Desinstalar em sequência
+              </Button>
+            </div>
+          </div>
+        )}
         {letters.length > 1 && (
           <ChoiceChips
             variant="letter"
@@ -243,6 +317,11 @@ export function ProgramUninstaller() {
                   key={program.id}
                   className="group flex items-center gap-3.5 px-4 py-2.5 transition-colors hover:bg-muted/30"
                 >
+                  <Checkbox
+                    checked={picked.has(program.id)}
+                    onCheckedChange={() => togglePicked(program.id)}
+                    aria-label={`Selecionar ${program.name} para desinstalar em sequência`}
+                  />
                   <ProgramIcon program={program} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -257,12 +336,18 @@ export function ProgramUninstaller() {
                           Componente
                         </StatusBadge>
                       )}
+                      {isIdle(program, openedAt) && (
+                        <StatusBadge tone="neutral" title="Sem abrir há 3 meses ou mais">
+                          Encostado
+                        </StatusBadge>
+                      )}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {[
                         program.publisher,
                         program.version && `v${program.version}`,
                         formatDate(program.installDate),
+                        lastUseLabel(program),
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -277,7 +362,7 @@ export function ProgramUninstaller() {
                     size="sm"
                     className="shrink-0 rounded-full"
                     aria-label={`Desinstalar ${program.name}`}
-                    onClick={() => setTarget(program)}
+                    onClick={() => startQueue([program])}
                   >
                     <Trash2 /> Desinstalar
                   </Button>
@@ -292,7 +377,8 @@ export function ProgramUninstaller() {
         <UninstallWizard
           key={target.id}
           program={target}
-          onClose={() => setTarget(null)}
+          position={queueSize > 1 ? `${queueSize - queue.length + 1} de ${queueSize}` : undefined}
+          onClose={() => setQueue((q) => q.slice(1))}
           onFinished={() => void refresh()}
         />
       )}
@@ -312,10 +398,13 @@ type Stage =
 
 function UninstallWizard({
   program,
+  position,
   onClose,
   onFinished,
 }: {
   program: InstalledProgram;
+  /** "2 de 5" quando faz parte de uma desinstalação em sequência. */
+  position?: string;
   onClose: () => void;
   onFinished: () => void;
 }) {
@@ -472,7 +561,14 @@ function UninstallWizard({
       locked={busy}
       describeBody={stage !== "leftovers"}
       className="max-w-2xl"
-      title={<span className="min-w-0 truncate">Desinstalar {program.name}</span>}
+      title={
+        <span className="min-w-0 truncate">
+          Desinstalar {program.name}
+          {position && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">({position})</span>
+          )}
+        </span>
+      }
       icon={<ProgramIcon program={program} />}
       onClose={close}
       footer={footer()}

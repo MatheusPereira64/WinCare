@@ -398,6 +398,25 @@ function AppContentColumn() {
 }
 
 function RootComponent() {
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  // Painel da bandeja: janela própria, sem barra lateral, avisos nem assistente.
+  if (pathname === "/painel") return <PanelRoot />;
+  return <AppRoot />;
+}
+
+function PanelRoot() {
+  useEffect(() => {
+    hydrateStore();
+  }, []);
+  return (
+    <>
+      <Outlet />
+      <Toaster containerAriaLabel="Notificações" />
+    </>
+  );
+}
+
+function AppRoot() {
   const { queryClient } = Route.useRouteContext();
   const sidebarOpen = useStore((s) => s.sidebarOpen);
 

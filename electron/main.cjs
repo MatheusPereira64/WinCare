@@ -28,6 +28,8 @@ const { parseJobArg, resolveSelfLaunch, runScheduledJob } = require("./scheduler
 const { optimizeMemory } = require("./memory-optimizer.cjs");
 const history = require("./maintenance-history.cjs");
 const background = require("./background.cjs");
+const { disposeTrayPanel, hidePanel, initTrayPanel, togglePanel } = require("./tray-panel.cjs");
+const { listProcesses } = require("./system-tools.cjs");
 const { countBatteries, readBatteryReport, writeFullBatteryReport } = require("./battery.cjs");
 const {
   computeWindowBounds,
@@ -380,6 +382,9 @@ function createWindow(initialRoute) {
   });
   mainWindow.on("closed", () => {
     mainWindow = null;
+    // O painel da bandeja (escondido) também é uma janela: sem isto o app não
+    // sairia ao fechar a janela principal com "manter na bandeja" desligado.
+    if (!isQuitting) app.quit();
   });
 
   mainWindow.loadURL(`app://wincare/index.html${initialRoute ? `#${initialRoute}` : ""}`);
@@ -445,7 +450,13 @@ if (scheduledJob) {
       launchedHidden,
       appId: APP_ID,
       getRecentSystemInfo: () => lastSystemInfo,
+      onTrayClick: (bounds) => togglePanel(bounds),
+      onTrayDoubleClick: () => {
+        hidePanel();
+        openApp({});
+      },
     });
+    initTrayPanel({ openApp });
     // Sem bandeja (falhou ao criar) não dá para ficar só em segundo plano.
     if (launchedHidden && !background.keepInTray()) createWindow();
   });
@@ -457,6 +468,7 @@ if (scheduledJob) {
   app.on("will-quit", () => {
     history.flushHistory();
     background.disposeBackground();
+    disposeTrayPanel();
   });
   app.on("activate", () => BrowserWindow.getAllWindows().length === 0 && createWindow());
 }
@@ -1767,19 +1779,10 @@ async function setStartupEnabled({ id, enabled }) {
 }
 
 /** Processos com maior uso de CPU/memoria (amostra). */
+/** Processos que mais usam CPU (% real entre leituras) e memória; também libera "Encerrar". */
 ipcMain.handle("wincare:topProcesses", async () => {
-  if (process.platform !== "win32") return [];
   try {
-    const rows = await psJson(
-      "Get-Process | Where-Object { $_.Name -ne 'Idle' -and $_.Name -ne 'System' } | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First 20 @{N='name';E={$_.ProcessName}}, @{N='pid';E={$_.Id}}, @{N='cpu';E={[math]::Round(([double]($_.CPU)),1)}}, @{N='memMb';E={[math]::Round($_.WorkingSet64/1MB,0)}} | ConvertTo-Json -Compress",
-    );
-    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-    return list.map((p) => ({
-      name: String(p.name || "?"),
-      pid: Number(p.pid) || 0,
-      cpu: typeof p.cpu === "number" ? p.cpu : 0,
-      memMb: typeof p.memMb === "number" ? p.memMb : 0,
-    }));
+    return await listProcesses();
   } catch {
     return [];
   }

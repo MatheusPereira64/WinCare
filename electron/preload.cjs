@@ -148,6 +148,42 @@ contextBridge.exposeInMainWorld("wincare", {
     ipcRenderer.on("wincare:trayCommand", listener);
     return () => ipcRenderer.removeListener("wincare:trayCommand", listener);
   },
+  // Armazenamento: só ids e escolhas de lista chegam ao processo principal.
+  storageScanStart: (options) => ipcRenderer.invoke("wincare:storageScanStart", options || {}),
+  storageScanStatus: () => ipcRenderer.invoke("wincare:storageScanStatus"),
+  storageScanCancel: () => ipcRenderer.invoke("wincare:storageScanCancel"),
+  storageChildren: (id) => ipcRenderer.invoke("wincare:storageChildren", { id }),
+  storageFind: (filters) => ipcRenderer.invoke("wincare:storageFind", filters || {}),
+  storageOwners: (ids) => ipcRenderer.invoke("wincare:storageOwners", { ids }),
+  storageReveal: (id) => ipcRenderer.invoke("wincare:storageReveal", { id }),
+  storageTrash: (ids, source) => ipcRenderer.invoke("wincare:storageTrash", { ids, source }),
+  storageDuplicatesStart: (minSize) =>
+    ipcRenderer.invoke("wincare:storageDuplicatesStart", { minSize }),
+  storageDuplicates: () => ipcRenderer.invoke("wincare:storageDuplicates"),
+  storagePhotosStart: () => ipcRenderer.invoke("wincare:storagePhotosStart"),
+  storagePhotos: () => ipcRenderer.invoke("wincare:storagePhotos"),
+  storageForgotten: (age) => ipcRenderer.invoke("wincare:storageForgotten", { age }),
+  storageSnapshots: () => ipcRenderer.invoke("wincare:storageSnapshots"),
+  storageSnapshotSave: () => ipcRenderer.invoke("wincare:storageSnapshotSave"),
+  storageSnapshotDelete: (id) => ipcRenderer.invoke("wincare:storageSnapshotDelete", { id }),
+  storageSnapshotCompare: (a, b) => ipcRenderer.invoke("wincare:storageSnapshotCompare", { a, b }),
+  exportTable: (payload) => ipcRenderer.invoke("wincare:exportTable", payload),
+  processes: () => ipcRenderer.invoke("wincare:processes"),
+  endProcess: (pid) => ipcRenderer.invoke("wincare:endProcess", { pid }),
+  securityStatus: () => ipcRenderer.invoke("wincare:securityStatus"),
+  browserExtensions: () => ipcRenderer.invoke("wincare:browserExtensions"),
+  networkStatus: () => ipcRenderer.invoke("wincare:networkStatus"),
+  speedTest: () => ipcRenderer.invoke("wincare:speedTest"),
+  bluetooth: () => ipcRenderer.invoke("wincare:bluetooth"),
+  cpuBreakdown: () => ipcRenderer.invoke("wincare:cpuBreakdown"),
+  panelExpand: (expanded) => ipcRenderer.invoke("wincare:panelExpand", { expanded: !!expanded }),
+  panelClose: () => ipcRenderer.invoke("wincare:panelClose"),
+  panelOpenApp: (to) => ipcRenderer.invoke("wincare:panelOpenApp", { to }),
+  onPanelVisibility: (handler) => {
+    const listener = (_e, visible) => handler(!!visible);
+    ipcRenderer.on("wincare:panelVisibility", listener);
+    return () => ipcRenderer.removeListener("wincare:panelVisibility", listener);
+  },
   onHistoryChanged: (handler) => {
     const listener = () => handler();
     ipcRenderer.on("wincare:historyChanged", listener);

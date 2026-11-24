@@ -400,6 +400,12 @@ const COMMAND_RULES = [
     title: "Cache de ícones e miniaturas recriado",
   },
   {
+    test: /^defrag(\.exe)?\s+\/C\b.*\/O\b/i,
+    kind: "optimize",
+    action: "optimize-drives",
+    title: "Unidades otimizadas (TRIM/desfragmentação)",
+  },
+  {
     test: /^ipconfig(\.exe)?\s+\/flushdns\s*$/i,
     kind: "repair",
     action: "flushdns",

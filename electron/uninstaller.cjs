@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { measurePaths } = require("./file-walker.cjs");
 const { isWindowsAdmin, psElevatedJson, psFileJson, psQuote } = require("./powershell.cjs");
+const { lastUsedFor, readUsageEntries } = require("./app-usage.cjs");
 
 const UNINSTALL_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -354,6 +355,10 @@ async function listInstalledPrograms() {
   }
   programsById = next;
 
+  // Último uso (UserAssist): se a leitura falhar, a tela só não marca "encostados".
+  const usage = await readUsageEntries().catch(() => []);
+  for (const program of list) program.lastUsedAt = lastUsedFor(program, usage);
+
   const publicList = [];
   for (let i = 0; i < list.length; i += 8) {
     const batch = list.slice(i, i + 8);
@@ -375,6 +380,7 @@ function toPublicProgram(program, icon) {
     scope: program.scope,
     critical: program.critical,
     icon: icon || null,
+    lastUsedAt: program.lastUsedAt ?? null,
   };
 }
 

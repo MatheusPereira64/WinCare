@@ -16,6 +16,36 @@ const {
 } = require("./scheduler.cjs");
 const { createRestorePoint } = require("./restore-point.cjs");
 const history = require("./maintenance-history.cjs");
+const {
+  cancelScan,
+  childrenOf,
+  compareSnapshots,
+  deleteSnapshot,
+  fileOwners,
+  findFiles,
+  listSnapshots,
+  publicDuplicates,
+  publicPhotos,
+  publicScan,
+  reveal,
+  saveSnapshot,
+  scanForgotten,
+  startDuplicates,
+  startPhotos,
+  startScan,
+  trashFiles,
+} = require("./storage-explorer.cjs");
+const {
+  bluetoothDevices,
+  browserExtensions,
+  cpuBreakdown,
+  endProcess,
+  listProcesses,
+  networkStatus,
+  securityStatus,
+  speedTest,
+} = require("./system-tools.cjs");
+const { exportTable } = require("./exporter.cjs");
 
 const plural = (n, one, many) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
@@ -153,6 +183,36 @@ function registerNativeActions() {
     limits: { maxEvents: history.LIMITS.maxEvents, maxHealthDays: history.LIMITS.maxHealthDays },
   }));
   handle("wincare:clearMaintenanceHistory", async () => ({ ok: history.clearHistory() }));
+
+  // Mapa do disco, busca, duplicados, fotos parecidas, esquecidos e análises salvas.
+  handle("wincare:storageScanStart", (p) => startScan(p));
+  handle("wincare:storageScanStatus", async () => publicScan());
+  handle("wincare:storageScanCancel", async () => cancelScan());
+  handle("wincare:storageChildren", async (p) => childrenOf(p));
+  handle("wincare:storageFind", async (p) => findFiles(p));
+  handle("wincare:storageOwners", (p) => fileOwners(p));
+  handle("wincare:storageReveal", async (p) => reveal(p));
+  handle("wincare:storageTrash", (p) => trashFiles(p));
+  handle("wincare:storageDuplicatesStart", async (p) => startDuplicates(p));
+  handle("wincare:storageDuplicates", async () => ({ ok: true, ...publicDuplicates() }));
+  handle("wincare:storagePhotosStart", async () => startPhotos());
+  handle("wincare:storagePhotos", async () => ({ ok: true, ...publicPhotos() }));
+  handle("wincare:storageForgotten", (p) => scanForgotten(p));
+  handle("wincare:storageSnapshots", async () => listSnapshots());
+  handle("wincare:storageSnapshotSave", async () => saveSnapshot());
+  handle("wincare:storageSnapshotDelete", async (p) => deleteSnapshot(p));
+  handle("wincare:storageSnapshotCompare", async (p) => compareSnapshots(p));
+  handle("wincare:exportTable", (p) => exportTable(p));
+
+  // Processos, proteção, extensões, rede e Bluetooth.
+  handle("wincare:processes", async () => ({ ok: true, items: await listProcesses() }));
+  handle("wincare:endProcess", async (p) => endProcess(p));
+  handle("wincare:securityStatus", () => securityStatus());
+  handle("wincare:browserExtensions", async () => browserExtensions());
+  handle("wincare:networkStatus", () => networkStatus());
+  handle("wincare:speedTest", () => speedTest());
+  handle("wincare:bluetooth", () => bluetoothDevices());
+  handle("wincare:cpuBreakdown", async () => ({ ok: true, ...cpuBreakdown() }));
 }
 
 module.exports = { registerNativeActions };

@@ -331,6 +331,19 @@ export const TOOLS: Tool[] = [
     risk: "safe",
     estimate: 4000,
   },
+  {
+    id: "optimize-drives",
+    name: "Otimizar unidades",
+    description:
+      "Roda a otimização do Windows em todas as unidades: TRIM nos SSDs e desfragmentação nos HDs. Pode levar alguns minutos.",
+    command: "defrag /C /O /U /V",
+    commandPreview: "defrag /C /O (todas as unidades)",
+    category: "disk",
+    risk: "safe",
+    requiresAdmin: true,
+    estimate: 180000,
+    timeoutMs: 1_800_000,
+  },
 
   // ---------------- Redes ----------------
   // Destinos fixos (sem campo de host livre — no Electron, input nativo travava a UI).
