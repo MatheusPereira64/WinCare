@@ -18,6 +18,8 @@ test.describe("Sistema → Bateria (notebook de demonstração)", () => {
   test("gráfico de capacidade: dica ao passar o mouse e tabela", async ({ page }) => {
     const chart = page.locator("[data-wincare-battery-chart]");
     await expect(chart).toHaveAccessibleName(/de 99% para 87%/);
+    // A seção de Proteção fica acima da bateria: rola até o gráfico antes do mouse.
+    await chart.scrollIntoViewIfNeeded();
     const box = (await chart.boundingBox())!;
     await page.mouse.move(box.x + 2, box.y + box.height / 2);
     await expect(chart).toContainText("jun/25");

@@ -258,6 +258,37 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+/**
+ * Atalhos do Menu Iniciar com o ID do WinCare (o Electron cria um para as
+ * notificações funcionarem) definem o ícone da barra de tarefas. Se foram
+ * criados quando o .exe ainda tinha o ícone do Electron, o Windows guarda o
+ * átomo: aponta cada um para o icon.ico. Só altera o ícone; não apaga nada.
+ */
+function fixShortcutIcons() {
+  if (process.platform !== "win32") return;
+  const ico = path.join(__dirname, "assets", "icon.ico");
+  const dir = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs");
+  if (!fs.existsSync(ico)) return;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir).filter((name) => name.toLowerCase().endsWith(".lnk"));
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    const file = path.join(dir, name);
+    try {
+      const link = shell.readShortcutLink(file);
+      if (link.appUserModelId !== APP_ID) continue;
+      if (path.resolve(link.icon || "").toLowerCase() === ico.toLowerCase()) continue;
+      shell.writeShortcutLink(file, "update", { icon: ico, iconIndex: 0 });
+      logger.log("app", "Ícone do atalho atualizado", { shortcut: name });
+    } catch {
+      /* atalho de outro app ou sem permissão: ignora */
+    }
+  }
+}
+
 function resolveAppIcon() {
   const ico = path.join(__dirname, "assets", "icon.ico");
   const png256 = path.join(__dirname, "assets", "icon-256.png");
@@ -440,6 +471,7 @@ if (scheduledJob) {
       },
     });
     buildAppMenu();
+    fixShortcutIcons();
     protocol.handle("app", (request) => {
       const { pathname } = new URL(request.url);
       let filePath = path.join(DIST, decodeURIComponent(pathname));
