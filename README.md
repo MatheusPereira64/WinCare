@@ -11,9 +11,17 @@ Central de manutenção do Windows com interface moderna. O WinCare reúne diagn
 
 > Imagens geradas no modo demonstração, com dados simulados.
 
+| Painel da bandeja | Explorador de armazenamento |
+| --- | --- |
+| ![Painel ao lado do relógio com saúde do PC, disco, memória, CPU, rede e Bluetooth, e o detalhe do processador com os maiores consumidores](docs/screenshots/painel-bandeja.png) | ![Mapa do disco em blocos: quanto maior o bloco, mais espaço a pasta ocupa](docs/screenshots/explorador-disco.png) |
+
+| Duplicados por conteúdo | Rede |
+| --- | --- |
+| ![Grupos de arquivos com conteúdo idêntico, mantendo a cópia mais nova](docs/screenshots/duplicados.png) | ![Conexão, download e upload ao vivo, teste de velocidade e comparativo dos últimos testes](docs/screenshots/redes.png) |
+
 | Limpeza com prévia dos arquivos | Programas |
 | --- | --- |
-| ![Limpeza de navegadores e apps com a lista de arquivos antes de apagar](docs/screenshots/limpeza.png) | ![Lista de programas instalados com filtros e ordenação](docs/screenshots/programas.png) |
+| ![Limpeza de navegadores e apps com a lista de arquivos antes de apagar, e arquivos esquecidos](docs/screenshots/limpeza.png) | ![Programas instalados com filtro de encostados e desinstalação em sequência](docs/screenshots/programas.png) |
 
 | Remoção de resíduos | Ponto de restauração |
 | --- | --- |
@@ -25,11 +33,11 @@ Central de manutenção do Windows com interface moderna. O WinCare reúne diagn
 
 | Monitoramento | Disco |
 | --- | --- |
-| ![Gráficos de CPU, memória e discos em tempo real](docs/screenshots/monitoramento.png) | ![Saúde dos discos e análise de espaço](docs/screenshots/disco.png) |
+| ![Comparativo do processador (usuário, sistema e livre), temperatura, tempo ligado e maiores consumidores](docs/screenshots/monitoramento.png) | ![O que ocupa a unidade em gráfico de rosca, saúde SMART e tipo do disco](docs/screenshots/disco.png) |
 
-| Sistema e bateria | Histórico |
+| Proteção e bateria | Histórico |
 | --- | --- |
-| ![Saúde da bateria, capacidade ao longo do tempo, dicas de energia e consoles do Windows](docs/screenshots/sistema.png) | ![Histórico de manutenção com espaço liberado, programas removidos e saúde ao longo do tempo](docs/screenshots/historico.png) |
+| ![Proteção do Windows, extensões de navegador, saúde da bateria e consoles do Windows](docs/screenshots/sistema.png) | ![Histórico de manutenção com espaço liberado, programas removidos e saúde ao longo do tempo](docs/screenshots/historico.png) |
 
 | Bandeja e alertas | Primeira execução |
 | --- | --- |

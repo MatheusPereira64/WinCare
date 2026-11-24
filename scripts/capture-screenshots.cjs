@@ -45,7 +45,18 @@ const SHOTS = [
   { file: "reparo", route: "/reparo" },
   { file: "confirmacao-ponto-restauracao", route: "/reparo", script: "openRestorePointConfirm()" },
   { file: "monitoramento", route: "/monitoramento", delayMs: 7000 },
-  { file: "disco", route: "/disco" },
+  { file: "disco", route: "/disco", delayMs: 1500 },
+  { file: "explorador-disco", route: "/disco", script: "startDiskScan()" },
+  { file: "duplicados", route: "/disco", script: "openDuplicates()" },
+  { file: "redes", route: "/redes", script: "runSpeedTest()", delayMs: 2500 },
+  {
+    file: "painel-bandeja",
+    route: "/painel",
+    script: "openPanelDetail('Processador')",
+    delayMs: 4000,
+    // Só os dois cartões do painel (largura da janela dele aberta com o detalhe).
+    viewport: "800x720",
+  },
   { file: "sistema", route: "/sistema" },
   { file: "historico", route: "/historico" },
   { file: "bandeja-alertas", route: "/configuracoes", script: "scrollToTraySettings()" },
@@ -88,7 +99,8 @@ const HELPERS = `
   }
   async function openUninstallWizard() {
     const row = await waitFor(() => byText("[data-wincare-programs] li", "OBS Studio"));
-    row.querySelector("button").click();
+    // A linha também tem a caixa de seleção (desinstalar em sequência).
+    [...row.querySelectorAll("button")].find((b) => b.textContent.includes("Desinstalar")).click();
     const start = await waitFor(() => byText("[role=dialog] button", "Abrir desinstalador"));
     const point = document.querySelector("[role=dialog] button[role=checkbox]");
     if (point) point.click();
@@ -103,6 +115,29 @@ const HELPERS = `
     );
     [...card.querySelectorAll("button")].find((b) => b.textContent.includes("Executar")).click();
     await waitFor(() => document.querySelector("[role=dialog]"));
+  }
+  async function startDiskScan() {
+    const button = await waitFor(() => byText("button", "Analisar unidade"));
+    button.click();
+    const map = await waitFor(() => byText("button", "Mapa do disco"));
+    await wait(3500);
+    map.closest("[class*=surface-panel], [class*=hero-panel]")?.scrollIntoView({ block: "start" });
+  }
+  async function openDuplicates() {
+    await startDiskScan();
+    (await waitFor(() => byText("[role=tab]", "Duplicados"))).click();
+    (await waitFor(() => byText("button", "Procurar duplicados"))).click();
+    await waitFor(() => byText("button", "Mover"));
+    await wait(400);
+    byText("[role=tablist]", "Duplicados")?.scrollIntoView({ block: "start" });
+  }
+  async function runSpeedTest() {
+    (await waitFor(() => byText("button", "Iniciar teste"))).click();
+    await waitFor(() => byText("button", "testar de novo"));
+  }
+  async function openPanelDetail(label) {
+    const tile = await waitFor(() => document.querySelector('[aria-label="Detalhes: ' + label + '"]'));
+    tile.click();
   }
   async function scrollToTraySettings() {
     const panel = await waitFor(() => document.querySelector("[data-wincare-background]"));
@@ -171,7 +206,7 @@ app.whenReady().then(async () => {
         })),
       )
     : SHOTS.map((shot) => ({
-        viewport: README_VIEWPORT,
+        viewport: shot.viewport ? parseViewport(shot.viewport) : README_VIEWPORT,
         shot,
         target: path.join(OUT_DIR, `${shot.file}.png`),
       }));

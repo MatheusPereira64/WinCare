@@ -96,33 +96,47 @@ function sanitizePartial(data: Partial<State>): Partial<State> {
 function persist() {
   if (typeof window === "undefined") return;
   if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => {
-    persistTimer = null;
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          runs: state.runs.slice(0, MAX_RUNS).map((run) => ({
-            ...run,
-            lines: run.lines.slice(-MAX_LINES_PER_RUN),
-          })),
-          favorites: state.favorites,
-          theme: state.theme,
-          autoCheck: state.autoCheck,
-          autoCheckUpdates: state.autoCheckUpdates,
-          confirmCritical: state.confirmCritical,
-          autoRestorePoint: state.autoRestorePoint,
-          zoom: state.zoom,
-          sidebarOpen: state.sidebarOpen,
-          dismissedRecommendations: state.dismissedRecommendations,
-          onboardingDone: state.onboardingDone,
-          lastCheckupAt: state.lastCheckupAt,
-        }),
-      );
-    } catch {
-      /* ignore */
-    }
-  }, 0);
+  persistTimer = setTimeout(writeState, 0);
+}
+
+/**
+ * Fechar ou recarregar a janela logo depois de mudar algo: grava na hora o que
+ * ainda estava agendado (senão a última alteração podia se perder).
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    if (!persistTimer) return;
+    clearTimeout(persistTimer);
+    writeState();
+  });
+}
+
+function writeState() {
+  persistTimer = null;
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        runs: state.runs.slice(0, MAX_RUNS).map((run) => ({
+          ...run,
+          lines: run.lines.slice(-MAX_LINES_PER_RUN),
+        })),
+        favorites: state.favorites,
+        theme: state.theme,
+        autoCheck: state.autoCheck,
+        autoCheckUpdates: state.autoCheckUpdates,
+        confirmCritical: state.confirmCritical,
+        autoRestorePoint: state.autoRestorePoint,
+        zoom: state.zoom,
+        sidebarOpen: state.sidebarOpen,
+        dismissedRecommendations: state.dismissedRecommendations,
+        onboardingDone: state.onboardingDone,
+        lastCheckupAt: state.lastCheckupAt,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 function setState(next: Partial<State>) {
