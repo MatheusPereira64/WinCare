@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HardDrive, Thermometer } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
+import { DiskDashboard } from "@/components/wincare/DiskDashboard";
 import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
 import { IconChip } from "@/components/wincare/IconChip";
 import { Panel } from "@/components/wincare/Panel";
@@ -42,6 +43,8 @@ function DiskPage() {
           title="Disco"
           subtitle="Integridade das unidades instaladas, espaço disponível e pastas que mais ocupam."
         />
+
+        <DiskDashboard />
 
         {loading ? (
           <LoadingState label="Lendo as unidades de disco…" variant="block" />

@@ -18,6 +18,7 @@ const { createRestorePoint } = require("./restore-point.cjs");
 const history = require("./maintenance-history.cjs");
 const {
   cancelScan,
+  diskBreakdown,
   childrenOf,
   compareSnapshots,
   deleteSnapshot,
@@ -203,6 +204,7 @@ function registerNativeActions() {
   handle("wincare:storageSnapshotDelete", async (p) => deleteSnapshot(p));
   handle("wincare:storageSnapshotCompare", async (p) => compareSnapshots(p));
   handle("wincare:exportTable", (p) => exportTable(p));
+  handle("wincare:diskBreakdown", async (p) => diskBreakdown(p));
 
   // Processos, proteção, extensões, rede e Bluetooth.
   handle("wincare:processes", async () => ({ ok: true, items: await listProcesses() }));

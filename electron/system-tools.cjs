@@ -614,7 +614,7 @@ function cpuBreakdown() {
   );
   const prev = lastCpuTimes;
   lastCpuTimes = totals;
-  if (!prev) return null;
+  if (!prev) return cpuIdentity();
   const user = totals.user - prev.user;
   const sys = totals.sys - prev.sys;
   const idle = totals.idle - prev.idle;
@@ -624,6 +624,19 @@ function cpuBreakdown() {
     userPct: Math.round((user / sum) * 100),
     systemPct: Math.round((sys / sum) * 100),
     idlePct: Math.round((idle / sum) * 100),
+    ...cpuIdentity(),
+  };
+}
+
+/** Nome do processador, núcleos e há quanto tempo o PC está ligado. */
+function cpuIdentity() {
+  const cpus = os.cpus();
+  return {
+    model: String(cpus[0]?.model || "Processador")
+      .replace(/\s+/g, " ")
+      .trim(),
+    cores: cpus.length,
+    uptimeSeconds: Math.round(os.uptime()),
   };
 }
 

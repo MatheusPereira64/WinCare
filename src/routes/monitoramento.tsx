@@ -5,6 +5,7 @@ import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
 import { AppScrollArea } from "@/components/wincare/AppScrollArea";
+import { CpuDashboard } from "@/components/wincare/CpuDashboard";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { ProcessList } from "@/components/wincare/ProcessList";
 import { MemoryOptimizerCard } from "@/components/wincare/MemoryOptimizerCard";
@@ -245,6 +246,8 @@ function MonitorPage() {
         subtitle="Painéis em tempo real: CPU, memória, discos e processos."
         actions={<LiveBadge />}
       />
+
+      <CpuDashboard />
 
       <MemoryOptimizerCard />
 

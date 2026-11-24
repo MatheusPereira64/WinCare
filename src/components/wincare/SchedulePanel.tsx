@@ -239,13 +239,14 @@ function ScheduleCard({
         ))}
       </ul>
 
-      <div className="surface-inset @container space-y-3 p-3.5">
+      <div className="surface-inset @container divide-y divide-border/50 px-4 py-1">
         <Field label="Frequência">
           <ChoiceChips
             label="Frequência"
             value={config.frequency}
             options={FREQUENCIES}
             disabled={busy}
+            className="grid grid-cols-3"
             onChange={(frequency) => setConfig((c) => ({ ...c, frequency }))}
           />
         </Field>
@@ -256,6 +257,7 @@ function ScheduleCard({
               value={config.weekDay}
               options={WEEK_DAYS}
               disabled={busy}
+              className="grid grid-cols-7"
               onChange={(weekDay) => setConfig((c) => ({ ...c, weekDay }))}
             />
           </Field>
@@ -267,6 +269,7 @@ function ScheduleCard({
               value={config.monthDay}
               options={MONTH_DAYS}
               disabled={busy}
+              className="grid grid-cols-3 @sm:grid-cols-6"
               onChange={(monthDay) => setConfig((c) => ({ ...c, monthDay }))}
             />
           </Field>
@@ -277,6 +280,7 @@ function ScheduleCard({
             value={config.time}
             options={TIMES}
             disabled={busy}
+            className="grid grid-cols-5"
             onChange={(time) => setConfig((c) => ({ ...c, time }))}
           />
         </Field>
@@ -351,8 +355,10 @@ function ScheduleCard({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1.5 @xs:grid-cols-[5.5rem_1fr] @xs:items-center">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    // Rótulo em cima e opções numa grade de largura fixa: as linhas ficam alinhadas
+    // e os dias da semana cabem numa linha só, em qualquer largura do card.
+    <div className="space-y-2 py-3">
+      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </div>
   );

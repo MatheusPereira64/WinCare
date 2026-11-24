@@ -168,6 +168,8 @@ contextBridge.exposeInMainWorld("wincare", {
   storageSnapshotDelete: (id) => ipcRenderer.invoke("wincare:storageSnapshotDelete", { id }),
   storageSnapshotCompare: (a, b) => ipcRenderer.invoke("wincare:storageSnapshotCompare", { a, b }),
   exportTable: (payload) => ipcRenderer.invoke("wincare:exportTable", payload),
+  diskBreakdown: (drive, refresh) =>
+    ipcRenderer.invoke("wincare:diskBreakdown", { drive, refresh: !!refresh }),
   processes: () => ipcRenderer.invoke("wincare:processes"),
   endProcess: (pid) => ipcRenderer.invoke("wincare:endProcess", { pid }),
   securityStatus: () => ipcRenderer.invoke("wincare:securityStatus"),

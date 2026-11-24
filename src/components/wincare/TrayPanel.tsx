@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import {
   AppWindow,
   Bluetooth,
@@ -39,46 +39,14 @@ import {
   type SpeedTestResult,
 } from "@/lib/wincare/systemTools";
 import type { BackgroundState } from "@/lib/wincare/types";
+import { useHistory, usePolling } from "@/lib/wincare/useLive";
 import { useDiskList, useSystemInfo } from "@/lib/wincare/useSystem";
+import { AreaChart } from "./AreaChart";
 import { ProcessList } from "./ProcessList";
 
 type Detail = "cpu" | "network" | "disk" | "memory" | "bluetooth" | "monitor" | null;
 
 /* ------------------------------ Dados ao vivo ------------------------------ */
-
-/** Mantém as últimas N leituras de um valor (gráficos pequenos do painel). */
-function useHistory(value: number | null | undefined, size = 30) {
-  const [values, setValues] = useState<number[]>([]);
-  useEffect(() => {
-    if (typeof value !== "number" || !Number.isFinite(value)) return;
-    setValues((prev) => [...prev, value].slice(-size));
-  }, [value, size]);
-  return values;
-}
-
-function usePolling<T>(load: () => Promise<T>, ms: number, enabled = true) {
-  const [data, setData] = useState<T | null>(null);
-  const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load;
-  });
-  useEffect(() => {
-    if (!enabled) return;
-    let alive = true;
-    const tick = () =>
-      loadRef
-        .current()
-        .then((d) => alive && setData(d))
-        .catch(() => undefined);
-    void tick();
-    const id = window.setInterval(tick, ms);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, [ms, enabled]);
-  return data;
-}
 
 interface BatteryInfo {
   level: number;
@@ -122,56 +90,6 @@ function useBattery() {
 }
 
 /* ------------------------------ Peças visuais ------------------------------ */
-
-function AreaChart({
-  series,
-  max = 100,
-  className,
-}: {
-  series: { values: number[]; className: string }[];
-  max?: number;
-  className?: string;
-}) {
-  const top = Math.max(max, ...series.flatMap((s) => s.values), 1);
-  const path = (values: number[], close: boolean) => {
-    if (values.length < 2) return "";
-    const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${100 - (v / top) * 96}`);
-    return close ? `M0,100 L${pts.join(" L")} L100,100 Z` : `M${pts.join(" L")}`;
-  };
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className={cn("w-full", className)}
-      aria-hidden
-    >
-      {[25, 50, 75].map((y) => (
-        <line
-          key={y}
-          x1="0"
-          x2="100"
-          y1={y}
-          y2={y}
-          className="stroke-border/60"
-          strokeWidth="0.4"
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
-      {series.map((s, i) => (
-        <g key={i} className={s.className}>
-          <path d={path(s.values, true)} fill="currentColor" opacity="0.14" />
-          <path
-            d={path(s.values, false)}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            vectorEffect="non-scaling-stroke"
-          />
-        </g>
-      ))}
-    </svg>
-  );
-}
 
 function Tile({
   icon: Icon,

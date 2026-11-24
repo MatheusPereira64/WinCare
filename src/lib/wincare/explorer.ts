@@ -209,7 +209,37 @@ export interface ExportPayload {
   rows: Record<string, string | number | null | undefined>[];
 }
 
+export type DiskCategory =
+  | "apps"
+  | "system"
+  | "desktop"
+  | "downloads"
+  | "documents"
+  | "pictures"
+  | "videos"
+  | "music"
+  | "recycle";
+
+export interface DiskBreakdown {
+  ok: boolean;
+  reason?: string;
+  drive: string;
+  /** "running": medindo; os números são parciais ou do resultado anterior. */
+  state: "running" | "done" | "error";
+  /** Quando os números mostrados foram medidos (0 = nunca). */
+  at: number;
+  progress?: { done: number; total: number } | null;
+  error?: string;
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+  sizes: Partial<Record<DiskCategory, number>>;
+  /** Espaço usado que não cai em nenhuma categoria; null até medir tudo. */
+  otherBytes: number | null;
+}
+
 export interface ExplorerBridge {
+  diskBreakdown?: (drive: string, refresh?: boolean) => Promise<DiskBreakdown>;
   storageScanStart?: (options: {
     target: "drive" | "folder";
     drive?: string;
@@ -256,6 +286,8 @@ export const photosStart = () => native()?.storagePhotosStart?.() ?? demo.photos
 export const photosStatus = () => native()?.storagePhotos?.() ?? demo.photosStatus();
 export const forgottenFiles = (age: ForgottenAge) =>
   native()?.storageForgotten?.(age) ?? demo.forgotten(age);
+export const diskBreakdown = (drive: string, refresh = false) =>
+  native()?.diskBreakdown?.(drive, refresh) ?? demo.diskBreakdown(drive);
 export const listSnapshots = () => native()?.storageSnapshots?.() ?? demo.listSnapshots();
 export const saveSnapshot = () => native()?.storageSnapshotSave?.() ?? demo.saveSnapshot();
 export const deleteSnapshot = (id: string) =>

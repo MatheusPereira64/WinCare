@@ -84,6 +84,10 @@ export interface CpuBreakdown {
   userPct?: number;
   systemPct?: number;
   idlePct?: number;
+  /** Nome do processador ("13th Gen Intel(R) Core(TM) i7-13700K"). */
+  model?: string;
+  cores?: number;
+  uptimeSeconds?: number;
 }
 
 interface SystemToolsBridge {
@@ -292,7 +296,25 @@ export async function cpuBreakdown(): Promise<CpuBreakdown> {
   if (bridge?.cpuBreakdown) return bridge.cpuBreakdown();
   const user = Math.round(jitter(9, 8));
   const system = Math.round(jitter(5, 4));
-  return { ok: true, userPct: user, systemPct: system, idlePct: Math.max(0, 100 - user - system) };
+  return {
+    ok: true,
+    userPct: user,
+    systemPct: system,
+    idlePct: Math.max(0, 100 - user - system),
+    model: "13th Gen Intel(R) Core(TM) i7-13700K",
+    cores: 24,
+    uptimeSeconds: 2 * 86_400 + 6 * 3600 + 14 * 60,
+  };
+}
+
+/** "13th Gen Intel(R) Core(TM) i7-13700K" → "13th Gen Intel Core i7-13700K". */
+export function cleanCpuName(model?: string) {
+  return (model || "Processador")
+    .replace(/\((R|TM|C)\)/gi, "")
+    .replace(/\s+CPU\b/i, "")
+    .replace(/\s+@.*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* ------------------------------ Painel da bandeja ------------------------------ */

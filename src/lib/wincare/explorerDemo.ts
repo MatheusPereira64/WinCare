@@ -3,6 +3,7 @@
  * screenshots). Nada aqui toca o disco: "apagar" só some da lista.
  */
 import type {
+  DiskBreakdown,
   DuplicatesState,
   ExportPayload,
   FileCategory,
@@ -560,6 +561,40 @@ export async function compareSnapshots(a: string, b: string): Promise<SnapshotCo
     deltaBytes: after.totalBytes - before.totalBytes,
     grew,
     shrank,
+  };
+}
+
+/* ------------------------------ O que ocupa a unidade ------------------------------ */
+
+export async function diskBreakdown(drive: string): Promise<DiskBreakdown> {
+  await wait(250);
+  const d = drive.toUpperCase().startsWith("D");
+  const totalBytes = (d ? 1863 : 476) * GB;
+  const freeBytes = (d ? 1120 : 128) * GB;
+  const sizes = d
+    ? { apps: 412 * GB, recycle: 0.2 * GB }
+    : {
+        apps: 132.6 * GB,
+        system: 28.1 * GB,
+        desktop: 3.5 * GB,
+        downloads: 22.4 * GB,
+        documents: 12.5 * GB,
+        pictures: 39.1 * GB,
+        videos: 29.5 * GB,
+        music: 2.8 * GB,
+        recycle: 1.4 * GB,
+      };
+  const known = Object.values(sizes).reduce((n, v) => n + v, 0);
+  return {
+    ok: true,
+    drive: drive.toUpperCase(),
+    state: "done",
+    at: now() - 6 * 60_000,
+    totalBytes,
+    freeBytes,
+    usedBytes: totalBytes - freeBytes,
+    sizes,
+    otherBytes: Math.max(0, totalBytes - freeBytes - known),
   };
 }
 

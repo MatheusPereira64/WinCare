@@ -731,6 +731,155 @@ async function scanForgotten({ age = "180d" } = {}) {
   };
 }
 
+/* ------------------------------ O que ocupa a unidade ------------------------------ */
+
+const BREAKDOWN_TTL_MS = 10 * 60 * 1000;
+/** letra → { state, at, sizes, progress, error } */
+const breakdowns = new Map();
+const breakdownFile = () => path.join(app.getPath("userData"), "disk-breakdown.json");
+
+/** Último resultado salvo: a tela abre com números na hora e atualiza em segundo plano. */
+function loadSavedBreakdown(letter) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(breakdownFile(), "utf8"))[letter];
+    if (saved && typeof saved.at === "number" && saved.sizes && typeof saved.sizes === "object") {
+      return { state: "done", at: saved.at, sizes: saved.sizes, progress: null, saved: true };
+    }
+  } catch {
+    /* ainda não há resultado salvo */
+  }
+  return null;
+}
+
+function saveBreakdown(letter, job) {
+  try {
+    let all = {};
+    try {
+      all = JSON.parse(fs.readFileSync(breakdownFile(), "utf8")) || {};
+    } catch {
+      all = {};
+    }
+    all[letter] = { at: job.at, sizes: job.sizes };
+    fs.writeFileSync(breakdownFile(), JSON.stringify(all), "utf8");
+  } catch (error) {
+    logger.warn(
+      "storage",
+      "Salvar divisão do disco",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/** Pastas de cada categoria na unidade (só as que existem nela). */
+function breakdownCategories(letter) {
+  const e = env();
+  const drive = `${letter}:`;
+  const onDrive = (p) => !!p && p.toUpperCase().startsWith(drive);
+  const userPath = (name) => {
+    try {
+      return app.getPath(name);
+    } catch {
+      return null;
+    }
+  };
+  const cats = [
+    {
+      id: "apps",
+      paths: [
+        e.ProgramFiles,
+        e["ProgramFiles(x86)"],
+        e.LOCALAPPDATA && path.join(e.LOCALAPPDATA, "Programs"),
+      ],
+    },
+    { id: "system", paths: [e.WINDIR] },
+    { id: "desktop", paths: [userPath("desktop")] },
+    { id: "downloads", paths: [userPath("downloads")] },
+    { id: "documents", paths: [userPath("documents")] },
+    { id: "pictures", paths: [userPath("pictures")] },
+    { id: "videos", paths: [userPath("videos")] },
+    { id: "music", paths: [userPath("music")] },
+    { id: "recycle", paths: [`${drive}\$Recycle.Bin`] },
+  ];
+  return cats.map((c) => ({
+    id: c.id,
+    paths: [...new Set(c.paths.filter((p) => onDrive(p) && fs.existsSync(p)))],
+  }));
+}
+
+/**
+ * Quanto cada categoria ocupa (aplicativos, Windows, pastas do usuário,
+ * Lixeira); o resto do espaço usado vira "Outros". Calcula num worker e
+ * guarda por 10 minutos; a tela consulta até ficar pronto.
+ */
+function diskBreakdown({ drive = "C", refresh = false } = {}) {
+  const letter = String(drive).toUpperCase().slice(0, 1);
+  const info = listDrives().find((d) => d.letter === letter);
+  if (!info) return { ok: false, reason: "Unidade inválida." };
+  const usedBytes = info.totalBytes - info.freeBytes;
+  if (!breakdowns.has(letter)) {
+    const saved = loadSavedBreakdown(letter);
+    if (saved) breakdowns.set(letter, saved);
+  }
+  const current = breakdowns.get(letter);
+  const fresh = current && current.state === "done" && Date.now() - current.at < BREAKDOWN_TTL_MS;
+  if (
+    !current ||
+    (!fresh && current.state !== "running") ||
+    (refresh && current.state !== "running")
+  ) {
+    const job = {
+      state: "running",
+      at: Date.now(),
+      sizes: current?.sizes || null,
+      previousAt: current?.at || 0,
+      progress: null,
+    };
+    breakdowns.set(letter, job);
+    const worker = new Worker(WORKER_FILE, {
+      workerData: { mode: "sizes", categories: breakdownCategories(letter) },
+    });
+    worker.on("message", (msg) => {
+      if (msg.type === "progress") {
+        job.progress = { done: msg.done, total: msg.total };
+        // Categorias já medidas substituem as do resultado anterior.
+        if (msg.partial) job.sizes = { ...(job.sizes || {}), ...msg.partial };
+      } else if (msg.type === "done") {
+        job.sizes = msg.result.sizes;
+        job.state = "done";
+        job.at = Date.now();
+        saveBreakdown(letter, job);
+      } else if (msg.type === "error") {
+        job.state = "error";
+        job.error = msg.message;
+      }
+    });
+    worker.on("error", (error) => {
+      job.state = "error";
+      job.error = error instanceof Error ? error.message : String(error);
+    });
+  }
+  const job = breakdowns.get(letter);
+  const sizes = job.sizes || {};
+  const known = Object.values(sizes).reduce((n, v) => n + v, 0);
+  return {
+    ok: true,
+    drive: letter,
+    state: job.state,
+    at: job.state === "running" ? job.previousAt || 0 : job.at,
+    progress: job.progress,
+    error: job.error,
+    totalBytes: info.totalBytes,
+    freeBytes: info.freeBytes,
+    usedBytes,
+    sizes,
+    // "Outros" só faz sentido com todas as categorias medidas (atual ou anterior).
+    otherBytes:
+      Object.keys(sizes).length >= breakdownCategories(letter).length
+        ? Math.max(0, usedBytes - known)
+        : null,
+  };
+}
+
 /* ------------------------------ Análises salvas ------------------------------ */
 
 const snapshotDir = () => path.join(app.getPath("userData"), "disk-snapshots");
@@ -842,6 +991,7 @@ function compareSnapshots({ a, b } = {}) {
 
 module.exports = {
   cancelScan,
+  diskBreakdown,
   childrenOf,
   compareSnapshots,
   deleteSnapshot,

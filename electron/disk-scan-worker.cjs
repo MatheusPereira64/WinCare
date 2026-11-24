@@ -180,8 +180,51 @@ function hashDuplicates({ files }) {
   return { groups };
 }
 
+/** Soma o tamanho de todos os arquivos abaixo de uma pasta (sem seguir junções). */
+function folderSize(root) {
+  let total = 0;
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (ent.isSymbolicLink()) continue;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) stack.push(full);
+      else if (ent.isFile()) {
+        try {
+          total += fs.lstatSync(full).size;
+        } catch {
+          /* arquivo em uso */
+        }
+      }
+    }
+  }
+  return total;
+}
+
+/** Tamanho de cada categoria do disco ({ id, paths }) — a tela "o que ocupa o disco". */
+function sumCategories({ categories }) {
+  const out = {};
+  categories.forEach((cat, i) => {
+    progress({ done: i, total: categories.length, current: cat.id, partial: { ...out } }, true);
+    out[cat.id] = cat.paths.reduce((n, p) => n + folderSize(p), 0);
+  });
+  return { sizes: out };
+}
+
 try {
-  const result = workerData.mode === "hash" ? hashDuplicates(workerData) : scan(workerData);
+  const result =
+    workerData.mode === "hash"
+      ? hashDuplicates(workerData)
+      : workerData.mode === "sizes"
+        ? sumCategories(workerData)
+        : scan(workerData);
   parentPort.postMessage({ type: "done", result });
 } catch (error) {
   parentPort.postMessage({

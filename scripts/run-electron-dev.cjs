@@ -21,11 +21,13 @@ function resolveExecutable() {
     ? fs.readFileSync(versionFile, "utf8").trim()
     : "unknown";
 
+  // O marcador inclui o ícone: trocar o icon.ico refaz a cópia com o ícone novo.
+  const stamp = `${version}|${iconStamp()}`;
   const needsSync =
     !fs.existsSync(brandedExe) ||
     !fs.existsSync(path.join(devDir, "icudtl.dat")) ||
     !fs.existsSync(marker) ||
-    fs.readFileSync(marker, "utf8").trim() !== version;
+    fs.readFileSync(marker, "utf8").trim() !== stamp;
 
   if (needsSync) {
     fs.rmSync(devDir, { recursive: true, force: true });
@@ -37,11 +39,69 @@ function resolveExecutable() {
     }
 
     fs.copyFileSync(path.join(electronDist, "electron.exe"), brandedExe);
-    fs.writeFileSync(marker, version, "utf8");
+    // Só grava o marcador depois do ícone: se falhar, tenta de novo na próxima vez.
+    return brandExecutable(brandedExe)
+      .then(() => fs.writeFileSync(marker, stamp, "utf8"))
+      .catch((error) => console.warn("[WinCare] Não foi possível aplicar o ícone:", error.message))
+      .then(() => {
+        writeLaunchers(root, brandedExe);
+        return brandedExe;
+      });
   }
 
   writeLaunchers(root, brandedExe);
-  return brandedExe;
+  return Promise.resolve(brandedExe);
+}
+
+const ICON_FILE = path.join(root, "electron", "assets", "icon.ico");
+
+function iconStamp() {
+  try {
+    const st = fs.statSync(ICON_FILE);
+    return `icon-${st.size}-${Math.round(st.mtimeMs)}`;
+  } catch {
+    return "no-icon";
+  }
+}
+
+/**
+ * Troca o ícone e o nome embutidos no WinCare.exe de desenvolvimento (cópia do
+ * electron.exe). Sem isso o Explorador, os atalhos e a barra de tarefas mostram
+ * o átomo do Electron. Mesmo processo que o @electron/packager faz no pacote final.
+ */
+async function brandExecutable(exePath) {
+  if (!fs.existsSync(ICON_FILE)) return;
+  const { NtExecutable, NtExecutableResource, Resource, Data } =
+    await require("resedit/cjs").load();
+  const exe = NtExecutable.from(fs.readFileSync(exePath));
+  const res = NtExecutableResource.from(exe);
+
+  const groups = Resource.IconGroupEntry.fromEntries(res.entries);
+  if (groups.length < 1) throw new Error("grupo de ícones não encontrado no executável");
+  const icon = Data.IconFile.from(fs.readFileSync(ICON_FILE));
+  Resource.IconGroupEntry.replaceIconsForResource(
+    res.entries,
+    groups[0].id,
+    groups[0].lang,
+    icon.icons.map((item) => item.data),
+  );
+
+  const [versionInfo] = Resource.VersionInfo.fromEntries(res.entries);
+  if (versionInfo) {
+    const [language] = versionInfo.getAllLanguagesForStringValues();
+    if (language) {
+      versionInfo.setStringValues(language, {
+        ProductName: "WinCare",
+        FileDescription: "WinCare — Central de manutenção do Windows",
+        InternalName: "WinCare",
+        OriginalFilename: "WinCare.exe",
+      });
+      versionInfo.outputToResourceEntries(res.entries);
+    }
+  }
+
+  res.outputResource(exe);
+  fs.writeFileSync(exePath, Buffer.from(exe.generate()));
 }
 
 /** Atalhos na raiz do projeto — sempre passam o caminho do app ao WinCare.exe. */
@@ -82,34 +142,40 @@ cd /d "%ROOT%"
 "%EXE%" "%ROOT%"
 `;
 
-  fs.writeFileSync(path.join(rootDir, "WinCare.cmd"), winCareCmd, "utf8");
-  fs.writeFileSync(path.join(rootDir, "WinCare-Admin.cmd"), adminCmd, "utf8");
+  // CRLF: .cmd do Windows (e igual ao que está no Git, sem diff a cada execução).
+  const crlf = (text) => text.replace(/\r?\n/g, "\r\n");
+  fs.writeFileSync(path.join(rootDir, "WinCare.cmd"), crlf(winCareCmd), "utf8");
+  fs.writeFileSync(path.join(rootDir, "WinCare-Admin.cmd"), crlf(adminCmd), "utf8");
 }
 
-const exe = resolveExecutable();
+async function main() {
+  const exe = await resolveExecutable();
 
-if (process.argv.includes("--admin")) {
-  const { spawn: spawnSync } = require("child_process");
-  const adminCmd = path.join(root, "WinCare-Admin.cmd");
-  if (!fs.existsSync(adminCmd)) {
-    console.error("WinCare-Admin.cmd não encontrado. Rode npm run wincare:dev uma vez antes.");
-    process.exit(1);
+  if (process.argv.includes("--admin")) {
+    const { spawn: spawnSync } = require("child_process");
+    const adminCmd = path.join(root, "WinCare-Admin.cmd");
+    if (!fs.existsSync(adminCmd)) {
+      console.error("WinCare-Admin.cmd não encontrado. Rode npm run wincare:dev uma vez antes.");
+      process.exit(1);
+    }
+    const child = spawnSync("cmd.exe", ["/c", adminCmd], {
+      cwd: root,
+      stdio: "inherit",
+      env: process.env,
+    });
+    process.exit(child.status ?? 0);
   }
-  const child = spawnSync("cmd.exe", ["/c", adminCmd], {
+
+  const child = spawn(exe, [root], {
     cwd: root,
     stdio: "inherit",
     env: process.env,
   });
-  process.exit(child.status ?? 0);
+
+  child.on("exit", (code, signal) => {
+    if (signal) process.kill(process.pid, signal);
+    else process.exit(code ?? 0);
+  });
 }
 
-const child = spawn(exe, [root], {
-  cwd: root,
-  stdio: "inherit",
-  env: process.env,
-});
-
-child.on("exit", (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code ?? 0);
-});
+void main();
