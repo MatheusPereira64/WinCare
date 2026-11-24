@@ -329,6 +329,25 @@ function createWindow(initialRoute) {
       /* ignore */
     }
   }
+  // Com AppUserModelID próprio e sem atalho no Menu Iniciar, a barra de tarefas
+  // pega o ícone do .exe (no desenvolvimento, uma cópia do electron.exe, e o
+  // Windows ainda guarda em cache o ícone antigo). Apontar o .ico aqui resolve.
+  const taskbarIcon = path.join(__dirname, "assets", "icon.ico");
+  if (process.platform === "win32" && fs.existsSync(taskbarIcon)) {
+    try {
+      const launch = resolveSelfLaunch();
+      const quote = (value) => `"${String(value).replace(/"/g, "")}"`;
+      mainWindow.setAppDetails({
+        appId: APP_ID,
+        appIconPath: taskbarIcon,
+        appIconIndex: 0,
+        relaunchCommand: [launch.exe, ...launch.args].map(quote).join(" "),
+        relaunchDisplayName: APP_NAME,
+      });
+    } catch (error) {
+      logger.warn("window", "setAppDetails", error instanceof Error ? error.message : error);
+    }
+  }
 
   // Maximiza antes de exibir: a janela não pisca no tamanho menor antes.
   // (maximize() já a torna visível, mas sem foco — show() foca.)
