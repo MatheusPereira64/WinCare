@@ -13,6 +13,7 @@ import {
   type Appearance,
   type ThemeMode,
 } from "./appearance";
+import { runThemeChange } from "./themeTransition";
 import { DEFAULT_ZOOM, sanitizeZoom, stepZoom, type ZoomCommand } from "./zoom";
 
 interface State {
@@ -194,7 +195,7 @@ export function hydrateStore() {
     }
     state = { ...initial };
   }
-  applyTheme(state.theme);
+  applyTheme(state.theme, state.themeMode);
   applyAppearance(state.appearance);
   applyZoom(state.zoom);
   watchSystemTheme();
@@ -225,17 +226,25 @@ function watchSystemTheme() {
   window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
     if (state.themeMode !== "system") return;
     const theme = resolveTheme("system");
-    applyTheme(theme);
-    if (theme !== state.theme) setState({ theme });
+    if (theme === state.theme) return;
+    runThemeChange(() => {
+      applyTheme(theme, "system");
+      setState({ theme });
+    });
   });
 }
 
-function applyTheme(theme: "dark" | "light") {
+/**
+ * Classe do tema no <html> e tema nativo da janela. Em "Igual ao Windows" o
+ * nativo fica em "system": se o app fixasse claro/escuro, a detecção do tema
+ * do Windows passaria a refletir a escolha do próprio app e pararia de mudar.
+ */
+function applyTheme(theme: "dark" | "light", mode: ThemeMode = theme) {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("light", theme === "light");
   void (
     window as unknown as { wincare?: { setNativeTheme?: (t: string) => Promise<void> } }
-  ).wincare?.setNativeTheme?.(theme);
+  ).wincare?.setNativeTheme?.(mode === "system" ? "system" : theme);
 }
 
 /**
@@ -269,6 +278,18 @@ export function useStore<T>(selector: (s: State) => T): T {
   );
 }
 
+function commitTheme(themeMode: ThemeMode) {
+  const theme = resolveTheme(themeMode);
+  applyTheme(theme, themeMode);
+  setState({ themeMode, theme });
+}
+
+function commitAppearance(patch: Partial<Appearance>) {
+  const appearance = sanitizeAppearance({ ...state.appearance, ...patch });
+  applyAppearance(appearance);
+  setState({ appearance });
+}
+
 export const actions = {
   upsertRun(run: RunRecord) {
     const rest = state.runs.filter((r) => r.id !== run.id);
@@ -298,34 +319,35 @@ export const actions = {
     actions.setThemeMode(theme);
   },
   setThemeMode(themeMode: ThemeMode) {
-    const theme = resolveTheme(themeMode);
-    applyTheme(theme);
-    setState({ themeMode, theme });
+    runThemeChange(() => commitTheme(themeMode));
   },
   setAppearance(patch: Partial<Appearance>) {
-    const appearance = sanitizeAppearance({ ...state.appearance, ...patch });
-    applyAppearance(appearance);
-    setState({ appearance });
+    runThemeChange(() => commitAppearance(patch));
   },
-  /** Tema pronto: modo + destaque + fundo de uma vez. */
+  /** Tema pronto: modo + destaque + fundo numa única troca (um esmaecimento só). */
   applyThemePreset(id: string) {
     const preset = THEME_PRESETS.find((p) => p.id === id);
     if (!preset) return;
-    actions.setAppearance({ accent: preset.accent, surface: preset.surface });
-    actions.setThemeMode(preset.mode);
+    runThemeChange(() => {
+      commitAppearance({ accent: preset.accent, surface: preset.surface });
+      commitTheme(preset.mode);
+    });
   },
   /** Layout pronto: densidade, cantos, cartões, largura, animações e barra lateral. */
   applyLayoutPreset(id: string) {
     const preset = LAYOUT_PRESETS.find((p) => p.id === id);
     if (!preset) return;
-    actions.setAppearance(preset.values);
-    actions.setSidebarOpen(preset.sidebarOpen);
+    runThemeChange(() => {
+      commitAppearance(preset.values);
+      if (preset.sidebarOpen !== state.sidebarOpen) setState({ sidebarOpen: preset.sidebarOpen });
+    });
   },
   resetAppearance() {
-    applyAppearance(DEFAULT_APPEARANCE);
-    setState({ appearance: DEFAULT_APPEARANCE });
-    actions.setThemeMode("dark");
-    actions.setSidebarOpen(true);
+    runThemeChange(() => {
+      commitAppearance(DEFAULT_APPEARANCE);
+      commitTheme("dark");
+      if (!state.sidebarOpen) setState({ sidebarOpen: true });
+    });
   },
   setAutoCheck(autoCheck: boolean) {
     setState({ autoCheck });

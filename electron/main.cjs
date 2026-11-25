@@ -320,6 +320,28 @@ function showUpdatePrompt(info) {
   else send();
 }
 
+/** Fundo da janela antes da interface carregar (sem lampejo escuro no tema claro). */
+const WINDOW_BG = { dark: "#0d1117", light: "#eef1f6" };
+const windowBgFile = () => path.join(app.getPath("userData"), "window-background.json");
+
+function loadWindowBackground() {
+  try {
+    const color = JSON.parse(fs.readFileSync(windowBgFile(), "utf8")).color;
+    if (Object.values(WINDOW_BG).includes(color)) return color;
+  } catch {
+    /* primeira vez: escuro */
+  }
+  return WINDOW_BG.dark;
+}
+
+function saveWindowBackground(color) {
+  try {
+    fs.writeFileSync(windowBgFile(), JSON.stringify({ color }), "utf8");
+  } catch {
+    /* sem isso a janela só abre escura */
+  }
+}
+
 function resolveAppIcon() {
   const ico = path.join(__dirname, "assets", "icon.ico");
   const png256 = path.join(__dirname, "assets", "icon-256.png");
@@ -374,7 +396,7 @@ function createWindow(initialRoute) {
     minWidth: bounds.minWidth,
     minHeight: bounds.minHeight,
     show: false,
-    backgroundColor: "#0d1117",
+    backgroundColor: loadWindowBackground(),
     title: APP_NAME,
     autoHideMenuBar: true,
     ...(icon ? { icon } : {}),
@@ -1120,7 +1142,12 @@ ipcMain.handle("wincare:clearStorage", () => clearRendererStorage());
 
 /* Mantém a barra de título da janela no mesmo tema da interface. */
 ipcMain.handle("wincare:setNativeTheme", (_e, theme) => {
-  nativeTheme.themeSource = theme === "light" ? "light" : "dark";
+  // "system": segue o Windows (modo "Igual ao Windows" da Aparência).
+  nativeTheme.themeSource = theme === "light" || theme === "system" ? theme : "dark";
+  const dark = nativeTheme.shouldUseDarkColors;
+  const color = dark ? WINDOW_BG.dark : WINDOW_BG.light;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBackgroundColor(color);
+  saveWindowBackground(color);
 });
 
 registerNativeActions();

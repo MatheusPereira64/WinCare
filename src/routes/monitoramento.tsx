@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Activity, Cpu, HardDrive, MemoryStick } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/wincare/States";
 import { StatCard } from "@/components/wincare/StatCard";
 import { formatGb } from "@/lib/wincare/format";
 import { useStore } from "@/lib/wincare/store";
+import { useChartColors } from "@/lib/wincare/useChartColors";
 import { useDisks, useSystemInfo } from "@/lib/wincare/useSystem";
 
 export const Route = createFileRoute("/monitoramento")({
@@ -40,16 +41,7 @@ interface Point {
   mem: number;
 }
 
-/*
- * Cores dos textos dos gráficos por tema (ApexCharts precisa de cor literal):
- * mesmos tons de --muted-foreground / --foreground, >= 4.5:1 nos cards.
- */
-const CHART_TEXT = {
-  dark: { muted: "#9aa2ae", strong: "#f1f4f7", grid: "rgba(148, 163, 184, 0.18)" },
-  light: { muted: "#545b66", strong: "#11161f", grid: "rgba(71, 85, 105, 0.18)" },
-} as const;
-
-type ChartMode = keyof typeof CHART_TEXT;
+type ChartMode = "dark" | "light";
 
 /** Resumo em texto de uma série (o gráfico em si fica oculto para o leitor de tela). */
 function describeSeries(label: string, values: number[]) {
@@ -60,14 +52,19 @@ function describeSeries(label: string, values: number[]) {
   return `${label} agora em ${now}%. Nas últimas ${values.length} leituras: mínimo ${min}%, máximo ${max}%.`;
 }
 
-function chartTheme(mode: ChartMode, overrides: ApexOptions = {}): ApexOptions {
+function chartTheme(
+  mode: ChartMode,
+  palette: { grid: string; muted: string; animate: boolean },
+  overrides: ApexOptions = {},
+): ApexOptions {
   // Defaults por último nas chaves aninhadas — evita que `...overrides` no fim
   // apague toolbar:false e outros defaults (bug que deixava o zoom do ApexCharts aparecer).
   return {
     ...overrides,
     chart: {
       background: "transparent",
-      animations: { enabled: true, speed: 400 },
+      // Trocar de tema só recolore: sem reanimar os gráficos do zero.
+      animations: { enabled: palette.animate, speed: 400 },
       fontFamily: "inherit",
       // A camada acessível do Apex é em inglês e deixa o SVG/legenda no Tab;
       // os gráficos ficam ocultos e cada um tem um resumo em texto em português.
@@ -78,7 +75,7 @@ function chartTheme(mode: ChartMode, overrides: ApexOptions = {}): ApexOptions {
     },
     theme: { mode, ...overrides.theme },
     grid: {
-      borderColor: CHART_TEXT[mode].grid,
+      borderColor: palette.grid,
       strokeDashArray: 4,
       ...overrides.grid,
     },
@@ -89,7 +86,7 @@ function chartTheme(mode: ChartMode, overrides: ApexOptions = {}): ApexOptions {
       ...overrides.tooltip,
     },
     legend: {
-      labels: { colors: CHART_TEXT[mode].muted },
+      labels: { colors: palette.muted },
       ...overrides.legend,
     },
   };
@@ -97,7 +94,19 @@ function chartTheme(mode: ChartMode, overrides: ApexOptions = {}): ApexOptions {
 
 function MonitorPage() {
   const mode: ChartMode = useStore((s) => s.theme);
-  const text = CHART_TEXT[mode];
+  // Cores do tema atual (claro/escuro, destaque e fundo da Aparência).
+  const colors = useChartColors();
+  // Na troca de tema/aparência os gráficos recolorem sem reanimar do zero.
+  const lastColors = useRef(colors);
+  const themeJustChanged = lastColors.current !== colors;
+  useEffect(() => {
+    lastColors.current = colors;
+  });
+  const palette = useMemo(
+    () => ({ ...colors, animate: !themeJustChanged }),
+    [colors, themeJustChanged],
+  );
+  const text = palette;
   const info = useSystemInfo(2000);
   const disks = useDisks();
   const [data, setData] = useState<Point[]>([]);
@@ -121,12 +130,12 @@ function MonitorPage() {
 
   const radialOptions = useMemo(
     () =>
-      chartTheme(mode, {
+      chartTheme(mode, palette, {
         chart: { type: "radialBar" },
         plotOptions: {
           radialBar: {
             hollow: { size: "42%" },
-            track: { background: "rgba(148,163,184,0.12)", margin: 6 },
+            track: { background: palette.track, margin: 6 },
             dataLabels: {
               name: { show: true, color: text.muted, fontSize: "12px", offsetY: -8 },
               value: {
@@ -148,17 +157,17 @@ function MonitorPage() {
           },
         },
         labels: ["CPU", "RAM", "Disco"],
-        colors: ["#548dfc", "#43c6f5", "#a78bfa"],
+        colors: palette.series.slice(0, 3),
         legend: { show: false },
       }),
-    [info.health, mode, text],
+    [info.health, mode, text, palette],
   );
 
   const areaCpuOptions = useMemo(
     () =>
-      chartTheme(mode, {
+      chartTheme(mode, palette, {
         chart: { type: "area", sparkline: { enabled: false } },
-        colors: ["#548dfc"],
+        colors: [palette.series[0]],
         fill: {
           type: "gradient",
           gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 },
@@ -179,14 +188,14 @@ function MonitorPage() {
           labels: { style: { colors: text.muted, fontSize: "11px" }, formatter: (v) => `${v}%` },
         },
       }),
-    [categories, mode, text],
+    [categories, mode, text, palette],
   );
 
   const areaMemOptions = useMemo(
     () =>
-      chartTheme(mode, {
+      chartTheme(mode, palette, {
         chart: { type: "area" },
-        colors: ["#43c6f5"],
+        colors: [palette.series[1]],
         fill: {
           type: "gradient",
           gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05 },
@@ -207,15 +216,15 @@ function MonitorPage() {
           labels: { style: { colors: text.muted, fontSize: "11px" }, formatter: (v) => `${v}%` },
         },
       }),
-    [categories, mode, text],
+    [categories, mode, text, palette],
   );
 
   const diskBarOptions = useMemo(
     () =>
-      chartTheme(mode, {
+      chartTheme(mode, palette, {
         chart: { type: "bar", stacked: false },
         plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: "55%" } },
-        colors: ["#fbbf24", "#2e3650"],
+        colors: [palette.series[3], palette.track],
         xaxis: {
           categories: disks.map((d) => d.letter),
           max: 100,
@@ -224,7 +233,7 @@ function MonitorPage() {
         yaxis: { labels: { style: { colors: text.muted } } },
         legend: { show: true },
       }),
-    [disks, mode, text],
+    [disks, mode, text, palette],
   );
 
   const diskBarSeries = useMemo(() => {
@@ -298,7 +307,7 @@ function MonitorPage() {
               className="grid w-full shrink-0 grid-cols-3 gap-2 @md/overview:flex @md/overview:w-[132px] @md/overview:flex-col @md/overview:gap-2.5"
             >
               <OverviewLegend
-                color="#548dfc"
+                color={palette.series[0]}
                 label="CPU"
                 value={`${info.cpuUsage}%`}
                 hint={
@@ -308,7 +317,7 @@ function MonitorPage() {
                 }
               />
               <OverviewLegend
-                color="#43c6f5"
+                color={palette.series[1]}
                 label="Memória"
                 value={`${info.memoryUsage}%`}
                 hint={
@@ -318,7 +327,7 @@ function MonitorPage() {
                 }
               />
               <OverviewLegend
-                color="#a78bfa"
+                color={palette.series[2]}
                 label="Disco C:"
                 value={`${info.diskUsage}%`}
                 hint={`${info.diskTotalGb} GB`}

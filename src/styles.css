@@ -89,6 +89,8 @@
   --sh: var(--h);
   --sc: 1;
   --sl: 0;
+  /* Luminosidade do botão sólido (texto branco por cima, >= 4.5:1). */
+  --solid-l: 0.55;
 
   --background: oklch(calc(0.145 + var(--sl)) calc(0.02 * var(--sc)) var(--sh));
   --foreground: oklch(0.965 calc(0.005 * var(--sc)) var(--sh));
@@ -104,7 +106,7 @@
    * A luminosidade é a mesma em todos os tons, então os presets mantêm o contraste.
    */
   --primary: oklch(0.7 calc(0.17 * var(--ac)) var(--h));
-  --primary-solid: oklch(0.55 calc(0.2 * var(--ac)) var(--h));
+  --primary-solid: oklch(var(--solid-l) calc(0.2 * var(--ac)) var(--h));
   --primary-foreground: oklch(0.99 0.002 250);
   --primary-glow: oklch(0.78 calc(0.13 * var(--ac)) var(--h2));
 
@@ -223,6 +225,8 @@
   --h: 160;
   --h2: 185;
   --ac: 0.9;
+  /* Verde e ciano parecem mais claros na mesma luminosidade: botão um pouco mais escuro. */
+  --solid-l: 0.5;
 }
 :root[data-accent="amber"] {
   --h: 62;
@@ -236,6 +240,7 @@
 :root[data-accent="cyan"] {
   --h: 215;
   --h2: 190;
+  --solid-l: 0.5;
 }
 :root[data-accent="crimson"] {
   --h: 25;
@@ -507,4 +512,22 @@
 
 @utility animate-indeterminate {
   animation: wincare-indeterminate 1.4s ease-in-out infinite;
+}
+
+/*
+ * Troca de tema (src/lib/wincare/themeTransition.ts): as transições de cor de
+ * cada elemento ficam desligadas para tudo mudar no mesmo quadro; a tela
+ * inteira faz um único esmaecimento curto (View Transitions, pela GPU).
+ */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
