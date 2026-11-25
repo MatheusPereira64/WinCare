@@ -75,21 +75,64 @@ async function waitForExit(pid, timeoutMs, log) {
   return true;
 }
 
-/** Copia a pasta toda; arquivo em uso faz tentar de novo (antivírus, processo filho saindo). */
+/** Todos os arquivos da pasta (caminhos relativos), sem seguir links. */
+function listFiles(root) {
+  const out = [];
+  const walk = (rel) => {
+    for (const ent of fs.readdirSync(path.join(root, rel), { withFileTypes: true })) {
+      const child = path.join(rel, ent.name);
+      if (ent.isDirectory()) walk(child);
+      else if (ent.isFile()) out.push(child);
+    }
+  };
+  walk("");
+  return out;
+}
+
+/**
+ * Copia arquivo por arquivo (copyFileSync). NÃO usa fs.cpSync: no runtime do
+ * Electron ele derruba o processo ao copiar de uma unidade para outra
+ * (ex.: %TEMP% no C: → app em F:), e a atualização nunca terminava.
+ * Arquivo em uso (antivírus, processo do app antigo saindo) tenta de novo.
+ */
 async function copyWithRetry(sourceDir, installDir, log, attempts = COPY_ATTEMPTS) {
-  let lastError = null;
-  for (let i = 1; i <= attempts; i++) {
-    try {
-      fs.cpSync(sourceDir, installDir, { recursive: true, force: true });
-      return true;
-    } catch (error) {
-      lastError = error;
-      log(`Tentativa ${i}/${attempts} falhou: ${error && error.message}`);
+  let files;
+  try {
+    files = listFiles(sourceDir);
+  } catch (error) {
+    log(`Não foi possível ler a versão nova: ${error && error.message}`);
+    return false;
+  }
+  let pending = files;
+  for (let i = 1; i <= attempts && pending.length; i++) {
+    const failed = [];
+    let lastError = null;
+    for (const rel of pending) {
+      const target = path.join(installDir, rel);
+      try {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(path.join(sourceDir, rel), target);
+      } catch (error) {
+        failed.push(rel);
+        lastError = error;
+      }
+    }
+    if (failed.length) {
+      log(
+        `Tentativa ${i}/${attempts}: ${failed.length} de ${files.length} arquivos em uso (${failed[0]}: ${lastError && lastError.code})`,
+      );
       await sleep(COPY_RETRY_MS);
     }
+    pending = failed;
   }
-  log(`Cópia desistiu: ${lastError && lastError.message}`);
-  return false;
+  if (pending.length) {
+    log(
+      `Cópia desistiu: ${pending.length} arquivos não foram substituídos (${pending.slice(0, 3).join(", ")})`,
+    );
+    return false;
+  }
+  log(`${files.length} arquivos copiados.`);
+  return true;
 }
 
 function launchDetached(exePath, cwd) {
