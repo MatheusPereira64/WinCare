@@ -28,7 +28,19 @@ export function SettingSwitch({
 }) {
   const id = useId();
   return (
-    <div className="flex items-center justify-between gap-4">
+    // A linha toda alterna (não só a bolinha): o título já faz isso pelo
+    // htmlFor; o clique no switch ou no título não passa aqui de novo.
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 rounded-lg",
+        !disabled && "cursor-pointer",
+      )}
+      onClick={(event) => {
+        if (disabled) return;
+        if ((event.target as HTMLElement).closest("label, [role=switch], a, button")) return;
+        onCheckedChange(!checked);
+      }}
+    >
       <div className="flex min-w-0 items-start gap-3">
         <Icon aria-hidden className={cn("mt-0.5 size-5 shrink-0", TONE_TEXT[tone])} />
         <div className="min-w-0">

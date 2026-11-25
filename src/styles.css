@@ -70,32 +70,50 @@
   --font-mono: "Cascadia Code", "Consolas", ui-monospace, monospace;
 }
 
+/*
+ * Aparência personalizável (Configurações → Aparência). As cores saem de poucas
+ * variáveis, então cada preset troca só elas e a hierarquia/contraste continuam
+ * os mesmos (luminosidade OKLCH fixa por papel; o tom e a saturação variam):
+ *   --h / --h2   tom do destaque e do brilho     --ac  saturação do destaque (0–1)
+ *   --sh         tom das superfícies             --sc  saturação das superfícies
+ *   --sl         ajuste de luminosidade do fundo (Meia-noite escurece)
+ * Atributos no <html>: data-accent, data-surface, data-density, data-radius,
+ * data-cards, data-width, data-motion (ver src/lib/wincare/appearance.ts).
+ */
 :root {
   --radius: 1rem;
 
-  --background: oklch(0.145 0.02 264);
-  --foreground: oklch(0.965 0.005 250);
-  --card: oklch(0.195 0.024 263);
-  --card-foreground: oklch(0.965 0.005 250);
-  --popover: oklch(0.19 0.022 263);
-  --popover-foreground: oklch(0.965 0.005 250);
+  --h: 255;
+  --h2: 220;
+  --ac: 1;
+  --sh: var(--h);
+  --sc: 1;
+  --sl: 0;
+
+  --background: oklch(calc(0.145 + var(--sl)) calc(0.02 * var(--sc)) var(--sh));
+  --foreground: oklch(0.965 calc(0.005 * var(--sc)) var(--sh));
+  --card: oklch(calc(0.195 + var(--sl)) calc(0.024 * var(--sc)) var(--sh));
+  --card-foreground: var(--foreground);
+  --popover: oklch(calc(0.19 + var(--sl)) calc(0.022 * var(--sc)) var(--sh));
+  --popover-foreground: var(--foreground);
 
   /*
    * Contraste (WCAG 2.1 AA): --primary é usado como texto/ícone sobre as
    * superfícies escuras (>= 4.5:1 até sobre o próprio tom a 15%); texto branco
-   * sobre azul usa --primary-solid (>= 4.5:1). Um tom só não atende os dois.
+   * sobre o destaque usa --primary-solid (>= 4.5:1). Um tom só não atende os dois.
+   * A luminosidade é a mesma em todos os tons, então os presets mantêm o contraste.
    */
-  --primary: oklch(0.7 0.17 255);
-  --primary-solid: oklch(0.55 0.2 258);
+  --primary: oklch(0.7 calc(0.17 * var(--ac)) var(--h));
+  --primary-solid: oklch(0.55 calc(0.2 * var(--ac)) var(--h));
   --primary-foreground: oklch(0.99 0.002 250);
-  --primary-glow: oklch(0.78 0.13 220);
+  --primary-glow: oklch(0.78 calc(0.13 * var(--ac)) var(--h2));
 
-  --secondary: oklch(0.26 0.026 262);
-  --secondary-foreground: oklch(0.94 0.008 250);
-  --muted: oklch(0.25 0.024 262);
-  --muted-foreground: oklch(0.71 0.02 256);
-  --accent: oklch(0.3 0.05 258);
-  --accent-foreground: oklch(0.97 0.005 250);
+  --secondary: oklch(calc(0.26 + var(--sl)) calc(0.026 * var(--sc)) var(--sh));
+  --secondary-foreground: oklch(0.94 calc(0.008 * var(--sc)) var(--sh));
+  --muted: oklch(calc(0.25 + var(--sl)) calc(0.024 * var(--sc)) var(--sh));
+  --muted-foreground: oklch(0.71 calc(0.02 * var(--sc)) var(--sh));
+  --accent: oklch(calc(0.3 + var(--sl)) calc(0.05 * var(--ac)) var(--h));
+  --accent-foreground: oklch(0.97 0.005 var(--sh));
 
   --destructive: oklch(0.68 0.19 22);
   --destructive-solid: oklch(0.55 0.21 25);
@@ -105,25 +123,25 @@
   --warning: oklch(0.8 0.15 82);
   --warning-foreground: oklch(0.2 0.03 80);
 
-  --border: oklch(0.29 0.024 262);
+  --border: oklch(calc(0.29 + var(--sl)) calc(0.024 * var(--sc)) var(--sh));
   /* Contorno de campos e controles: >= 3:1 contra o fundo (WCAG 1.4.11). */
-  --input: oklch(0.5 0.025 260);
-  --ring: oklch(0.7 0.17 255);
+  --input: oklch(0.5 calc(0.025 * var(--sc)) var(--sh));
+  --ring: var(--primary);
 
-  --chart-1: oklch(0.65 0.19 255);
+  --chart-1: oklch(0.65 calc(0.19 * var(--ac)) var(--h));
   --chart-2: oklch(0.78 0.13 220);
   --chart-3: oklch(0.68 0.17 300);
   --chart-4: oklch(0.8 0.15 82);
   --chart-5: oklch(0.72 0.17 158);
 
-  --sidebar: oklch(0.165 0.022 264);
-  --sidebar-foreground: oklch(0.9 0.008 250);
-  --sidebar-primary: oklch(0.7 0.17 255);
+  --sidebar: oklch(calc(0.165 + var(--sl)) calc(0.022 * var(--sc)) var(--sh));
+  --sidebar-foreground: oklch(0.9 calc(0.008 * var(--sc)) var(--sh));
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.99 0.002 250);
-  --sidebar-accent: oklch(0.26 0.04 258);
-  --sidebar-accent-foreground: oklch(0.97 0.005 250);
-  --sidebar-border: oklch(0.25 0.024 262);
-  --sidebar-ring: oklch(0.7 0.17 255);
+  --sidebar-accent: oklch(calc(0.26 + var(--sl)) calc(0.04 * var(--ac)) var(--h));
+  --sidebar-accent-foreground: oklch(0.97 0.005 var(--sh));
+  --sidebar-border: oklch(calc(0.25 + var(--sl)) calc(0.024 * var(--sc)) var(--sh));
+  --sidebar-ring: var(--primary);
 
   --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-glow));
   --gradient-surface: linear-gradient(
@@ -157,23 +175,23 @@
  *   (+0.05 sobre o fundo, o mesmo degrau do escuro). Cards brancos ganham uma
  *   sombra de 1px para terem borda nítida sobre o fundo claro.
  */
-.light {
-  --background: oklch(0.95 0.01 252);
-  --foreground: oklch(0.2 0.02 260);
+:root.light {
+  /* "Meia-noite" só escurece o tema escuro. */
+  --sl: 0;
+  --background: oklch(0.95 calc(0.01 * var(--sc)) var(--sh));
+  --foreground: oklch(0.2 calc(0.02 * var(--sc)) var(--sh));
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 260);
-  --primary: oklch(0.48 0.18 258);
-  --primary-solid: oklch(0.48 0.18 258);
+  --primary: oklch(0.48 calc(0.18 * var(--ac)) var(--h));
+  --primary-solid: oklch(0.48 calc(0.18 * var(--ac)) var(--h));
   --primary-foreground: oklch(0.99 0.002 250);
-  --primary-glow: oklch(0.66 0.14 220);
-  --secondary: oklch(0.94 0.008 250);
-  --secondary-foreground: oklch(0.25 0.02 260);
-  --muted: oklch(0.93 0.01 250);
-  --muted-foreground: oklch(0.47 0.02 258);
-  --accent: oklch(0.9 0.035 250);
-  --accent-foreground: oklch(0.25 0.03 258);
+  --primary-glow: oklch(0.66 calc(0.14 * var(--ac)) var(--h2));
+  --secondary: oklch(0.94 calc(0.008 * var(--sc)) var(--sh));
+  --secondary-foreground: oklch(0.25 calc(0.02 * var(--sc)) var(--sh));
+  --muted: oklch(0.93 calc(0.01 * var(--sc)) var(--sh));
+  --muted-foreground: oklch(0.47 calc(0.02 * var(--sc)) var(--sh));
+  --accent: oklch(0.9 calc(0.035 * var(--ac)) var(--h));
+  --accent-foreground: oklch(0.25 calc(0.03 * var(--sc)) var(--sh));
   /* Tons escurecidos para servirem como texto (>= 4.5:1 no branco e nos fundos tingidos). */
   --destructive: oklch(0.5 0.2 25);
   --destructive-solid: oklch(0.5 0.2 25);
@@ -182,20 +200,114 @@
   --success-foreground: oklch(0.99 0.002 250);
   --warning: oklch(0.47 0.1 66);
   --warning-foreground: oklch(0.99 0.002 250);
-  --border: oklch(0.88 0.012 250);
-  --input: oklch(0.62 0.02 255);
-  --ring: oklch(0.48 0.18 258);
-  --sidebar: oklch(0.97 0.007 252);
-  --sidebar-foreground: oklch(0.25 0.02 260);
-  --sidebar-primary: oklch(0.48 0.18 258);
+  --border: oklch(0.88 calc(0.012 * var(--sc)) var(--sh));
+  --input: oklch(0.62 calc(0.02 * var(--sc)) var(--sh));
+  --sidebar: oklch(0.97 calc(0.007 * var(--sc)) var(--sh));
+  --sidebar-foreground: oklch(0.25 calc(0.02 * var(--sc)) var(--sh));
   --sidebar-primary-foreground: oklch(0.99 0.002 250);
-  --sidebar-accent: oklch(0.92 0.025 252);
-  --sidebar-accent-foreground: oklch(0.25 0.03 258);
-  --sidebar-border: oklch(0.9 0.01 250);
-  --sidebar-ring: oklch(0.48 0.18 258);
+  --sidebar-accent: oklch(0.92 calc(0.025 * var(--ac)) var(--h));
+  --sidebar-accent-foreground: oklch(0.25 calc(0.03 * var(--sc)) var(--sh));
+  --sidebar-border: oklch(0.9 calc(0.01 * var(--sc)) var(--sh));
   --shadow-elevated:
     0 1px 2px oklch(0.3 0.03 260 / 0.07), 0 18px 40px -24px oklch(0.3 0.05 260 / 0.3);
   --panel-highlight: inset 0 1px 0 0 oklch(1 0 0 / 0.6);
+}
+
+/* ------------------------------ Cor de destaque ------------------------------ */
+
+:root[data-accent="violet"] {
+  --h: 295;
+  --h2: 325;
+}
+:root[data-accent="emerald"] {
+  --h: 160;
+  --h2: 185;
+  --ac: 0.9;
+}
+:root[data-accent="amber"] {
+  --h: 62;
+  --h2: 35;
+  --ac: 0.95;
+}
+:root[data-accent="rose"] {
+  --h: 355;
+  --h2: 20;
+}
+:root[data-accent="cyan"] {
+  --h: 215;
+  --h2: 190;
+}
+:root[data-accent="crimson"] {
+  --h: 25;
+  --h2: 5;
+}
+:root[data-accent="graphite"] {
+  --h2: 255;
+  --ac: 0.12;
+}
+
+/* ------------------------------ Fundo ------------------------------ */
+
+/* Preto profundo (telas OLED e ambientes escuros). Só no tema escuro. */
+:root[data-surface="midnight"]:not(.light) {
+  --sl: -0.075;
+  --sc: 0.6;
+}
+/* Cinza sem tom de cor. */
+:root[data-surface="neutral"] {
+  --sc: 0;
+}
+/* Tom quente (papel/areia), independente do destaque. */
+:root[data-surface="warm"] {
+  --sh: 70;
+  --sc: 0.7;
+}
+
+/* ------------------------------ Layout ------------------------------ */
+
+/* Mais informação por tela: o texto e os espaçamentos (rem) encolhem juntos. */
+:root[data-density="compact"] {
+  font-size: 14.5px;
+}
+
+:root[data-radius="soft"] {
+  --radius: 0.6rem;
+}
+:root[data-radius="square"] {
+  --radius: 0.125rem;
+}
+
+/* Cartões sem degradê (cor chapada). */
+:root[data-cards="solid"] {
+  --gradient-surface: linear-gradient(var(--card), var(--card));
+  --gradient-hero: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--primary) 8%, var(--card)),
+    var(--card) 60%
+  );
+}
+/* Só contorno: sem fundo nem sombra (visual mais limpo). */
+:root[data-cards="outline"] {
+  --card: var(--background);
+  --gradient-surface: linear-gradient(var(--background), var(--background));
+  --gradient-hero: linear-gradient(var(--background), var(--background));
+  --shadow-elevated: 0 0 0 0 transparent;
+  --panel-highlight: 0 0 0 0 transparent;
+}
+
+/* Conteúdo ocupando a janela toda (monitores largos). */
+:root[data-width="full"] [data-wincare-page] {
+  max-width: none;
+}
+
+/* Sem animações e transições (escolha do usuário, além da do Windows). */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 @layer base {

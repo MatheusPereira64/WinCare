@@ -38,9 +38,28 @@ test("tema claro vale na hora e continua depois de reabrir", async ({ page }) =>
   await openRoute(page, "/configuracoes");
   const html = page.locator("html");
   await expect(html).not.toHaveClass(/\blight\b/);
-  await page.getByRole("switch", { name: "Tema claro" }).click();
+  const mode = page.getByRole("radiogroup", { name: "Modo de cor" });
+  await mode.getByRole("radio", { name: "Claro" }).click();
   await expect(html).toHaveClass(/\blight\b/);
   await page.reload();
-  await expect(page.getByRole("switch", { name: "Tema claro" })).toBeChecked();
+  await expect(mode.getByRole("radio", { name: "Claro" })).toBeChecked();
   await expect(html).toHaveClass(/\blight\b/);
+});
+
+test("tema e layout prontos mudam cores e layout e continuam depois de reabrir", async ({
+  page,
+}) => {
+  await openRoute(page, "/configuracoes");
+  const html = page.locator("html");
+  const themes = page.getByRole("radiogroup", { name: "Temas prontos" });
+  await themes.getByRole("radio", { name: /Ametista/ }).click();
+  await expect(html).toHaveAttribute("data-accent", "violet");
+  const layouts = page.getByRole("radiogroup", { name: "Layouts prontos" });
+  await layouts.getByRole("radio", { name: /Compacto/ }).click();
+  await expect(html).toHaveAttribute("data-density", "compact");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-accent", "violet");
+  await expect(html).toHaveAttribute("data-density", "compact");
+  await page.getByRole("button", { name: "Restaurar aparência padrão" }).click();
+  await expect(html).not.toHaveAttribute("data-accent", /.+/);
 });

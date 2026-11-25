@@ -385,6 +385,7 @@ function AppContentColumn() {
           */}
           <div
             key={pathname}
+            data-wincare-page
             className="@container/main animate-fade-in mx-auto w-full max-w-[1500px]"
           >
             {/* Required: nested routes render here. */}

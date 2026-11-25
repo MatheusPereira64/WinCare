@@ -131,6 +131,31 @@ describe("actions", () => {
     expect(document.documentElement).toHaveClass("light");
   });
 
+  it("aparência: tema pronto, layout pronto e restaurar ficam salvos", async () => {
+    const { actions, hydrateStore, getStoreState } = await freshStore();
+    hydrateStore();
+    actions.applyThemePreset("forest");
+    actions.applyLayoutPreset("compact");
+    expect(getStoreState().appearance).toMatchObject({ accent: "emerald", density: "compact" });
+    expect(getStoreState().sidebarOpen).toBe(false);
+    expect(document.documentElement.dataset.accent).toBe("emerald");
+    await flush();
+    expect(saved().appearance.accent).toBe("emerald");
+    expect(saved().themeMode).toBe("dark");
+    actions.resetAppearance();
+    expect(document.documentElement.hasAttribute("data-accent")).toBe(false);
+    expect(getStoreState().sidebarOpen).toBe(true);
+  });
+
+  it("estado salvo só com 'theme' (versão anterior) vira a escolha de modo", async () => {
+    localStorage.setItem("wincare-state", JSON.stringify({ theme: "light" }));
+    const { hydrateStore, getStoreState } = await freshStore();
+    hydrateStore();
+    expect(getStoreState().themeMode).toBe("light");
+    expect(getStoreState().theme).toBe("light");
+    expect(getStoreState().appearance.accent).toBe("blue");
+  });
+
   it("upsertRun substitui a execução com o mesmo id e põe no topo", async () => {
     const { actions, getStoreState } = await freshStore();
     actions.upsertRun(run(1));

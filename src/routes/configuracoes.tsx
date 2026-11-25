@@ -21,6 +21,7 @@ import { BackgroundSettings } from "@/components/wincare/BackgroundSettings";
 import { ChoiceChips } from "@/components/wincare/ChoiceChips";
 import { KeyCombo, ShortcutTable } from "@/components/wincare/KeyboardShortcuts";
 import { openShortcutsHelp, shortcutSections } from "@/lib/wincare/shortcuts";
+import { AppearanceSettings } from "@/components/wincare/AppearanceSettings";
 import { PageHeader } from "@/components/wincare/PageHeader";
 import { PreferenceSwitches } from "@/components/wincare/Preferences";
 import { Panel, PanelHeader } from "@/components/wincare/Panel";
@@ -88,9 +89,14 @@ function SettingsPage() {
       />
 
       <Panel padding="lg" className="gap-5">
-        <PanelHeader icon={Palette} size="sm" title="Aparência" />
+        <PanelHeader
+          icon={Palette}
+          size="sm"
+          title="Aparência"
+          description="Temas, cores e layout do WinCare. As mudanças valem na hora e ficam salvas."
+        />
 
-        <PreferenceSwitches keys={["theme"]} />
+        <AppearanceSettings />
 
         <div className="space-y-3" data-wincare-zoom-setting>
           <div className="flex flex-wrap items-start justify-between gap-3">

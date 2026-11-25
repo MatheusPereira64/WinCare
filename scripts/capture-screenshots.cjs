@@ -63,6 +63,19 @@ const SHOTS = [
   { file: "primeira-execucao", route: "/", state: { onboardingDone: false } },
   { file: "configuracoes", route: "/configuracoes" },
   { file: "dashboard-claro", route: "/", theme: "light" },
+  {
+    file: "aparencia",
+    route: "/configuracoes",
+    state: { appearance: { accent: "violet" } },
+  },
+  {
+    file: "dashboard-tema-floresta",
+    route: "/",
+    state: {
+      appearance: { accent: "emerald", density: "compact", radius: "soft", cards: "solid" },
+      sidebarOpen: false,
+    },
+  },
 ];
 
 /** Matriz responsiva: telas principais e os diálogos (os botões não podem sumir em 1024×640). */

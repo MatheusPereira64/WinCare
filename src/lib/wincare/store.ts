@@ -2,12 +2,28 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { RecommendationDismissal } from "./recommendations";
 import type { RunRecord } from "./types";
 import { getNative } from "./bridge";
+import {
+  applyAppearance,
+  DEFAULT_APPEARANCE,
+  LAYOUT_PRESETS,
+  resolveTheme,
+  sanitizeAppearance,
+  sanitizeThemeMode,
+  THEME_PRESETS,
+  type Appearance,
+  type ThemeMode,
+} from "./appearance";
 import { DEFAULT_ZOOM, sanitizeZoom, stepZoom, type ZoomCommand } from "./zoom";
 
 interface State {
   runs: RunRecord[];
   favorites: string[];
+  /** Tema efetivo (o que está na tela). */
   theme: "dark" | "light";
+  /** Escolha do usuário: claro, escuro ou seguir o Windows. */
+  themeMode: ThemeMode;
+  /** Cor de destaque, fundo e layout (Configurações → Aparência). */
+  appearance: Appearance;
   autoCheck: boolean;
   autoCheckUpdates: boolean;
   confirmCritical: boolean;
@@ -33,6 +49,8 @@ const initial: State = {
   runs: [],
   favorites: ["sfc", "temp"],
   theme: "dark",
+  themeMode: "dark",
+  appearance: DEFAULT_APPEARANCE,
   autoCheck: true,
   autoCheckUpdates: true,
   confirmCritical: true,
@@ -86,6 +104,10 @@ function sanitizePartial(data: Partial<State>): Partial<State> {
   if (!Array.isArray(next.favorites)) next.favorites = initial.favorites;
   next.zoom = sanitizeZoom(next.zoom ?? DEFAULT_ZOOM);
   if (typeof next.sidebarOpen !== "boolean") next.sidebarOpen = initial.sidebarOpen;
+  // Versões anteriores só tinham "theme": vira a escolha do usuário.
+  next.themeMode = sanitizeThemeMode(next.themeMode, next.theme === "light" ? "light" : "dark");
+  next.theme = resolveTheme(next.themeMode);
+  next.appearance = sanitizeAppearance(next.appearance);
   next.dismissedRecommendations = cleanDismissed(next.dismissedRecommendations);
   // Estado salvo de uma versão anterior (sem o campo) = usuário que já conhece o app.
   if (typeof next.onboardingDone !== "boolean") next.onboardingDone = true;
@@ -123,6 +145,8 @@ function writeState() {
         })),
         favorites: state.favorites,
         theme: state.theme,
+        themeMode: state.themeMode,
+        appearance: state.appearance,
         autoCheck: state.autoCheck,
         autoCheckUpdates: state.autoCheckUpdates,
         confirmCritical: state.confirmCritical,
@@ -151,6 +175,7 @@ export function hydrateStore() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       applyTheme(state.theme);
+      applyAppearance(state.appearance);
       applyZoom(state.zoom);
       return;
     }
@@ -170,8 +195,39 @@ export function hydrateStore() {
     state = { ...initial };
   }
   applyTheme(state.theme);
+  applyAppearance(state.appearance);
   applyZoom(state.zoom);
+  watchSystemTheme();
+  watchOtherWindows();
   listeners.forEach((l) => l());
+}
+
+let watchingOtherWindows = false;
+
+/**
+ * O painel da bandeja é outra janela com o mesmo armazenamento: quando a
+ * aparência muda na janela principal, ela recarrega as preferências.
+ */
+function watchOtherWindows() {
+  if (watchingOtherWindows || typeof window === "undefined") return;
+  watchingOtherWindows = true;
+  window.addEventListener("storage", (event) => {
+    if (event.key === STORAGE_KEY && event.newValue) hydrateStore();
+  });
+}
+
+let watchingSystemTheme = false;
+
+/** "Sistema": acompanha o Windows trocar entre claro e escuro com o app aberto. */
+function watchSystemTheme() {
+  if (watchingSystemTheme || typeof window === "undefined" || !window.matchMedia) return;
+  watchingSystemTheme = true;
+  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+    if (state.themeMode !== "system") return;
+    const theme = resolveTheme("system");
+    applyTheme(theme);
+    if (theme !== state.theme) setState({ theme });
+  });
 }
 
 function applyTheme(theme: "dark" | "light") {
@@ -237,9 +293,39 @@ export const actions = {
       favorites: has ? state.favorites.filter((f) => f !== id) : [...state.favorites, id],
     });
   },
+  /** Botão de sol/lua: escolha explícita (sai do "Sistema"). */
   setTheme(theme: "dark" | "light") {
+    actions.setThemeMode(theme);
+  },
+  setThemeMode(themeMode: ThemeMode) {
+    const theme = resolveTheme(themeMode);
     applyTheme(theme);
-    setState({ theme });
+    setState({ themeMode, theme });
+  },
+  setAppearance(patch: Partial<Appearance>) {
+    const appearance = sanitizeAppearance({ ...state.appearance, ...patch });
+    applyAppearance(appearance);
+    setState({ appearance });
+  },
+  /** Tema pronto: modo + destaque + fundo de uma vez. */
+  applyThemePreset(id: string) {
+    const preset = THEME_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    actions.setAppearance({ accent: preset.accent, surface: preset.surface });
+    actions.setThemeMode(preset.mode);
+  },
+  /** Layout pronto: densidade, cantos, cartões, largura, animações e barra lateral. */
+  applyLayoutPreset(id: string) {
+    const preset = LAYOUT_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    actions.setAppearance(preset.values);
+    actions.setSidebarOpen(preset.sidebarOpen);
+  },
+  resetAppearance() {
+    applyAppearance(DEFAULT_APPEARANCE);
+    setState({ appearance: DEFAULT_APPEARANCE });
+    actions.setThemeMode("dark");
+    actions.setSidebarOpen(true);
   },
   setAutoCheck(autoCheck: boolean) {
     setState({ autoCheck });

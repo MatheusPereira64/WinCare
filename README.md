@@ -43,6 +43,10 @@ Central de manutenção do Windows com interface moderna. O WinCare reúne diagn
 | --- | --- |
 | ![Opções de bandeja, abrir com o Windows e alertas em segundo plano](docs/screenshots/bandeja-alertas.png) | ![Introdução da primeira execução com o que o WinCare faz e nunca faz](docs/screenshots/primeira-execucao.png) |
 
+| Aparência personalizável | Outro tema e layout |
+| --- | --- |
+| ![Temas prontos, modo claro/escuro/Windows, cor de destaque, fundo e layouts prontos](docs/screenshots/aparencia.png) | ![Dashboard com o tema Floresta e o layout Compacto](docs/screenshots/dashboard-tema-floresta.png) |
+
 | Configurações | Tema claro |
 | --- | --- |
 | ![Preferências, zoom, segurança e atualizações](docs/screenshots/configuracoes.png) | ![Dashboard no tema claro](docs/screenshots/dashboard-claro.png) |
