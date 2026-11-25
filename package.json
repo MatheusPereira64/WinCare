@@ -1,7 +1,7 @@
 {
   "name": "wincare",
   "productName": "WinCare",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "private": true,
   "sideEffects": false,
   "type": "module",
