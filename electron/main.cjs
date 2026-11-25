@@ -25,12 +25,14 @@ const { enrichSystemInfo } = require("./system-metrics.cjs");
 const { isWindowsAdmin, psFileJson } = require("./powershell.cjs");
 const { registerNativeActions } = require("./native-actions.cjs");
 const { parseJobArg, resolveSelfLaunch, runScheduledJob } = require("./scheduler.cjs");
-const { parseApplyArgs, runApply } = require("./update-apply.cjs");
+const { parseApplyArgs, parseOkFile, parseRolledBack, runApply } = require("./update-apply.cjs");
 const { optimizeMemory } = require("./memory-optimizer.cjs");
 const history = require("./maintenance-history.cjs");
 const background = require("./background.cjs");
 const { disposeTrayPanel, hidePanel, initTrayPanel, togglePanel } = require("./tray-panel.cjs");
 const { listProcesses } = require("./system-tools.cjs");
+const { initShortcuts } = require("./shortcuts.cjs");
+const { initBootTimes } = require("./boot-times.cjs");
 const { countBatteries, readBatteryReport, writeFullBatteryReport } = require("./battery.cjs");
 const {
   computeWindowBounds,
@@ -98,10 +100,18 @@ const applyUpdate = parseApplyArgs(process.argv);
 if (applyUpdate) {
   app.disableHardwareAcceleration();
   app.whenReady().then(async () => {
-    const code = await runApply(applyUpdate, path.dirname(process.execPath));
+    const code = await runApply(
+      { ...applyUpdate, newVersion: app.getVersion() },
+      path.dirname(process.execPath),
+    );
     app.exit(code);
   });
 }
+
+/** Aberto pelo aplicador da atualização: avisa (arquivo de sinal) quando a janela carregou. */
+const updateOkFile = !applyUpdate && parseOkFile(process.argv);
+/** A atualização para esta versão falhou e o aplicador restaurou a anterior. */
+const updateRolledBack = !applyUpdate && parseRolledBack(process.argv);
 
 /** Rotina do Agendador de Tarefas: roda sem janela e em paralelo a uma instância aberta. */
 const scheduledJob = !applyUpdate && parseJobArg(process.argv);
@@ -274,6 +284,16 @@ function buildAppMenu() {
 }
 
 /**
+ * Ícone para o Windows desenhar (atalhos, barra de tarefas). No app empacotado
+ * o assets/ fica dentro do app.asar, que o Windows não lê: usa o próprio
+ * WinCare.exe, que tem o ícone embutido. Em desenvolvimento, o .ico do projeto.
+ */
+function shellIconPath() {
+  if (updater.isReleaseBuild()) return process.execPath;
+  return path.join(__dirname, "assets", "icon.ico");
+}
+
+/**
  * Atalhos do Menu Iniciar com o ID do WinCare (o Electron cria um para as
  * notificações funcionarem) definem o ícone da barra de tarefas. Se foram
  * criados quando o .exe ainda tinha o ícone do Electron, o Windows guarda o
@@ -281,7 +301,7 @@ function buildAppMenu() {
  */
 function fixShortcutIcons() {
   if (process.platform !== "win32") return;
-  const ico = path.join(__dirname, "assets", "icon.ico");
+  const ico = shellIconPath();
   const dir = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs");
   if (!fs.existsSync(ico)) return;
   let entries = [];
@@ -343,6 +363,7 @@ function saveWindowBackground(color) {
 }
 
 function resolveAppIcon() {
+  // Janela e bandeja: o Electron lê o .ico de dentro do app.asar sem problema.
   const ico = path.join(__dirname, "assets", "icon.ico");
   const png256 = path.join(__dirname, "assets", "icon-256.png");
   const png = path.join(__dirname, "assets", "icon.png");
@@ -416,7 +437,7 @@ function createWindow(initialRoute) {
   // Com AppUserModelID próprio e sem atalho no Menu Iniciar, a barra de tarefas
   // pega o ícone do .exe (no desenvolvimento, uma cópia do electron.exe, e o
   // Windows ainda guarda em cache o ícone antigo). Apontar o .ico aqui resolve.
-  const taskbarIcon = path.join(__dirname, "assets", "icon.ico");
+  const taskbarIcon = shellIconPath();
   if (process.platform === "win32" && fs.existsSync(taskbarIcon)) {
     try {
       const launch = resolveSelfLaunch();
@@ -467,6 +488,32 @@ function createWindow(initialRoute) {
   });
 
   attachRendererConsoleLogger(mainWindow.webContents);
+
+  mainWindow.webContents.once("did-finish-load", () => {
+    if (updateOkFile) {
+      try {
+        fs.writeFileSync(updateOkFile, app.getVersion(), "utf8");
+        logger.log("updater", "Versão nova abriu", { version: app.getVersion() });
+      } catch (error) {
+        logger.warn(
+          "updater",
+          "Sinal de atualização",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+    if (updateRolledBack) {
+      logger.warn("updater", "Atualização desfeita", { failedVersion: updateRolledBack });
+      void dialog.showMessageBox(mainWindow, {
+        type: "warning",
+        title: "Atualização desfeita",
+        message: `A versão ${updateRolledBack} não abriu corretamente neste PC.`,
+        detail:
+          "O WinCare voltou sozinho para a versão anterior e seus dados não foram afetados. Tente de novo mais tarde ou baixe o ZIP da página de releases.",
+        buttons: ["OK"],
+      });
+    }
+  });
 
   mainWindow.webContents.on("did-fail-load", (_event, code, desc, url) => {
     logger.error("window", `Falha ao carregar ${url}`, { code, desc });
@@ -525,6 +572,15 @@ if (scheduledJob) {
     });
     buildAppMenu();
     fixShortcutIcons();
+    // Primeira vez neste PC = ainda não há preferências do app salvas.
+    const firstRun = !fs.existsSync(path.join(app.getPath("userData"), "Local Storage"));
+    initShortcuts({
+      appId: APP_ID,
+      iconPath: shellIconPath(),
+      supported: () => process.platform === "win32" && updater.isReleaseBuild(),
+      firstRun,
+    });
+    initBootTimes();
     protocol.handle("app", (request) => {
       const { pathname } = new URL(request.url);
       let filePath = path.join(DIST, decodeURIComponent(pathname));
@@ -541,6 +597,18 @@ if (scheduledJob) {
       }
       return net.fetch(url.pathToFileURL(filePath).toString());
     });
+    // Só para o teste de atualização (scripts/test-update.cjs): simula uma versão
+    // que roda mas não abre a janela. Exige a variável E o marcador na pasta do app.
+    const testBroken = process.env.WINCARE_TEST_BROKEN_MARKER;
+    if (
+      testBroken &&
+      fs.existsSync(
+        path.join(path.dirname(process.execPath), "resources", path.basename(testBroken)),
+      )
+    ) {
+      logger.warn("app", "Teste: versão marcada como quebrada, sem janela");
+      return;
+    }
     if (!launchedHidden) createWindow();
     background.initBackground({
       getWindow: () => mainWindow,

@@ -28,8 +28,23 @@ function run(cmd, args, opts = {}) {
   }
 }
 
+/**
+ * O Electron vem com arquivos datados de 01/01/1980 (UTC). Em fusos atrás do
+ * UTC (ex.: Brasil) isso vira 31/12/1979, que o formato ZIP não aceita e o
+ * Compress-Archive falha. Puxa essas datas para 02/01/1980.
+ */
+function fixZipDates(dir) {
+  const min = new Date(1980, 0, 2);
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) fixZipDates(full);
+    if (fs.statSync(full).mtime < min) fs.utimesSync(full, min, min);
+  }
+}
+
 function zipFolder(sourceDir, destZip) {
   if (fs.existsSync(destZip)) fs.unlinkSync(destZip);
+  fixZipDates(sourceDir);
 
   if (process.platform === "win32") {
     const ps = [
@@ -74,6 +89,18 @@ function main() {
     "--ignore=^/docs",
     "--ignore=^/scripts",
     "--ignore=^/electron/tests",
+    // Pastas de desenvolvimento/teste que só existem na máquina de quem empacota.
+    "--ignore=^/\\.update-test",
+    "--ignore=^/\\.output",
+    "--ignore=^/\\.wrangler",
+    "--ignore=^/\\.cursor",
+    "--ignore=^/\\.tanstack",
+    "--ignore=^/\\.lovable",
+    "--ignore=^/\\.claude",
+    "--ignore=^/e2e",
+    "--ignore=^/tests",
+    "--ignore=^/test-results",
+    "--ignore=^/playwright-report",
   ]);
 
   if (!fs.existsSync(path.join(appDir, "WinCare.exe"))) {

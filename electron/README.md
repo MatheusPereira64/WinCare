@@ -106,13 +106,13 @@ Regra: a rota `/inteligencia` **não** chama esses três no mount. Boot vem do c
 
 ## Scripts disponíveis
 
-| Script | O que faz |
-| --- | --- |
-| `npm run wincare:build` | Compila só a interface para `dist/` |
-| `npm run wincare:dev` | Compila e abre a janela do WinCare (desktop) |
-| `npm run wincare:admin` | Abre o WinCare como administrador (desenvolvimento) |
-| `npm run wincare:dev:debug` | Igual ao dev, com DevTools aberto |
-| `npm run wincare:package` | Gera o ZIP `WinCare-Windows-x64.zip` em `electron-release/` |
-| `npm run wincare:clear-data` | Limpa histórico local do app |
+| Script                        | O que faz                                                            |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `npm run wincare:build`       | Compila só a interface para `dist/`                                  |
+| `npm run wincare:dev`         | Compila e abre a janela do WinCare (desktop)                         |
+| `npm run wincare:admin`       | Abre o WinCare como administrador (desenvolvimento)                  |
+| `npm run wincare:dev:debug`   | Igual ao dev, com DevTools aberto                                    |
+| `npm run wincare:package`     | Gera o ZIP `WinCare-Windows-x64.zip` em `electron-release/`          |
+| `npm run wincare:clear-data`  | Limpa histórico local do app                                         |
 | `npm run wincare:screenshots` | Regera as prévias do README em `docs/screenshots/` (dados simulados) |
-| `npm test` | Roda os testes das proteções contra exclusão indevida |
+| `npm test`                    | Roda os testes das proteções contra exclusão indevida                |

@@ -25,6 +25,7 @@ const ALERT_TYPES = [
   "windowsUpdate",
   "diskGrowth",
   "newProgram",
+  "windowsUpdateBusy",
 ];
 
 const THRESHOLDS = Object.freeze({
@@ -43,6 +44,11 @@ const THRESHOLDS = Object.freeze({
   /** Disco que ganhou 1 GB ou mais em até 30 minutos (download, instalação, log fora de controle). */
   diskGrowthBytes: GB,
   diskGrowthWindowMs: 30 * MINUTE,
+  /** Windows Update (TiWorker) acima de 15% do processador por ~20 min (6 leituras de 3 min)… */
+  wuBusyPct: 15,
+  wuBusyReadings: 6,
+  /** …e só desliga abaixo de 5%. */
+  wuClearPct: 5,
   /** Avisos de "evento" (salto no disco, programa novo) ficam visíveis por 30 min. */
   eventHoldMs: 30 * MINUTE,
 });
@@ -55,6 +61,7 @@ const CHECK_EVERY_MS = Object.freeze({
   windowsUpdate: 6 * HOUR,
   diskGrowth: 5 * MINUTE,
   newProgram: 15 * MINUTE,
+  windowsUpdateBusy: 3 * MINUTE,
 });
 
 /** Com o problema ainda ativo, lembra depois de… */
@@ -65,6 +72,7 @@ const REMIND_MS = Object.freeze({
   windowsUpdate: 7 * DAY,
   diskGrowth: DAY,
   newProgram: DAY,
+  windowsUpdateBusy: DAY,
 });
 
 /** Problema que some e volta: novo aviso só depois de… (evita pisca-pisca). */
@@ -75,6 +83,7 @@ const REARM_MS = Object.freeze({
   windowsUpdate: 7 * DAY,
   diskGrowth: 0,
   newProgram: 0,
+  windowsUpdateBusy: 6 * HOUR,
 });
 
 const MIN_GAP_MS = 10 * MINUTE;
@@ -89,6 +98,7 @@ const ALERT_ROUTE = Object.freeze({
   windowsUpdate: "/",
   diskGrowth: "/disco",
   newProgram: "/programas",
+  windowsUpdateBusy: "/monitoramento",
 });
 
 const pct = (n) => `${Math.round(n)}%`;
@@ -141,6 +151,25 @@ function evaluateWindowsUpdate(reading, now) {
   if (!Number.isFinite(last)) return null;
   const days = Math.floor((now - last) / DAY);
   return { active: days >= THRESHOLDS.updateStaleDays, detail: { days, lastInstalled: last } };
+}
+
+/**
+ * Windows Update pesando: `reading` = { cpuPct, name } do TiWorker e afins
+ * (soma). Precisa de várias leituras seguidas acima do limite (instalações
+ * curtas não incomodam); desliga só quando cai bem abaixo.
+ */
+function evaluateWindowsUpdateBusy(reading, prev = {}) {
+  if (!reading || typeof reading.cpuPct !== "number") return null;
+  const busy = reading.cpuPct >= THRESHOLDS.wuBusyPct;
+  const streak = busy ? (prev.streak || 0) + 1 : 0;
+  let active = !!prev.active;
+  if (!active && streak >= THRESHOLDS.wuBusyReadings) active = true;
+  if (active && reading.cpuPct < THRESHOLDS.wuClearPct) active = false;
+  return {
+    active,
+    streak,
+    detail: { cpuPct: Math.round(reading.cpuPct), name: reading.name || "TiWorker" },
+  };
 }
 
 /**
@@ -271,6 +300,12 @@ function describeAlert(type, detail = {}) {
         short: `Disco ${where} cresceu ${gbText(first.bytes)}`,
       };
     }
+    case "windowsUpdateBusy":
+      return {
+        title: "O Windows Update está pesando o PC",
+        body: `${detail.name || "TiWorker"} usa ${detail.cpuPct || 0}% do processador há uns 20 minutos. É normal ao instalar atualizações; se passar de 1 hora, o WinCare mostra como destravar.`,
+        short: `Windows Update usando ${detail.cpuPct || 0}% da CPU`,
+      };
     case "newProgram": {
       const names = Array.isArray(detail.names) ? detail.names : [];
       const label =
@@ -434,6 +469,7 @@ module.exports = {
   evaluateDisk,
   evaluateDiskGrowth,
   evaluateNewProgram,
+  evaluateWindowsUpdateBusy,
   evaluateTemperature,
   evaluateWindowsUpdate,
   nextAlertState,

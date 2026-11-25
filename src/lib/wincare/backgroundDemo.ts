@@ -10,6 +10,7 @@ const UPDATE_STALE_DAYS = 45;
 
 const demo = {
   closeToTray: false,
+  weeklyReport: true,
   openAtLogin: false,
   monitorEnabled: true,
   types: {
@@ -19,6 +20,7 @@ const demo = {
     windowsUpdate: true,
     diskGrowth: true,
     newProgram: true,
+    windowsUpdateBusy: true,
   } as Record<AlertType, boolean>,
   snoozeUntil: 0,
   lastCheckAt: 0,
@@ -56,6 +58,7 @@ export function demoBackgroundState(lastUpdate: string, now = Date.now()): Backg
     ok: true,
     supported: { tray: false, notifications: false, openAtLogin: false },
     closeToTray: demo.closeToTray,
+    weeklyReport: demo.weeklyReport,
     openAtLogin: { supported: false, enabled: demo.openAtLogin },
     launchedHidden: false,
     monitor: {
@@ -74,6 +77,7 @@ export function demoBackgroundState(lastUpdate: string, now = Date.now()): Backg
         ),
         diskGrowth: check("2 unidades vigiadas (aviso com +1 GB em 30 min)"),
         newProgram: check("142 programas conhecidos"),
+        windowsUpdateBusy: check("TiWorker: 17% do processador agora"),
       },
       active,
     },
@@ -82,6 +86,7 @@ export function demoBackgroundState(lastUpdate: string, now = Date.now()): Backg
 
 export function demoUpdateBackground(patch: BackgroundSettingsPatch, lastUpdate: string) {
   if (typeof patch.closeToTray === "boolean") demo.closeToTray = patch.closeToTray;
+  if (typeof patch.weeklyReport === "boolean") demo.weeklyReport = patch.weeklyReport;
   if (typeof patch.openAtLogin === "boolean") demo.openAtLogin = patch.openAtLogin;
   if (typeof patch.monitorEnabled === "boolean") demo.monitorEnabled = patch.monitorEnabled;
   for (const [type, value] of Object.entries(patch.types ?? {})) {

@@ -348,6 +348,31 @@ async function findExtractedRoot(extractDir) {
 }
 
 /**
+ * Abre o WinCare.exe da versão nova (em `sourceDir`) para trocar os arquivos
+ * desta instalação e fecha este app. Usado pelo botão Atualizar e pelo teste
+ * de atualização do CI (scripts/test-update.cjs), que exercita este mesmo código.
+ */
+function launchApply(sourceDir) {
+  const installDir = getInstallDir();
+  const newExe = path.join(sourceDir, "WinCare.exe");
+  const logFile = path.join(os.tmpdir(), `wincare-apply-update-${Date.now()}.log`);
+  logger.log("updater", "Aplicando com o WinCare novo", { newExe, logFile, installDir });
+
+  // Processo de janela (sem console). Ele espera este fechar antes de copiar.
+  const child = spawn(newExe, buildApplyArgs({ installDir, pid: process.pid, logFile }), {
+    cwd: sourceDir,
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+
+  setTimeout(() => app.quit(), 400);
+  // Se algo segurar o encerramento, o app novo forçaria; melhor sair daqui mesmo.
+  setTimeout(() => app.exit(0), 8000);
+  return { logFile, installDir };
+}
+
+/**
  * Baixa o ZIP do latest release, extrai e agenda a substituição ao sair.
  * Só funciona no build portátil empacotado.
  */
@@ -397,24 +422,8 @@ async function downloadAndApplyUpdate(onProgress) {
     await expandZip(zipPath, extractDir);
     const sourceDir = await findExtractedRoot(extractDir);
 
-    const installDir = getInstallDir();
-    const newExe = path.join(sourceDir, "WinCare.exe");
-    const logFile = path.join(os.tmpdir(), `wincare-apply-update-${Date.now()}.log`);
-
     onProgress?.({ phase: "apply", percent: 100 });
-    logger.log("updater", "Aplicando com o WinCare novo", { newExe, logFile, installDir });
-
-    // Processo de janela (sem console). Ele espera este fechar antes de copiar.
-    const child = spawn(newExe, buildApplyArgs({ installDir, pid: process.pid, logFile }), {
-      cwd: sourceDir,
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-
-    setTimeout(() => app.quit(), 400);
-    // Se algo segurar o encerramento, o app novo forçaria; melhor sair daqui mesmo.
-    setTimeout(() => app.exit(0), 8000);
+    const { logFile } = launchApply(sourceDir);
 
     return {
       ok: true,
@@ -463,5 +472,6 @@ module.exports = {
   compareVersions,
   checkForUpdate,
   downloadAndApplyUpdate,
+  launchApply,
   openLatestReleasePage,
 };

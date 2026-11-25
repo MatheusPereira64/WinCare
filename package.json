@@ -22,6 +22,7 @@
     "test:e2e": "npm run wincare:build && playwright test --project=e2e",
     "test:visual": "npm run wincare:build && node scripts/visual-docker.cjs",
     "test:visual:update": "npm run wincare:build && node scripts/visual-docker.cjs --update-snapshots",
+    "test:update": "node scripts/test-update.cjs",
     "test:all": "npm test && npm run test:e2e && npm run test:visual",
     "typecheck": "tsc --noEmit",
     "knip": "knip --no-config-hints",

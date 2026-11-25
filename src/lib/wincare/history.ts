@@ -409,3 +409,40 @@ export function historyToJson(
 export function exportFileName(days: number, ext: "csv" | "json", now: number) {
   return `WinCare-historico-${days}-dias-${dayKey(now)}.${ext}`;
 }
+
+/* ------------------------------ Semana × semana ------------------------------ */
+
+export interface WeekTotals {
+  freedBytes: number;
+  maintenance: number;
+  programsRemoved: number;
+  healthAvg: number | null;
+}
+
+function totalsBetween(
+  history: Pick<MaintenanceHistory, "events" | "health">,
+  from: number,
+  to: number,
+): WeekTotals {
+  const events = history.events.filter((e) => e.ts >= from && e.ts < to && e.ok);
+  const fromDay = dayKey(from);
+  const toDay = dayKey(to - 1);
+  const health = history.health.filter((h) => h.day >= fromDay && h.day <= toDay);
+  return {
+    freedBytes: events.reduce((n, e) => n + (e.freedBytes ?? 0), 0),
+    maintenance: events.filter((e) => e.kind !== "safety").length,
+    programsRemoved: events.filter((e) => e.kind === "uninstall").length,
+    healthAvg: health.length
+      ? Math.round(health.reduce((n, h) => n + h.avg, 0) / health.length)
+      : null,
+  };
+}
+
+/** Últimos 7 dias × os 7 anteriores (mesma conta do resumo semanal do processo principal). */
+export function compareWeeks(history: Pick<MaintenanceHistory, "events" | "health">, now: number) {
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+  return {
+    week: totalsBetween(history, now - WEEK, now + 1),
+    previous: totalsBetween(history, now - 2 * WEEK, now - WEEK),
+  };
+}

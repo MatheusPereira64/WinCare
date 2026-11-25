@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { BootTimesPanel } from "@/components/wincare/BootTimesPanel";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmModal } from "@/components/wincare/ConfirmModal";
 import { StartupAppIcon } from "@/components/wincare/StartupAppIcon";
@@ -200,6 +201,8 @@ export function StartupManager() {
       />
 
       <StartupChangeBanner />
+
+      <BootTimesPanel />
 
       {ready && items.length > 0 && (
         <StartupDiagnosisCard

@@ -240,6 +240,8 @@ export interface ScheduleConfig {
   monthDay: number;
   /** HH:mm */
   time: string;
+  /** Limpeza: também manda instaladores esquecidos (30+ dias) para a Lixeira. */
+  includeInstallers?: boolean;
 }
 
 export interface ScheduleEntry {
@@ -316,7 +318,13 @@ export interface MaintenanceHistory {
 /* Segundo plano: bandeja e alertas (electron/background.cjs + alerts.cjs). */
 
 export type AlertType =
-  "disk" | "temperature" | "defender" | "windowsUpdate" | "diskGrowth" | "newProgram";
+  | "disk"
+  | "temperature"
+  | "defender"
+  | "windowsUpdate"
+  | "diskGrowth"
+  | "newProgram"
+  | "windowsUpdateBusy";
 
 export interface ActiveAlert {
   type: AlertType;
@@ -333,6 +341,8 @@ export interface BackgroundState {
   reason?: string;
   supported: { tray: boolean; notifications: boolean; openAtLogin: boolean };
   closeToTray: boolean;
+  /** Notificação semanal com o resumo de saúde (segunda de manhã). */
+  weeklyReport?: boolean;
   openAtLogin: { supported: boolean; enabled: boolean; blockedByWindows?: boolean };
   /** O app abriu com o Windows (sem janela). */
   launchedHidden: boolean;
@@ -350,6 +360,7 @@ export interface BackgroundState {
 
 export interface BackgroundSettingsPatch {
   closeToTray?: boolean;
+  weeklyReport?: boolean;
   openAtLogin?: boolean;
   monitorEnabled?: boolean;
   types?: Partial<Record<AlertType, boolean>>;

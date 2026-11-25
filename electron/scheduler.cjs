@@ -58,7 +58,17 @@ const MONTHS = [
   "December",
 ];
 
-const DEFAULT_CONFIG = { frequency: "weekly", weekDay: 0, monthDay: 1, time: "12:00" };
+const DEFAULT_CONFIG = {
+  frequency: "weekly",
+  weekDay: 0,
+  monthDay: 1,
+  time: "12:00",
+  /** Limpeza: também manda para a Lixeira instaladores esquecidos (30+ dias). */
+  includeInstallers: false,
+};
+
+/** Instalador em Downloads/Área de Trabalho há mais que isso entra na limpeza agendada. */
+const INSTALLER_MIN_DAYS = 30;
 
 function parseJobArg(argv = process.argv) {
   const arg = argv.find((a) => String(a).startsWith(JOB_ARG));
@@ -76,6 +86,7 @@ function normalizeConfig(raw) {
   const monthDay = Number(raw?.monthDay);
   if (Number.isInteger(monthDay) && monthDay >= 1 && monthDay <= 28) config.monthDay = monthDay;
   if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw?.time))) config.time = raw.time;
+  config.includeInstallers = raw?.includeInstallers === true;
   return config;
 }
 
@@ -339,14 +350,45 @@ function runCommand(command, timeoutMs) {
   });
 }
 
+/** Instaladores esquecidos há 30+ dias → Lixeira (recuperável). */
+async function trashForgottenInstallers(dryRun) {
+  // Carregado só aqui: a busca usa o Electron (Lixeira, pastas do usuário).
+  const { scanForgotten, trashFiles } = require("./storage-explorer.cjs");
+  const found = await scanForgotten({ age: "1y" });
+  const cutoff = Date.now() - INSTALLER_MIN_DAYS * 24 * 60 * 60 * 1000;
+  const old = found.installers.filter((i) => i.modifiedAt <= cutoff);
+  if (!old.length || dryRun) {
+    return { removed: 0, freedBytes: 0, found: old.length };
+  }
+  const out = await trashFiles({ ids: old.map((i) => i.id), source: "forgotten" });
+  return { removed: out.removed, freedBytes: out.freedBytes, found: old.length };
+}
+
 async function runCleanupJob(dryRun) {
   const totals = await runScheduledCleanup(process.env, { dryRun });
-  return {
-    ok: true,
-    freedBytes: totals.freedBytes,
-    summary: `${totals.removed} arquivos removidos, ${totals.skipped} mantidos (recentes ou em uso).`,
-    steps: [{ name: "Temporários e caches", ok: true }],
-  };
+  const config = normalizeConfig(readJson(configFile(), {}).cleanup);
+  const steps = [{ name: "Temporários e caches", ok: true }];
+  let summary = `${totals.removed} arquivos removidos, ${totals.skipped} mantidos (recentes ou em uso).`;
+  let freedBytes = totals.freedBytes || 0;
+  if (config.includeInstallers) {
+    try {
+      const inst = await trashForgottenInstallers(dryRun);
+      freedBytes += inst.freedBytes;
+      steps.push({
+        name: "Instaladores esquecidos",
+        ok: true,
+        detail: `${inst.removed} na Lixeira`,
+      });
+      if (inst.removed) summary += ` ${inst.removed} instaladores antigos foram para a Lixeira.`;
+    } catch (error) {
+      steps.push({
+        name: "Instaladores esquecidos",
+        ok: false,
+        detail: error instanceof Error ? error.message : "falhou",
+      });
+    }
+  }
+  return { ok: true, freedBytes, summary, steps };
 }
 
 async function runFullCheckJob(dryRun) {

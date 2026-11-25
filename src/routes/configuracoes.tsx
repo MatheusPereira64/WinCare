@@ -23,6 +23,7 @@ import { KeyCombo, ShortcutTable } from "@/components/wincare/KeyboardShortcuts"
 import { openShortcutsHelp, shortcutSections } from "@/lib/wincare/shortcuts";
 import { AppearanceSettings } from "@/components/wincare/AppearanceSettings";
 import { PageHeader } from "@/components/wincare/PageHeader";
+import { ShortcutSettings } from "@/components/wincare/ShortcutSettings";
 import { PreferenceSwitches } from "@/components/wincare/Preferences";
 import { Panel, PanelHeader } from "@/components/wincare/Panel";
 import { StatusBadge } from "@/components/wincare/StatusBadge";
@@ -174,6 +175,8 @@ function SettingsPage() {
       </Panel>
 
       <BackgroundSettings />
+
+      <ShortcutSettings />
 
       <UpdateCard />
 

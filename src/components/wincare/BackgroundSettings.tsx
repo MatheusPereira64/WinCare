@@ -6,6 +6,7 @@ import {
   BellRing,
   HardDrive,
   Loader2,
+  CalendarDays,
   Minimize2,
   Power,
   RefreshCw,
@@ -60,6 +61,11 @@ const ALERT_TEXT: Record<AlertType, { icon: typeof HardDrive; title: string; rul
     title: "Disco crescendo rápido",
     rule: "Qualquer unidade ganhou 1 GB ou mais em até 30 minutos.",
   },
+  windowsUpdateBusy: {
+    icon: RefreshCw,
+    title: "Windows Update pesando o PC",
+    rule: "TiWorker (instalação de atualizações) acima de 15% do processador por uns 20 minutos.",
+  },
   newProgram: {
     icon: ShieldAlert,
     title: "Programa novo instalado",
@@ -73,6 +79,7 @@ const ALERT_ORDER: AlertType[] = [
   "temperature",
   "defender",
   "windowsUpdate",
+  "windowsUpdateBusy",
   "newProgram",
 ];
 
@@ -241,6 +248,13 @@ function BackgroundOptions({
           onCheckedChange={(v) =>
             void onApply({ closeToTray: v }, v ? "Ao fechar, o WinCare fica na bandeja" : undefined)
           }
+        />
+        <SettingSwitch
+          icon={CalendarDays}
+          label="Resumo semanal de saúde"
+          description="Toda segunda de manhã, uma notificação com o que foi feito na semana: espaço liberado, manutenções e a saúde média comparada com a semana anterior."
+          checked={state.weeklyReport !== false}
+          onCheckedChange={(v) => void onApply({ weeklyReport: v })}
         />
         <div className="space-y-2">
           <SettingSwitch

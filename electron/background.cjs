@@ -20,6 +20,9 @@ const logger = require("./logger.cjs");
 const alerts = require("./alerts.cjs");
 const { psFileJson } = require("./powershell.cjs");
 const { collectCpuTempC, collectGpuMetrics } = require("./system-metrics.cjs");
+const { listProcesses } = require("./system-tools.cjs");
+const history = require("./maintenance-history.cjs");
+const { describeDigest, isDigestDue, weeklyDigest } = require("./weekly-report.cjs");
 const { resolveSelfLaunch } = require("./scheduler.cjs");
 
 /** Argumento da entrada "Abrir com o Windows": começa só na bandeja. */
@@ -55,6 +58,7 @@ const DEFAULT_SETTINGS = {
       windowsUpdate: true,
       diskGrowth: true,
       newProgram: true,
+      windowsUpdateBusy: true,
     },
   },
   snoozeUntil: 0,
@@ -62,6 +66,8 @@ const DEFAULT_SETTINGS = {
   lastNotificationAt: 0,
   /** Verificação de versão nova com o app aberto (espelha "Verificar atualizações ao abrir"). */
   updates: { enabled: true, notifiedVersion: "" },
+  /** Resumo semanal de saúde por notificação (segunda de manhã). */
+  weeklyReport: { enabled: true, lastSentAt: 0 },
   /** Estado de cada alerta — persiste para não repetir aviso a cada reinício. */
   alerts: {},
 };
@@ -96,6 +102,10 @@ function sanitize(raw) {
   out.snoozeUntil = num(raw.snoozeUntil);
   out.lastNotificationAt = num(raw.lastNotificationAt);
   out.trayHintShown = raw.trayHintShown === true;
+  if (raw.weeklyReport && typeof raw.weeklyReport === "object") {
+    out.weeklyReport.enabled = raw.weeklyReport.enabled !== false;
+    out.weeklyReport.lastSentAt = num(raw.weeklyReport.lastSentAt);
+  }
   if (raw.updates && typeof raw.updates === "object") {
     out.updates.enabled = raw.updates.enabled !== false;
     out.updates.notifiedVersion =
@@ -318,7 +328,21 @@ async function readPrograms() {
   return programs.length ? { programs } : null;
 }
 
+const WINDOWS_UPDATE_PROCESSES = new Set(["tiworker", "trustedinstaller", "mousocoreworker"]);
+
+/** CPU do Windows Update desde a leitura anterior (a 1ª leitura só prepara a base). */
+async function readWindowsUpdateBusy() {
+  if (process.platform !== "win32") return null;
+  const list = await listProcesses({ limit: 80 });
+  const wu = list.filter((p) => WINDOWS_UPDATE_PROCESSES.has(String(p.name).toLowerCase()));
+  if (!wu.length) return { cpuPct: 0, name: null };
+  if (wu.every((p) => p.cpuPct === null)) return null;
+  const top = [...wu].sort((a, b) => (b.cpuPct ?? 0) - (a.cpuPct ?? 0))[0];
+  return { cpuPct: wu.reduce((n, p) => n + (p.cpuPct ?? 0), 0), name: top.name };
+}
+
 const READERS = {
+  windowsUpdateBusy: readWindowsUpdateBusy,
   disk: async () => readSystemDrive(),
   diskGrowth: async () => readDriveUsage(),
   newProgram: readPrograms,
@@ -341,6 +365,8 @@ function evaluate(type, reading, prev, now) {
       return alerts.evaluateDiskGrowth(reading, prev, now);
     case "newProgram":
       return alerts.evaluateNewProgram(reading, prev, now);
+    case "windowsUpdateBusy":
+      return alerts.evaluateWindowsUpdateBusy(reading, prev);
     default:
       return null;
   }
@@ -375,6 +401,10 @@ function summarize(type, reading, result) {
       return `${reading.drives.length} ${reading.drives.length === 1 ? "unidade vigiada" : "unidades vigiadas"} (aviso com +1 GB em 30 min)`;
     case "newProgram":
       return `${reading.programs.length.toLocaleString("pt-BR")} programas conhecidos`;
+    case "windowsUpdateBusy":
+      return reading.name
+        ? `${reading.name}: ${Math.round(reading.cpuPct)}% do processador agora`
+        : "Windows Update parado";
     default:
       return "";
   }
@@ -621,6 +651,7 @@ function publicState() {
       openAtLogin: process.platform === "win32",
     },
     closeToTray: settings.closeToTray,
+    weeklyReport: settings.weeklyReport.enabled,
     openAtLogin: loginItemState(),
     launchedHidden: !!deps?.launchedHidden,
     monitor: {
@@ -646,6 +677,7 @@ function updateSettings(patch = {}) {
   if (typeof patch.closeToTray === "boolean") settings.closeToTray = patch.closeToTray;
   if (typeof patch.openAtLogin === "boolean") setOpenAtLogin(patch.openAtLogin);
   if (typeof patch.checkUpdates === "boolean") settings.updates.enabled = patch.checkUpdates;
+  if (typeof patch.weeklyReport === "boolean") settings.weeklyReport.enabled = patch.weeklyReport;
   let restart = false;
   if (
     typeof patch.monitorEnabled === "boolean" &&
@@ -718,6 +750,37 @@ function initBackground(options) {
   createTray();
   startMonitor();
   startUpdateWatch();
+  weeklyTimer = setInterval(checkWeeklyReport, 30 * 60_000);
+  setTimeout(checkWeeklyReport, 5 * 60_000);
+}
+
+/* ------------------------------ Resumo semanal ------------------------------ */
+
+let weeklyTimer = null;
+
+/** Segunda de manhã: notificação com a semana (clique → Histórico). */
+function checkWeeklyReport() {
+  if (!settings.weeklyReport.enabled) return;
+  if (settings.snoozeUntil > Date.now()) return;
+  const now = Date.now();
+  const { due, mark } = isDigestDue(settings.weeklyReport.lastSentAt, now);
+  if (mark) {
+    settings.weeklyReport.lastSentAt = now;
+    saveSettings();
+    return;
+  }
+  if (!due) return;
+  settings.weeklyReport.lastSentAt = now;
+  saveSettings();
+  try {
+    const digest = weeklyDigest(history.readHistory(), now);
+    if (!digest.hasData) return;
+    const message = describeDigest(digest);
+    showNotification({ ...message, route: "/historico" });
+    logger.log("weekly", "Resumo semanal enviado", { body: message.body });
+  } catch (error) {
+    logger.warn("weekly", "Resumo semanal", error instanceof Error ? error.message : error);
+  }
 }
 
 /* ------------------------------ Versão nova ------------------------------ */
@@ -796,6 +859,8 @@ function setPendingCommand(command) {
 function disposeBackground() {
   stopMonitor();
   stopUpdateWatch();
+  if (weeklyTimer) clearInterval(weeklyTimer);
+  weeklyTimer = null;
   if (tray && !tray.isDestroyed()) tray.destroy();
   tray = null;
 }

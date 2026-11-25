@@ -129,6 +129,15 @@ let demoProcesses: ProcessInfo[] = [
   },
   { name: "WinCare", pid: 4412, cpu: 22, cpuPct: 0.4, memMb: 168, hasWindow: true, canEnd: false },
   { name: "OneDrive", pid: 7004, cpu: 30, cpuPct: 0.2, memMb: 150, hasWindow: false, canEnd: true },
+  {
+    name: "TiWorker",
+    pid: 8120,
+    cpu: 640,
+    cpuPct: 17.5,
+    memMb: 310,
+    hasWindow: false,
+    canEnd: false,
+  },
 ];
 
 export async function listProcesses(): Promise<ProcessInfo[]> {

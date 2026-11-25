@@ -237,3 +237,117 @@ test("alerta: programa novo só depois da primeira leitura", () => {
   const state = nextAlertState(prev, next, 2);
   assert.equal(state.episodeNotified, false);
 });
+
+test("alerta: Windows Update pesando só depois de ~20 min e desliga abaixo de 5%", () => {
+  const { evaluateWindowsUpdateBusy, describeAlert: describe } = require("../alerts.cjs");
+  let prev = {};
+  // 5 leituras altas (15 min): ainda não avisa.
+  for (let i = 0; i < 5; i++) {
+    prev = { ...prev, ...evaluateWindowsUpdateBusy({ cpuPct: 30, name: "TiWorker" }, prev) };
+    assert.equal(prev.active, false);
+  }
+  prev = { ...prev, ...evaluateWindowsUpdateBusy({ cpuPct: 30, name: "TiWorker" }, prev) };
+  assert.equal(prev.active, true);
+  assert.match(describe("windowsUpdateBusy", prev.detail).body, /TiWorker usa 30%/);
+  // Oscilar a 10% não desliga; abaixo de 5% desliga.
+  prev = { ...prev, ...evaluateWindowsUpdateBusy({ cpuPct: 10, name: "TiWorker" }, prev) };
+  assert.equal(prev.active, true);
+  prev = { ...prev, ...evaluateWindowsUpdateBusy({ cpuPct: 2, name: "TiWorker" }, prev) };
+  assert.equal(prev.active, false);
+  // Leitura que falhou não muda nada.
+  assert.equal(evaluateWindowsUpdateBusy(null, prev), null);
+});
+
+test("limpeza agendada: instaladores esquecidos só quando o usuário liga", () => {
+  const { normalizeConfig } = require("../scheduler.cjs");
+  assert.equal(normalizeConfig({}).includeInstallers, false);
+  assert.equal(normalizeConfig({ includeInstallers: "sim" }).includeInstallers, false);
+  assert.equal(normalizeConfig({ includeInstallers: true }).includeInstallers, true);
+});
+
+test("resumo semanal compara esta semana com a anterior", () => {
+  const { describeDigest, isDigestDue, weeklyDigest } = require("../weekly-report.cjs");
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = new Date(2026, 10, 23, 10, 0, 0).getTime(); // segunda, 10 h
+  const day = (ts) => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const data = {
+    events: [
+      { ts: now - 1 * DAY, ok: true, kind: "clean", freedBytes: 2 * 1024 ** 3 },
+      { ts: now - 2 * DAY, ok: true, kind: "uninstall", freedBytes: 0 },
+      { ts: now - 3 * DAY, ok: false, kind: "clean", freedBytes: 9 * 1024 ** 3 },
+      { ts: now - 3 * DAY, ok: true, kind: "safety" },
+      { ts: now - 10 * DAY, ok: true, kind: "clean", freedBytes: 1024 ** 3 },
+    ],
+    health: [
+      { day: day(now - DAY), avg: 90 },
+      { day: day(now - 2 * DAY), avg: 80 },
+      { day: day(now - 9 * DAY), avg: 70 },
+    ],
+  };
+  const digest = weeklyDigest(data, now);
+  assert.deepEqual(digest.week, {
+    freedBytes: 2 * 1024 ** 3,
+    maintenance: 2,
+    programsRemoved: 1,
+    healthAvg: 85,
+  });
+  assert.deepEqual(digest.previous, {
+    freedBytes: 1024 ** 3,
+    maintenance: 1,
+    programsRemoved: 0,
+    healthAvg: 70,
+  });
+  assert.equal(digest.hasData, true);
+  const text = describeDigest(digest);
+  assert.match(text.body, /2 GB liberados/);
+  assert.match(text.body, /2 manutenções/);
+  assert.match(text.body, /1 programa removido/);
+  assert.match(text.body, /saúde média 85% \(\+15 vs\. semana passada\)/);
+  assert.match(
+    describeDigest(weeklyDigest({ events: [], health: [] }, now)).body,
+    /Semana tranquila/,
+  );
+
+  assert.deepEqual(isDigestDue(0, now), { due: false, mark: true });
+  assert.equal(isDigestDue(now - 7 * DAY, now).due, true); // segunda às 10 h
+  assert.equal(isDigestDue(now - 3 * DAY, now).due, false);
+  assert.equal(isDigestDue(now - 7 * DAY, now - 2 * 60 * 60 * 1000).due, false); // 8 h, cedo
+  assert.equal(isDigestDue(now - 9 * DAY, now + DAY).due, true); // 8+ dias, qualquer dia
+});
+
+test("tempo de boot junta início, login e programas de inicialização", () => {
+  const { compareBoots, lastStartupChange, pairBoots } = require("../boot-times.cjs");
+  const S = 1000;
+  const M = 60 * S;
+  const D = 24 * 60 * M;
+  const raw = {
+    boots: [3 * D, 1 * D, 2 * D],
+    logons: [1 * D + 12 * S, 2 * D + 30 * M, 3 * D + 10 * S],
+    ready: [1 * D + 60 * S, 1 * D + 90 * S, 3 * D + 40 * S, 3 * D + 20 * M],
+  };
+  const boots = pairBoots(raw);
+  // O boot do dia 2 ficou 30 min na tela de bloqueio: fora da conta.
+  assert.deepEqual(boots, [
+    { ts: 3 * D, logonMs: 10 * S, readyMs: 30 * S },
+    { ts: 1 * D, logonMs: 12 * S, readyMs: 78 * S },
+  ]);
+  assert.deepEqual(pairBoots(null), []);
+
+  const change = lastStartupChange([
+    { ts: 5, action: "startup-disable", subject: "Velho" },
+    { ts: 2 * D, action: "startup-disable", subject: "Steam" },
+    { ts: 4 * D, action: "startup-enable", ok: false },
+    { ts: 4 * D, action: "clean" },
+  ]);
+  assert.deepEqual(change, { ts: 2 * D, action: "startup-disable", subject: "Steam" });
+  assert.deepEqual(compareBoots(boots, change.ts), {
+    beforeMs: 78 * S,
+    afterMs: 30 * S,
+    beforeCount: 1,
+    afterCount: 1,
+  });
+  assert.equal(compareBoots(boots, null), null);
+});

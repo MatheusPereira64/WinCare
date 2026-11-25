@@ -146,3 +146,31 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Atualização de verdade no Windows: app empacotado numa unidade (D:) e a
+  # versão nova em %TEMP% (C:), o caso que já quebrou a atualização. Testa a
+  # troca completa e a volta automática quando a versão nova não abre.
+  update:
+    name: Atualização automática (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Align npm with lockfile
+        run: npm install -g npm@11.16.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package WinCare
+        run: npm run wincare:package
+
+      - name: Update (troca e volta automática)
+        run: npm run test:update

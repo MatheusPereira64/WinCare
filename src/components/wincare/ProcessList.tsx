@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDecimal } from "@/lib/wincare/format";
 import { pageHidden } from "@/lib/wincare/pageVisibility";
+import { processHint } from "@/lib/wincare/processHints";
 import { endProcess, listProcesses, type ProcessInfo } from "@/lib/wincare/systemTools";
 import { ChoiceChips } from "./ChoiceChips";
 import { ConfirmModal } from "./ConfirmModal";
@@ -138,6 +139,11 @@ export function ProcessList({
                   <p className="truncate text-sm font-medium" title={`${p.name} (PID ${p.pid})`}>
                     {p.name}
                   </p>
+                  {processHint(p.name) && (
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {processHint(p.name)}
+                    </p>
+                  )}
                   {!compact && (
                     <div
                       aria-hidden

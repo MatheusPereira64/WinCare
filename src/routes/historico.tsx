@@ -13,6 +13,7 @@ import {
   WeeklyChart,
 } from "@/components/wincare/MaintenanceHistory";
 import { PageHeader } from "@/components/wincare/PageHeader";
+import { WeeklyReport } from "@/components/wincare/WeeklyReport";
 import { EmptyState, LoadingState, ResourceView } from "@/components/wincare/States";
 import { clearMaintenanceHistory, saveGeneratedFile } from "@/lib/wincare/bridge";
 import {
@@ -230,6 +231,8 @@ function HistoryContent({
         </div>
         <HistoryTotals summary={summary} health={history.health} now={now} />
       </section>
+
+      <WeeklyReport history={history} now={now} />
 
       <WeeklyChart weeks={weeks} />
 

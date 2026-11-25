@@ -53,6 +53,9 @@ const PROTECTED_PROCESSES = new Set(
     "searchhost",
     "taskhostw",
     "runtimebroker",
+    // Windows Update no meio da instalação: encerrar pode corromper a atualização.
+    "tiworker",
+    "trustedinstaller",
   ].map((n) => n.toLowerCase()),
 );
 

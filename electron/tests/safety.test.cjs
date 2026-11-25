@@ -206,11 +206,11 @@ test("argumento de rotina só aceita rotinas conhecidas", () => {
 test("configuração de agendamento é normalizada", () => {
   assert.deepEqual(
     normalizeConfig({ frequency: "monthly", monthDay: 31, weekDay: 9, time: "25:00" }),
-    { frequency: "monthly", weekDay: 0, monthDay: 1, time: "12:00" },
+    { frequency: "monthly", weekDay: 0, monthDay: 1, time: "12:00", includeInstallers: false },
   );
   assert.deepEqual(
     normalizeConfig({ frequency: "weekly", weekDay: 3, monthDay: 15, time: "22:30" }),
-    { frequency: "weekly", weekDay: 3, monthDay: 15, time: "22:30" },
+    { frequency: "weekly", weekDay: 3, monthDay: 15, time: "22:30", includeInstallers: false },
   );
 });
 

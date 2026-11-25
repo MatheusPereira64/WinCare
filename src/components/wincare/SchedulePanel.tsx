@@ -10,6 +10,7 @@ import {
   Save,
   ShieldCheck,
   XCircle,
+  PackageOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ import { invalidateSystemData } from "@/lib/wincare/systemData";
 import { TONE_CALLOUT } from "@/lib/wincare/tone";
 import { useResource } from "@/lib/wincare/useResource";
 import { ChoiceChips } from "./ChoiceChips";
+import { SettingSwitch } from "./Preferences";
 import { PageHeader } from "./PageHeader";
 import { ListPanel, Panel, PanelHeader } from "./Panel";
 import { EmptyState, LoadingState, ResourceView } from "./States";
@@ -285,6 +287,17 @@ function ScheduleCard({
           />
         </Field>
       </div>
+
+      {entry.job === "cleanup" && (
+        <SettingSwitch
+          icon={PackageOpen}
+          label="Incluir instaladores esquecidos"
+          description="Instaladores (.exe, .msi) em Downloads e na Área de Trabalho há mais de 30 dias vão para a Lixeira — dá para recuperar de lá."
+          checked={!!config.includeInstallers}
+          disabled={busy}
+          onCheckedChange={(includeInstallers) => setConfig((c) => ({ ...c, includeInstallers }))}
+        />
+      )}
 
       {entry.stale && (
         <p

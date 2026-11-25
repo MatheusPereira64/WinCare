@@ -28,23 +28,68 @@ test("espera o processo antigo fechar antes de seguir", async () => {
   assert.ok(Date.now() - started >= 1000, "não deveria seguir antes de o processo fechar");
 });
 
-test("copia a versão nova por cima da antiga e registra no log", async () => {
+/** Instalação "antiga" (1.2.0) e versão "nova" (1.2.1) em pastas temporárias. */
+function makeVersions() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "wincare-apply-test-"));
   const source = path.join(base, "novo");
   const install = path.join(base, "instalado");
   fs.mkdirSync(path.join(source, "resources"), { recursive: true });
   fs.mkdirSync(path.join(install, "resources"), { recursive: true });
   fs.writeFileSync(path.join(source, "resources", "versao.txt"), "1.2.1");
+  fs.writeFileSync(path.join(source, "so-na-nova.txt"), "novo");
   fs.writeFileSync(path.join(install, "resources", "versao.txt"), "1.2.0");
   fs.writeFileSync(path.join(install, "config-local.txt"), "fica");
-  const logFile = path.join(base, "log.txt");
+  return { base, source, install, logFile: path.join(base, "log.txt") };
+}
 
-  // pid 0 = processo antigo já fechado; o WinCare.exe de teste não existe (não abre nada).
-  const code = await runApply({ installDir: install, pid: 0, logFile }, source);
+const okArg = (args) => args.find((a) => a.startsWith("--update-ok-file="))?.split("=")[1];
 
+test("copia a versão nova e conclui quando ela avisa que abriu", async () => {
+  const v = makeVersions();
+  const launched = [];
+  // A "versão nova" confirma que abriu escrevendo o arquivo de sinal.
+  const launch = (exe, cwd, args) => {
+    launched.push(args);
+    const ok = okArg(args);
+    if (ok) setTimeout(() => fs.writeFileSync(ok, "1.2.1"), 200);
+    return 0;
+  };
+  const code = await runApply(
+    { installDir: v.install, pid: 0, logFile: v.logFile, launch, okWaitMs: 5000 },
+    v.source,
+  );
   assert.equal(code, 0);
-  assert.equal(fs.readFileSync(path.join(install, "resources", "versao.txt"), "utf8"), "1.2.1");
-  assert.equal(fs.readFileSync(path.join(install, "config-local.txt"), "utf8"), "fica");
-  assert.match(fs.readFileSync(logFile, "utf8"), /Arquivos copiados/);
-  fs.rmSync(base, { recursive: true, force: true });
+  assert.equal(fs.readFileSync(path.join(v.install, "resources", "versao.txt"), "utf8"), "1.2.1");
+  assert.equal(fs.readFileSync(path.join(v.install, "config-local.txt"), "utf8"), "fica");
+  assert.equal(launched.length, 1);
+  assert.match(fs.readFileSync(v.logFile, "utf8"), /Atualização concluída/);
+  fs.rmSync(v.base, { recursive: true, force: true });
+});
+
+test("volta para a versão anterior se a nova não abrir", async () => {
+  const v = makeVersions();
+  const launched = [];
+  const launch = (exe, cwd, args) => {
+    launched.push(args);
+    return 0; // nunca escreve o sinal: a versão nova "travou"
+  };
+  const code = await runApply(
+    {
+      installDir: v.install,
+      pid: 0,
+      logFile: v.logFile,
+      launch,
+      okWaitMs: 800,
+      newVersion: "1.2.1",
+    },
+    v.source,
+  );
+  assert.equal(code, 1);
+  assert.equal(fs.readFileSync(path.join(v.install, "resources", "versao.txt"), "utf8"), "1.2.0");
+  assert.equal(fs.existsSync(path.join(v.install, "so-na-nova.txt")), false);
+  assert.equal(fs.readFileSync(path.join(v.install, "config-local.txt"), "utf8"), "fica");
+  // Reabre a anterior avisando qual versão falhou.
+  assert.deepEqual(launched[1], ["--update-rolled-back=1.2.1"]);
+  assert.match(fs.readFileSync(v.logFile, "utf8"), /Versão anterior restaurada/);
+  fs.rmSync(v.base, { recursive: true, force: true });
 });
