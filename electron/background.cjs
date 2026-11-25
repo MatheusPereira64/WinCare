@@ -60,6 +60,8 @@ const DEFAULT_SETTINGS = {
   snoozeUntil: 0,
   trayHintShown: false,
   lastNotificationAt: 0,
+  /** Verificação de versão nova com o app aberto (espelha "Verificar atualizações ao abrir"). */
+  updates: { enabled: true, notifiedVersion: "" },
   /** Estado de cada alerta — persiste para não repetir aviso a cada reinício. */
   alerts: {},
 };
@@ -94,6 +96,13 @@ function sanitize(raw) {
   out.snoozeUntil = num(raw.snoozeUntil);
   out.lastNotificationAt = num(raw.lastNotificationAt);
   out.trayHintShown = raw.trayHintShown === true;
+  if (raw.updates && typeof raw.updates === "object") {
+    out.updates.enabled = raw.updates.enabled !== false;
+    out.updates.notifiedVersion =
+      typeof raw.updates.notifiedVersion === "string"
+        ? raw.updates.notifiedVersion.slice(0, 40)
+        : "";
+  }
   if (raw.alerts && typeof raw.alerts === "object") {
     for (const type of alerts.ALERT_TYPES) {
       const a = raw.alerts[type];
@@ -397,14 +406,15 @@ function windowInFocus() {
   return !!win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused();
 }
 
-function showNotification({ title, body, route }) {
+function showNotification({ title, body, route, onClick }) {
   if (!Notification.isSupported()) return false;
   const notification = new Notification({ title, body, icon: deps.iconPath || undefined });
   liveNotifications.add(notification);
   const release = () => liveNotifications.delete(notification);
   notification.on("click", () => {
     release();
-    deps.openApp({ to: route });
+    if (onClick) onClick();
+    else deps.openApp({ to: route });
   });
   notification.on("close", release);
   notification.show();
@@ -635,6 +645,7 @@ function emitChanged() {
 function updateSettings(patch = {}) {
   if (typeof patch.closeToTray === "boolean") settings.closeToTray = patch.closeToTray;
   if (typeof patch.openAtLogin === "boolean") setOpenAtLogin(patch.openAtLogin);
+  if (typeof patch.checkUpdates === "boolean") settings.updates.enabled = patch.checkUpdates;
   let restart = false;
   if (
     typeof patch.monitorEnabled === "boolean" &&
@@ -693,6 +704,8 @@ function registerIpc() {
  * @param {boolean} options.launchedHidden
  * @param {string} [options.appId] AppUserModelID (nome e ícone das notificações)
  * @param {() => ({ at: number, info: object } | null)} [options.getRecentSystemInfo]
+ * @param {() => Promise<object>} [options.checkForUpdate] consulta o GitHub (updater.cjs)
+ * @param {(info: object) => void} [options.promptUpdate] abre o app no aviso de atualização
  * @param {(bounds: Electron.Rectangle) => void} [options.onTrayClick]
  * @param {() => void} [options.onTrayDoubleClick]
  */
@@ -704,6 +717,61 @@ function initBackground(options) {
   ensureNotificationIdentity();
   createTray();
   startMonitor();
+  startUpdateWatch();
+}
+
+/* ------------------------------ Versão nova ------------------------------ */
+
+/** Com o app aberto (inclusive só na bandeja), procura versão nova de tempos em tempos. */
+const UPDATE_FIRST_CHECK_MS = 30 * 60_000;
+const UPDATE_EVERY_MS = 6 * 60 * 60_000;
+let updateTimers = [];
+
+function startUpdateWatch() {
+  if (!deps.checkForUpdate) return;
+  stopUpdateWatch();
+  updateTimers = [
+    setTimeout(() => void checkUpdateInBackground(), UPDATE_FIRST_CHECK_MS),
+    setInterval(() => void checkUpdateInBackground(), UPDATE_EVERY_MS),
+  ];
+}
+
+function stopUpdateWatch() {
+  for (const t of updateTimers) {
+    clearTimeout(t);
+    clearInterval(t);
+  }
+  updateTimers = [];
+}
+
+/**
+ * Avisa uma vez por versão: com a janela em foco abre o aviso dentro do app;
+ * senão, notificação do Windows (clique → abre o app no aviso de atualização).
+ */
+async function checkUpdateInBackground() {
+  if (!settings.updates.enabled) return;
+  if (settings.snoozeUntil > Date.now()) return;
+  let info;
+  try {
+    info = await deps.checkForUpdate();
+  } catch (error) {
+    logger.warn("updater", "Verificação periódica", error instanceof Error ? error.message : error);
+    return;
+  }
+  if (!info?.ok || !info.updateAvailable || !info.latestVersion) return;
+  if (settings.updates.notifiedVersion === info.latestVersion) return;
+  settings.updates.notifiedVersion = info.latestVersion;
+  saveSettings();
+  logger.log("updater", "Versão nova encontrada com o app aberto", { version: info.latestVersion });
+  if (windowInFocus()) {
+    deps.promptUpdate(info);
+    return;
+  }
+  showNotification({
+    title: `WinCare ${info.latestVersion} disponível`,
+    body: "Clique para ver o que mudou e atualizar. Leva menos de um minuto.",
+    onClick: () => deps.promptUpdate(info),
+  });
 }
 
 /** Fechar a janela só esconde: com a opção ligada ou quando o app abriu com o Windows. */
@@ -727,6 +795,7 @@ function setPendingCommand(command) {
 
 function disposeBackground() {
   stopMonitor();
+  stopUpdateWatch();
   if (tray && !tray.isDestroyed()) tray.destroy();
   tray = null;
 }

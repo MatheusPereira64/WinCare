@@ -25,6 +25,7 @@ const { enrichSystemInfo } = require("./system-metrics.cjs");
 const { isWindowsAdmin, psFileJson } = require("./powershell.cjs");
 const { registerNativeActions } = require("./native-actions.cjs");
 const { parseJobArg, resolveSelfLaunch, runScheduledJob } = require("./scheduler.cjs");
+const { parseApplyArgs, runApply } = require("./update-apply.cjs");
 const { optimizeMemory } = require("./memory-optimizer.cjs");
 const history = require("./maintenance-history.cjs");
 const background = require("./background.cjs");
@@ -89,22 +90,36 @@ if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
 
+/**
+ * Atualização: este é o WinCare.exe novo (na pasta temporária) trocando os
+ * arquivos do app antigo. Sem janela, sem bandeja e sem trava de instância única.
+ */
+const applyUpdate = parseApplyArgs(process.argv);
+if (applyUpdate) {
+  app.disableHardwareAcceleration();
+  app.whenReady().then(async () => {
+    const code = await runApply(applyUpdate, path.dirname(process.execPath));
+    app.exit(code);
+  });
+}
+
 /** Rotina do Agendador de Tarefas: roda sem janela e em paralelo a uma instância aberta. */
-const scheduledJob = parseJobArg(process.argv);
+const scheduledJob = !applyUpdate && parseJobArg(process.argv);
 if (scheduledJob) {
   app.setPath("userData", path.join(app.getPath("userData"), "scheduled-runner"));
   app.disableHardwareAcceleration();
 }
 
 /** Aberto pela entrada "Abrir com o Windows": começa só na bandeja, sem janela. */
-const launchedHidden = !scheduledJob && process.argv.includes(background.HIDDEN_ARG);
+const launchedHidden =
+  !applyUpdate && !scheduledJob && process.argv.includes(background.HIDDEN_ARG);
 /** Sair de verdade (menu, bandeja, atualização): o fechar da janela não esconde. */
 let isQuitting = false;
 
-const hasSingleInstanceLock = !scheduledJob && app.requestSingleInstanceLock();
-if (!scheduledJob && !hasSingleInstanceLock) {
+const hasSingleInstanceLock = !applyUpdate && !scheduledJob && app.requestSingleInstanceLock();
+if (!applyUpdate && !scheduledJob && !hasSingleInstanceLock) {
   app.quit();
-} else if (!scheduledJob) {
+} else if (hasSingleInstanceLock) {
   // Abrir o WinCare de novo (atalho, .exe) mostra a janela que está na bandeja.
   app.on("second-instance", () => openApp({}));
 }
@@ -287,6 +302,22 @@ function fixShortcutIcons() {
       /* atalho de outro app ou sem permissão: ignora */
     }
   }
+}
+
+/**
+ * Mostra o aviso "atualização disponível" no app (abrindo a janela se ela
+ * estava só na bandeja). A janela recém-criada recebe o aviso depois de carregar.
+ */
+function showUpdatePrompt(info) {
+  openApp({});
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  const send = () => {
+    if (!win.isDestroyed()) win.webContents.send("wincare:updateAvailable", info);
+  };
+  if (win.webContents.isLoading())
+    win.webContents.once("did-finish-load", () => setTimeout(send, 1500));
+  else send();
 }
 
 function resolveAppIcon() {
@@ -501,6 +532,8 @@ if (scheduledJob) {
       launchedHidden,
       appId: APP_ID,
       getRecentSystemInfo: () => lastSystemInfo,
+      checkForUpdate: () => updater.checkForUpdate(),
+      promptUpdate: showUpdatePrompt,
       onTrayClick: (bounds) => togglePanel(bounds),
       onTrayDoubleClick: () => {
         hidePanel();

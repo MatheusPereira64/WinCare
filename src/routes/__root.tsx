@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { actions, hydrateStore, useStore } from "@/lib/wincare/store";
 import { hydrateIntelligence } from "@/lib/wincare/intelligenceStore";
-import { isNative } from "@/lib/wincare/bridge";
+import { getNative, isNative } from "@/lib/wincare/bridge";
 import { unlockUi } from "@/lib/wincare/unlockUi";
 import { useAdmin } from "@/lib/wincare/useAdmin";
 import { useAppUpdater } from "@/lib/wincare/useUpdate";
@@ -269,6 +269,12 @@ function StartupUpdateCheck() {
   const onboardingDone = useStore((s) => s.onboardingDone);
   const { version, info, applying, progress, promptOpen, apply, openReleasePage, dismissPrompt } =
     useAppUpdater({ autoCheck: autoCheckUpdates, promptOnAvailable: true });
+
+  // O processo principal também procura versão nova com o app aberto (bandeja):
+  // segue a mesma preferência.
+  useEffect(() => {
+    void getNative()?.setBackgroundSettings?.({ checkUpdates: autoCheckUpdates });
+  }, [autoCheckUpdates]);
 
   const handleConfirm = () => {
     if (!info?.canAutoUpdate) {

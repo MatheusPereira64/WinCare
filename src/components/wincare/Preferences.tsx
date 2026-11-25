@@ -112,7 +112,7 @@ export function PreferenceSwitches({ keys }: { keys: PreferenceKey[] }) {
       icon: Download,
       label: "Verificar atualizações ao abrir",
       description:
-        "Ao abrir o WinCare, confere no GitHub se há uma versão mais nova e avisa em uma janela. É a única consulta automática à internet.",
+        "Ao abrir o WinCare (e a cada 6 horas com ele aberto, inclusive na bandeja), confere no GitHub se há uma versão mais nova e avisa. É a única consulta automática à internet.",
       checked: autoCheckUpdates,
       onCheckedChange: actions.setAutoCheckUpdates,
     },

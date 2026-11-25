@@ -4,8 +4,10 @@
  * Fluxo de apply:
  * 1) Baixa WinCare-Windows-x64.zip
  * 2) Extrai em %TEMP%
- * 3) Gera um .cmd que espera o processo atual encerrar, substitui os arquivos
- *    e reabre o WinCare.exe
+ * 3) Abre o WinCare.exe NOVO (da pasta extraída) com --apply-update: ele espera
+ *    este processo fechar, copia os arquivos e reabre o app (update-apply.cjs).
+ *    Sem .cmd: o script antigo abria janelas de console e às vezes copiava
+ *    antes do app fechar, deixando a versão antiga.
  * 4) Encerra o app
  */
 const { app, net } = require("electron");
@@ -17,6 +19,7 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 const logger = require("./logger.cjs");
+const { buildApplyArgs } = require("./update-apply.cjs");
 
 const GITHUB_OWNER = "MatheusPereira64";
 const GITHUB_REPO = "WinCare";
@@ -344,39 +347,6 @@ async function findExtractedRoot(extractDir) {
   throw new Error("WinCare.exe não encontrado no ZIP baixado.");
 }
 
-function writeApplyScript({ installDir, sourceDir, exePath, pid }) {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const batFile = path.join(os.tmpdir(), `wincare-apply-update-${id}.cmd`);
-  const logFile = path.join(os.tmpdir(), `wincare-apply-update-${id}.log`);
-
-  const bat = [
-    "@echo off",
-    `set LOG="${logFile}"`,
-    "echo [WinCare] Aguardando o aplicativo encerrar... > %LOG%",
-    `:wait`,
-    `tasklist /FI "PID eq ${pid}" 2>NUL | find "${pid}" >NUL`,
-    "if not errorlevel 1 (",
-    "  timeout /t 1 /nobreak >NUL",
-    "  goto wait",
-    ")",
-    "echo [WinCare] Copiando arquivos... >> %LOG%",
-    `robocopy "${sourceDir}" "${installDir}" /E /IS /IT /R:2 /W:1 /NFL /NDL /NJH /NJS /NP >> %LOG% 2>&1`,
-    "set RC=%ERRORLEVEL%",
-    "if %RC% GEQ 8 (",
-    "  echo [WinCare] Falha ao copiar arquivos (robocopy %RC%). >> %LOG%",
-    "  exit /b %RC%",
-    ")",
-    "echo [WinCare] Reiniciando... >> %LOG%",
-    `start "" "${exePath}"`,
-    'del "%~f0" >nul 2>&1',
-    "exit /b 0",
-    "",
-  ].join("\r\n");
-
-  fs.writeFileSync(batFile, bat, "utf8");
-  return { batFile, logFile };
-}
-
 /**
  * Baixa o ZIP do latest release, extrai e agenda a substituição ao sair.
  * Só funciona no build portátil empacotado.
@@ -428,25 +398,23 @@ async function downloadAndApplyUpdate(onProgress) {
     const sourceDir = await findExtractedRoot(extractDir);
 
     const installDir = getInstallDir();
-    const exePath = path.join(installDir, "WinCare.exe");
-    const { batFile, logFile } = writeApplyScript({
-      installDir,
-      sourceDir,
-      exePath,
-      pid: process.pid,
-    });
+    const newExe = path.join(sourceDir, "WinCare.exe");
+    const logFile = path.join(os.tmpdir(), `wincare-apply-update-${Date.now()}.log`);
 
     onProgress?.({ phase: "apply", percent: 100 });
-    logger.log("updater", "Agenda de substituição criada", { batFile, logFile, installDir });
+    logger.log("updater", "Aplicando com o WinCare novo", { newExe, logFile, installDir });
 
-    const child = spawn("cmd.exe", ["/c", batFile], {
+    // Processo de janela (sem console). Ele espera este fechar antes de copiar.
+    const child = spawn(newExe, buildApplyArgs({ installDir, pid: process.pid, logFile }), {
+      cwd: sourceDir,
       detached: true,
       stdio: "ignore",
-      windowsHide: true,
     });
     child.unref();
 
     setTimeout(() => app.quit(), 400);
+    // Se algo segurar o encerramento, o app novo forçaria; melhor sair daqui mesmo.
+    setTimeout(() => app.exit(0), 8000);
 
     return {
       ok: true,

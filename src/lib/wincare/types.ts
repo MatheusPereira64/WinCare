@@ -353,6 +353,8 @@ export interface BackgroundSettingsPatch {
   openAtLogin?: boolean;
   monitorEnabled?: boolean;
   types?: Partial<Record<AlertType, boolean>>;
+  /** Procurar versão nova também com o app aberto (segue "Verificar atualizações ao abrir"). */
+  checkUpdates?: boolean;
 }
 
 /** Pedido vindo da bandeja ou do clique numa notificação. */
