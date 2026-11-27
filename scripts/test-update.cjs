@@ -6,6 +6,9 @@
  *      versão nova confirma que abriu.
  *   2) "versão nova quebrada": o app.asar da versão nova é corrompido; o
  *      aplicador precisa restaurar a anterior e reabri-la avisando.
+ *   3) "atualização pequena": o app instalado confere o manifesto do pacote,
+ *      descomprime o app.asar.gz e monta a versão nova com os próprios
+ *      arquivos (electron/update-delta.cjs) — só o download fica de fora.
  *
  * A instalação fica na pasta do projeto e a versão nova em %TEMP%: no CI do
  * GitHub (D: × C:) e aqui (F: × C:) a cópia atravessa unidades, o caso que
@@ -55,13 +58,13 @@ async function waitForLog(file, pattern, timeoutMs) {
   return false;
 }
 
-async function scenario(name, { breakNewVersion }) {
+async function scenario(name, { breakNewVersion = false, delta = false } = {}) {
   console.log(`\n== ${name}`);
   const install = path.join(WORK_INSTALL, name);
   const source = path.join(WORK_TEMP, name);
   copyDir(PACKAGE, install);
-  copyDir(PACKAGE, source);
-  fs.writeFileSync(path.join(source, "resources", "marcador-versao-nova.txt"), "nova");
+  if (delta) fs.rmSync(source, { recursive: true, force: true });
+  else copyDir(PACKAGE, source);
   if (breakNewVersion) {
     // A versão nova roda (o aplicador é ela mesma), mas não abre a janela.
     fs.writeFileSync(path.join(source, "resources", "versao-quebrada-teste.txt"), "1");
@@ -78,6 +81,40 @@ async function scenario(name, { breakNewVersion }) {
     },
   });
   await (await app.firstWindow()).waitForTimeout(3000);
+  if (delta) {
+    // Mesmo caminho do updater.tryDeltaUpdate, com os arquivos do pacote no lugar do download.
+    const plan = await app.evaluate(
+      async (_electron, { manifestFile, gzFile, sourceDir }) => {
+        const nodePath = process.mainModule.require("path");
+        const nodeFs = process.mainModule.require("fs");
+        const delta = process.mainModule.require("./update-delta.cjs");
+        const installDir = nodePath.dirname(process.execPath);
+        const manifest = JSON.parse(nodeFs.readFileSync(manifestFile, "utf8"));
+        const local = await delta.readLocalFiles(installDir, manifest);
+        const result = delta.planDelta(manifest, local, process.versions.electron);
+        if (!result.ok) return result;
+        nodeFs.mkdirSync(sourceDir, { recursive: true });
+        const newAsar = nodePath.join(nodePath.dirname(sourceDir), "app.asar.new");
+        await delta.unpackAsar(gzFile, newAsar, result.asar.sha256);
+        delta.buildStaging(installDir, sourceDir, newAsar, manifest);
+        return { ok: true };
+      },
+      {
+        manifestFile: path.join(ROOT, "electron-release", "WinCare-manifest.json"),
+        gzFile: path.join(ROOT, "electron-release", "WinCare-app.asar.gz"),
+        sourceDir: source,
+      },
+    );
+    if (!plan.ok) {
+      fail(`${name}: a atualização pequena foi recusada (${JSON.stringify(plan)}).`);
+      await app.close().catch(() => {});
+      return;
+    }
+    if (!fs.existsSync(path.join(source, "WinCare.exe"))) {
+      fail(`${name}: a versão nova montada não tem WinCare.exe.`);
+    }
+  }
+  fs.writeFileSync(path.join(source, "resources", "marcador-versao-nova.txt"), "nova");
   // O mesmo código do botão Atualizar (só sem o download do GitHub).
   const { logFile } = await app.evaluate((_electron, sourceDir) => {
     const updater = process.mainModule.require("./updater.cjs");
@@ -125,6 +162,7 @@ async function scenario(name, { breakNewVersion }) {
   try {
     await scenario("versao-nova-abre", { breakNewVersion: false });
     await scenario("versao-nova-quebrada", { breakNewVersion: true });
+    await scenario("atualizacao-pequena", { delta: true });
   } finally {
     killFrom(WORK_INSTALL);
     killFrom(WORK_TEMP);

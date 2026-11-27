@@ -34,6 +34,7 @@ import { CheckboxCard } from "./CheckboxCard";
 import { ChoiceChips } from "./ChoiceChips";
 import { ModalShell } from "./ConfirmModal";
 import { ListPanel, Panel } from "./Panel";
+import { ProgramUpdates } from "./ProgramUpdates";
 import { EmptyState, LoadingState, ResourceView } from "./States";
 import { StatusBadge } from "./StatusBadge";
 import { PageHeader } from "./PageHeader";
@@ -212,6 +213,8 @@ export function ProgramUninstaller() {
           </>
         }
       />
+
+      <ProgramUpdates />
 
       <Panel padding="sm" className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">

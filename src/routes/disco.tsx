@@ -3,6 +3,7 @@ import { HardDrive, Thermometer } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
 import { DiskDashboard } from "@/components/wincare/DiskDashboard";
+import { DiskHealthPanel } from "@/components/wincare/DiskHealthPanel";
 import { DiskSpaceAnalyzer } from "@/components/wincare/DiskSpaceAnalyzer";
 import { IconChip } from "@/components/wincare/IconChip";
 import { Panel } from "@/components/wincare/Panel";
@@ -45,6 +46,8 @@ function DiskPage() {
         />
 
         <DiskDashboard />
+
+        <DiskHealthPanel />
 
         {loading ? (
           <LoadingState label="Lendo as unidades de disco…" variant="block" />

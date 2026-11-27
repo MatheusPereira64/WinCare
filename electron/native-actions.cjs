@@ -47,6 +47,8 @@ const {
   speedTest,
 } = require("./system-tools.cjs");
 const { exportTable } = require("./exporter.cjs");
+const { listProgramUpdates, updateProgram } = require("./program-updates.cjs");
+const { diskHealth } = require("./disk-health.cjs");
 
 const plural = (n, one, many) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
@@ -101,6 +103,17 @@ const HISTORY = {
       freedBytes: out.freedBytes,
       // Parte removida já liberou espaço; as falhas ficam no detalhe.
       ok: true,
+    });
+  },
+  programUpdate(out) {
+    if (!out?.name || out.reason === "unknown-id" || out.reason === "busy") return;
+    history.recordEvent({
+      kind: "optimize",
+      action: "program-update",
+      title: out.ok ? `${out.name} atualizado` : `${out.name} não foi atualizado`,
+      subject: out.name,
+      detail: out.ok ? (out.version ? `Versão ${out.version}` : undefined) : out.message,
+      ok: !!out.ok,
     });
   },
   restorePoint(out) {
@@ -207,6 +220,9 @@ function registerNativeActions() {
   handle("wincare:diskBreakdown", async (p) => diskBreakdown(p));
 
   // Processos, proteção, extensões, rede e Bluetooth.
+  handle("wincare:diskHealth", (p) => diskHealth({ details: p.details === true }));
+  handle("wincare:programUpdates", () => listProgramUpdates());
+  handle("wincare:updateProgram", withHistory(updateProgram, HISTORY.programUpdate));
   handle("wincare:processes", async () => ({ ok: true, items: await listProcesses() }));
   handle("wincare:endProcess", async (p) => endProcess(p));
   handle("wincare:securityStatus", () => securityStatus());

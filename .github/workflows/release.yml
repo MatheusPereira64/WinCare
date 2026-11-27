@@ -54,7 +54,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: WinCare-Windows-x64
-          path: electron-release/WinCare-Windows-x64.zip
+          path: |
+            electron-release/WinCare-Windows-x64.zip
+            electron-release/WinCare-manifest.json
+            electron-release/WinCare-app.asar.gz
           if-no-files-found: error
 
       - name: Resolve version
@@ -81,7 +84,11 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.ver.outputs.tag, '-') }}
           generate_release_notes: true
-          files: electron-release/WinCare-Windows-x64.zip
+          # Manifesto + app.asar comprimido: a atualização pequena do app (só o que mudou).
+          files: |
+            electron-release/WinCare-Windows-x64.zip
+            electron-release/WinCare-manifest.json
+            electron-release/WinCare-app.asar.gz
           body: |
             ## Baixar o WinCare para Windows
 

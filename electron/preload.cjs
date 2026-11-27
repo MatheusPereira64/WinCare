@@ -170,6 +170,9 @@ contextBridge.exposeInMainWorld("wincare", {
   exportTable: (payload) => ipcRenderer.invoke("wincare:exportTable", payload),
   diskBreakdown: (drive, refresh) =>
     ipcRenderer.invoke("wincare:diskBreakdown", { drive, refresh: !!refresh }),
+  diskHealth: (details) => ipcRenderer.invoke("wincare:diskHealth", { details: !!details }),
+  programUpdates: () => ipcRenderer.invoke("wincare:programUpdates"),
+  updateProgram: (id) => ipcRenderer.invoke("wincare:updateProgram", { id }),
   processes: () => ipcRenderer.invoke("wincare:processes"),
   endProcess: (pid) => ipcRenderer.invoke("wincare:endProcess", { pid }),
   securityStatus: () => ipcRenderer.invoke("wincare:securityStatus"),

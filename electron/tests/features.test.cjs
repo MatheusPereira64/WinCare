@@ -351,3 +351,82 @@ test("tempo de boot junta início, login e programas de inicialização", () => 
   });
   assert.equal(compareBoots(boots, null), null);
 });
+
+test("tabela do winget upgrade vira lista (cabeçalho traduzido, spinner e rodapé)", () => {
+  const { parseWingetUpgrade } = require("../program-updates.cjs");
+  const pad = (text, n) => text.padEnd(n);
+  const row = (name, id, version, available, source) =>
+    `${pad(name, 30)}${pad(id, 28)}${pad(version, 16)}${pad(available, 16)}${source}`;
+  const text = [
+    "   - \r   \\ \r",
+    `\r${row("Nome", "ID", "Versão", "Disponível", "Origem")}`,
+    "-".repeat(96),
+    row("Git", "Git.Git", "2.56.0.4", "2.56.1", "winget"),
+    row("7-Zip 23.01 (x64)", "7zip.7zip", "23.01", "24.09", "winget"),
+    row("Ubisoft Connect", "Ubisoft.Connect", "< 175.2.0", "175.2.0.13423", "winget"),
+    row("Nome muito compri…", "Fabricante.ProgramaCom…", "1.0", "2.0", "winget"),
+    row("CrystalDiskInfo 9.7.2", "XP8K4RGX25G3GM", "9.7.2", "9.9.5", "msstore"),
+    "42 atualizações disponíveis.",
+    "",
+    "Os pacotes a seguir têm uma atualização, mas exigem destino explícito:",
+    row("Nome", "ID", "Versão", "Disponível", "Origem"),
+    "-".repeat(96),
+    row("Fixado", "Fixado.App", "1.0", "2.0", "winget"),
+  ].join("\r\n");
+  const items = parseWingetUpgrade(text);
+  assert.deepEqual(
+    items.map((i) => i.id),
+    ["Git.Git", "7zip.7zip", "Ubisoft.Connect", "XP8K4RGX25G3GM"],
+  );
+  assert.deepEqual(items[0], {
+    id: "Git.Git",
+    name: "Git",
+    version: "2.56.0.4",
+    available: "2.56.1",
+    source: "winget",
+  });
+  assert.equal(items[2].version, "< 175.2.0");
+  assert.equal(items[3].source, "msstore");
+  assert.deepEqual(parseWingetUpgrade("Nenhuma atualização disponível."), []);
+  assert.deepEqual(parseWingetUpgrade(""), []);
+});
+
+test("saúde do disco: status do Windows, desgaste, temperatura e erros", () => {
+  const { assessDisk, mergeDetail, normalizeBasic } = require("../disk-health.cjs");
+  const [ssd, hdd] = normalizeBasic([
+    {
+      id: 0,
+      model: " Samsung SSD ",
+      media: "SSD",
+      bus: "NVMe",
+      health: "Healthy",
+      sizeBytes: 1e12,
+      letters: ["C:", "lixo"],
+    },
+    { id: "1", model: "WDC", media: "HDD", bus: "SATA", health: "Healthy", letters: "D:" },
+  ]);
+  assert.equal(ssd.model, "Samsung SSD");
+  assert.deepEqual(ssd.letters, ["C:"]);
+  assert.deepEqual(hdd.letters, ["D:"]);
+  assert.equal(assessDisk(ssd).level, "good");
+  assert.equal(assessDisk({ ...ssd, health: "Warning" }).level, "warn");
+  assert.equal(assessDisk({ ...ssd, health: "Unhealthy" }).level, "bad");
+  assert.equal(assessDisk({ ...ssd, health: "Unknown" }).level, "unknown");
+  assert.equal(assessDisk(ssd, { predictFailure: true }).level, "bad");
+
+  const [withSmart, hddSmart] = mergeDetail([ssd, hdd], {
+    ok: true,
+    counters: [
+      { id: "0", temperature: 74, wear: 75, powerOnHours: 9000, readErrors: 0, writeErrors: 0 },
+      { id: "1", temperature: 0, powerOnHours: 41000, readErrors: 12, writeErrors: 0 },
+    ],
+  });
+  const ssdResult = assessDisk(withSmart);
+  assert.equal(ssdResult.level, "warn");
+  assert.equal(ssdResult.notes.length, 2); // 75% de desgaste + 74 °C
+  assert.equal(hddSmart.smart.temperature, null); // 0 = sem sensor
+  const hddResult = assessDisk(hddSmart);
+  assert.equal(hddResult.level, "bad"); // 12 erros não corrigidos
+  assert.ok(hddResult.notes.some((n) => /40 mil horas/.test(n.text)));
+  assert.equal(assessDisk({ ...withSmart, smart: { ...withSmart.smart, wear: 95 } }).level, "bad");
+});

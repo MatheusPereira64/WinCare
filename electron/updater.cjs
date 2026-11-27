@@ -20,6 +20,14 @@ const os = require("os");
 const path = require("path");
 const logger = require("./logger.cjs");
 const { buildApplyArgs } = require("./update-apply.cjs");
+const {
+  ASAR_ASSET,
+  MANIFEST_ASSET,
+  buildStaging,
+  planDelta,
+  readLocalFiles,
+  unpackAsar,
+} = require("./update-delta.cjs");
 
 const GITHUB_OWNER = "MatheusPereira64";
 const GITHUB_REPO = "WinCare";
@@ -122,9 +130,9 @@ async function githubJson(apiPath) {
   });
 }
 
-function pickAsset(release) {
+function pickAsset(release, name = ASSET_NAME) {
   const assets = Array.isArray(release?.assets) ? release.assets : [];
-  return assets.find((a) => a && a.name === ASSET_NAME) || null;
+  return assets.find((a) => a && a.name === name) || null;
 }
 
 /** Escolhe a tag SemVer mais nova (ex.: v1.0.5 > v1.0.4). */
@@ -138,6 +146,8 @@ function pickBestTag(list) {
 function releaseToInfo(release, currentVersion) {
   const latestVersion = stripVersion(release.tag_name);
   const asset = pickAsset(release);
+  const manifest = pickAsset(release, MANIFEST_ASSET);
+  const asarGz = pickAsset(release, ASAR_ASSET);
   return {
     ok: true,
     currentVersion,
@@ -149,6 +159,10 @@ function releaseToInfo(release, currentVersion) {
     downloadUrl: asset?.browser_download_url || null,
     assetName: asset?.name || null,
     assetSize: asset?.size || null,
+    // Atualização pequena (só o app.asar), quando o release publica os dois arquivos.
+    manifestUrl: manifest?.browser_download_url || null,
+    deltaUrl: asarGz?.browser_download_url || null,
+    deltaSize: asarGz?.size || null,
     canAutoUpdate: isReleaseBuild() && !!asset?.browser_download_url,
     packaged: isReleaseBuild(),
   };
@@ -373,6 +387,37 @@ function launchApply(sourceDir) {
 }
 
 /**
+ * Atualização pequena: se a instalação bate com o manifesto do release (mesmo
+ * Electron, mesmos arquivos), baixa só o app.asar comprimido e monta a versão
+ * nova em `workDir/app`. Devolve a pasta, ou null para cair no ZIP completo.
+ */
+async function tryDeltaUpdate(info, workDir, onProgress) {
+  if (!info.manifestUrl || !info.deltaUrl) return null;
+  const manifestFile = path.join(workDir, MANIFEST_ASSET);
+  await downloadFile(info.manifestUrl, manifestFile);
+  const manifest = JSON.parse(await fsp.readFile(manifestFile, "utf8"));
+  if (manifest.version !== info.latestVersion) {
+    logger.warn("updater", "Manifesto de outra versão; usando o ZIP", manifest.version);
+    return null;
+  }
+  const installDir = getInstallDir();
+  onProgress?.({ phase: "check", percent: 0 });
+  const local = await readLocalFiles(installDir, manifest);
+  const plan = planDelta(manifest, local, process.versions.electron);
+  if (!plan.ok) {
+    logger.log("updater", "Atualização pequena não serve; usando o ZIP", plan);
+    return null;
+  }
+  logger.log("updater", "Atualização pequena", { url: info.deltaUrl, size: info.deltaSize });
+  const gzFile = path.join(workDir, ASAR_ASSET);
+  await downloadFile(info.deltaUrl, gzFile, onProgress);
+  onProgress?.({ phase: "extract", percent: 0 });
+  const newAsar = path.join(workDir, "app.asar.new");
+  await unpackAsar(gzFile, newAsar, plan.asar.sha256);
+  return buildStaging(installDir, path.join(workDir, "app"), newAsar, manifest);
+}
+
+/**
  * Baixa o ZIP do latest release, extrai e agenda a substituição ao sair.
  * Só funciona no build portátil empacotado.
  */
@@ -412,15 +457,25 @@ async function downloadAndApplyUpdate(onProgress) {
 
   try {
     onProgress?.({ phase: "download", percent: 1 });
-    logger.log("updater", "Baixando release", {
-      version: info.latestVersion,
-      url: info.downloadUrl,
+    let sourceDir = await tryDeltaUpdate(info, workDir, onProgress).catch((error) => {
+      logger.warn(
+        "updater",
+        "Atualização pequena falhou; usando o ZIP",
+        error instanceof Error ? error.message : error,
+      );
+      return null;
     });
-    await downloadFile(info.downloadUrl, zipPath, onProgress);
+    if (!sourceDir) {
+      logger.log("updater", "Baixando release", {
+        version: info.latestVersion,
+        url: info.downloadUrl,
+      });
+      await downloadFile(info.downloadUrl, zipPath, onProgress);
 
-    onProgress?.({ phase: "extract", percent: 0 });
-    await expandZip(zipPath, extractDir);
-    const sourceDir = await findExtractedRoot(extractDir);
+      onProgress?.({ phase: "extract", percent: 0 });
+      await expandZip(zipPath, extractDir);
+      sourceDir = await findExtractedRoot(extractDir);
+    }
 
     onProgress?.({ phase: "apply", percent: 100 });
     const { logFile } = launchApply(sourceDir);
